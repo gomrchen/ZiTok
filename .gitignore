@@ -1,0 +1,65 @@
+# ZiTok 单仓库 .gitignore
+# 覆盖通用与 Go 后端；Flutter 规则由 frontend/.gitignore 管理
+
+# ----------------------
+# 通用临时/日志文件
+# ----------------------
+*.log
+logs/
+*.tmp
+tmp/
+*.swp
+*.swo
+*.bak
+*.orig
+*.rej
+
+# ---------
+# 操作系统文件
+# ---------
+.DS_Store
+Thumbs.db
+desktop.ini
+*.lnk
+
+# -------------
+# 编辑器/IDE
+# -------------
+.vscode/
+.idea/
+*.iml
+.history/
+*.code-workspace
+
+# --------------------
+# 机密与环境变量文件
+# --------------------
+.env
+.env.*
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+*.pem
+*.key
+*.crt
+
+# -----------
+# Go 后端
+# -----------
+backend/bin/
+backend/coverage/
+backend/**/*.cov
+backend/**/*.cover
+backend/**/*.coverprofile
+backend/**/*.lcov
+backend/go.work
+backend/go.work.sum
+backend/**/*.exe
+backend/**/*.dll
+backend/**/*.so
+backend/**/*.dylib
+backend/**/*.test
+backend/**/*.out
+
+# 前端 Flutter 客户端已有独立 .gitignore，这里不重复规则
