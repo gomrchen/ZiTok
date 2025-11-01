@@ -34,7 +34,7 @@ class VideoRepository {
       return videos;
     } catch (e) {
       AppLogger.error('获取推荐视频失败', e);
-      throw ApiException(
+      throw const ApiException(
         code: 'GET_RECOMMENDED_VIDEOS_FAILED',
         message: '获取推荐视频失败',
       );
@@ -64,7 +64,7 @@ class VideoRepository {
       return videos;
     } catch (e) {
       AppLogger.error('获取关注视频失败', e);
-      throw ApiException(
+      throw const ApiException(
         code: 'GET_FOLLOWING_VIDEOS_FAILED',
         message: '获取关注视频失败',
       );
@@ -83,7 +83,7 @@ class VideoRepository {
       return video;
     } catch (e) {
       AppLogger.error('获取视频详情失败', e);
-      throw ApiException(
+      throw const ApiException(
         code: 'GET_VIDEO_FAILED',
         message: '获取视频详情失败',
       );
@@ -127,7 +127,7 @@ class VideoRepository {
       return videos;
     } catch (e) {
       AppLogger.error('搜索视频失败', e);
-      throw ApiException(
+      throw const ApiException(
         code: 'SEARCH_VIDEOS_FAILED',
         message: '搜索视频失败',
       );
@@ -146,7 +146,7 @@ class VideoRepository {
       return success;
     } catch (e) {
       AppLogger.error('点赞视频失败', e);
-      throw ApiException(
+      throw const ApiException(
         code: 'LIKE_VIDEO_FAILED',
         message: '点赞失败',
       );
@@ -165,7 +165,7 @@ class VideoRepository {
       return success;
     } catch (e) {
       AppLogger.error('取消点赞视频失败', e);
-      throw ApiException(
+      throw const ApiException(
         code: 'UNLIKE_VIDEO_FAILED',
         message: '取消点赞失败',
       );
@@ -184,7 +184,7 @@ class VideoRepository {
       return success;
     } catch (e) {
       AppLogger.error('收藏视频失败', e);
-      throw ApiException(
+      throw const ApiException(
         code: 'FAVORITE_VIDEO_FAILED',
         message: '收藏失败',
       );
@@ -203,7 +203,7 @@ class VideoRepository {
       return success;
     } catch (e) {
       AppLogger.error('取消收藏视频失败', e);
-      throw ApiException(
+      throw const ApiException(
         code: 'UNFAVORITE_VIDEO_FAILED',
         message: '取消收藏失败',
       );
@@ -227,7 +227,7 @@ class VideoRepository {
       throw UnimplementedError('视频上传功能待实现');
     } catch (e) {
       AppLogger.error('上传视频失败', e);
-      throw ApiException(
+      throw const ApiException(
         code: 'UPLOAD_VIDEO_FAILED',
         message: '上传视频失败',
       );
@@ -246,7 +246,7 @@ class VideoRepository {
       return success;
     } catch (e) {
       AppLogger.error('删除视频失败', e);
-      throw ApiException(
+      throw const ApiException(
         code: 'DELETE_VIDEO_FAILED',
         message: '删除视频失败',
       );
@@ -269,7 +269,7 @@ class VideoRepository {
       return success;
     } catch (e) {
       AppLogger.error('举报视频失败', e);
-      throw ApiException(
+      throw const ApiException(
         code: 'REPORT_VIDEO_FAILED',
         message: '举报失败',
       );

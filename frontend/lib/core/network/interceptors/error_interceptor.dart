@@ -25,7 +25,7 @@ class ErrorInterceptor extends Interceptor {
     
     switch (err.type) {
       case DioExceptionType.connectionTimeout:
-        apiException = ApiException(
+        apiException = const ApiException(
           code: 'CONNECTION_TIMEOUT',
           message: '连接超时，请检查网络连接',
           statusCode: null,
@@ -33,7 +33,7 @@ class ErrorInterceptor extends Interceptor {
         break;
         
       case DioExceptionType.sendTimeout:
-        apiException = ApiException(
+        apiException = const ApiException(
           code: 'SEND_TIMEOUT',
           message: '请求发送超时',
           statusCode: null,
@@ -41,7 +41,7 @@ class ErrorInterceptor extends Interceptor {
         break;
         
       case DioExceptionType.receiveTimeout:
-        apiException = ApiException(
+        apiException = const ApiException(
           code: 'RECEIVE_TIMEOUT',
           message: '响应接收超时',
           statusCode: null,
@@ -69,7 +69,7 @@ class ErrorInterceptor extends Interceptor {
         break;
         
       case DioExceptionType.cancel:
-        apiException = ApiException(
+        apiException = const ApiException(
           code: 'REQUEST_CANCELLED',
           message: '请求已取消',
           statusCode: null,
@@ -77,7 +77,7 @@ class ErrorInterceptor extends Interceptor {
         break;
         
       case DioExceptionType.unknown:
-        apiException = ApiException(
+        apiException = const ApiException(
           code: 'NETWORK_ERROR',
           message: '网络连接异常，请检查网络设置',
           statusCode: null,

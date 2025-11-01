@@ -31,7 +31,7 @@ SafeMapValue SafeMap(Map<dynamic, dynamic>? map) {
 extension SafeMapExtension on SafeMapValue {
   SafeMapValue operator [](dynamic key) {
     if (_value is Map) {
-      final map = _value as Map;
+      final map = _value;
       return SafeMapValue(map[key]);
     }
     return SafeMapValue(null);

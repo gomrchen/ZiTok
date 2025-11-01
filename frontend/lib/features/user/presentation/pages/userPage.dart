@@ -1,4 +1,4 @@
-import 'package:frontend/pages/userDetailPage.dart';
+import 'package:frontend/features/user/presentation/pages/userDetailPage.dart';
 import 'package:frontend/shared/styles/style.dart';
 import 'package:frontend/shared/widgets/topToolRow.dart';
 import 'package:flutter/material.dart';
@@ -10,12 +10,12 @@ class UserPage extends StatefulWidget {
   final Function? onSwitch;
 
   const UserPage({
-    Key? key,
+    super.key,
     this.canPop = false,
     this.onPop,
     required this.isSelfPage,
     this.onSwitch,
-  }) : super(key: key);
+  });
 
   @override
   _UserPageState createState() => _UserPageState();
@@ -40,7 +40,7 @@ class _UserPageState extends State<UserPage> {
     );
     Widget avatar = Container(
       height: 120 + MediaQuery.of(context).padding.top,
-      padding: EdgeInsets.only(left: 18),
+      padding: const EdgeInsets.only(left: 18),
       alignment: Alignment.bottomLeft,
       child: OverflowBox(
         alignment: Alignment.bottomLeft,
@@ -49,7 +49,7 @@ class _UserPageState extends State<UserPage> {
         child: Container(
           height: 74,
           width: 74,
-          margin: EdgeInsets.only(bottom: 12),
+          margin: const EdgeInsets.only(bottom: 12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(44),
             color: Colors.orange,
@@ -68,7 +68,7 @@ class _UserPageState extends State<UserPage> {
       ),
     );
     Widget body = ListView(
-      physics: BouncingScrollPhysics(
+      physics: const BouncingScrollPhysics(
         parent: AlwaysScrollableScrollPhysics(),
       ),
       children: <Widget>[
@@ -83,12 +83,12 @@ class _UserPageState extends State<UserPage> {
           child: Column(
             children: <Widget>[
               Container(
-                padding: EdgeInsets.only(left: 18),
+                padding: const EdgeInsets.only(left: 18),
                 color: ColorPlate.back1,
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: <Widget>[
-                    Text(
+                    const Text(
                       '@用户名',
                       style: StandardTextStyle.big,
                     ),
@@ -100,7 +100,7 @@ class _UserPageState extends State<UserPage> {
                       ),
                     ),
                     Container(height: 10),
-                    Row(
+                    const Row(
                       children: <Widget>[
                         _UserTag(tag: '幽默'),
                         _UserTag(tag: '机智'),
@@ -114,11 +114,11 @@ class _UserPageState extends State<UserPage> {
               ),
               Container(
                 color: ColorPlate.back1,
-                padding: EdgeInsets.symmetric(
+                padding: const EdgeInsets.symmetric(
                   horizontal: 8,
                   vertical: 2,
                 ),
-                child: Row(
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.start,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: <Widget>[
@@ -130,7 +130,7 @@ class _UserPageState extends State<UserPage> {
               ),
               Container(
                 height: 10,
-                margin: EdgeInsets.symmetric(horizontal: 12),
+                margin: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
                   border: Border(
                     bottom: BorderSide(
@@ -139,14 +139,14 @@ class _UserPageState extends State<UserPage> {
                   ),
                 ),
               ),
-              _UserVideoTable(),
+              const _UserVideoTable(),
             ],
           ),
         ),
       ],
     );
     return Container(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           colors: <Color>[
@@ -159,14 +159,14 @@ class _UserPageState extends State<UserPage> {
         alignment: Alignment.topCenter,
         children: <Widget>[
           Container(
-            margin: EdgeInsets.only(top: 400),
+            margin: const EdgeInsets.only(top: 400),
             height: double.infinity,
             width: double.infinity,
             color: ColorPlate.back1,
           ),
           body,
           Container(
-            margin: EdgeInsets.only(top: 20),
+            margin: const EdgeInsets.only(top: 20),
             height: 62,
             child: TopToolRow(
               canPop: widget.canPop,
@@ -175,13 +175,13 @@ class _UserPageState extends State<UserPage> {
                 child: Container(
                   width: 30,
                   height: 30,
-                  margin: EdgeInsets.all(16),
+                  margin: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     color: Colors.black.withOpacity(0.36),
                     borderRadius: BorderRadius.circular(15),
                   ),
                   alignment: Alignment.center,
-                  child: Icon(
+                  child: const Icon(
                     Icons.more_horiz,
                     size: 24,
                   ),
@@ -202,28 +202,28 @@ class _UserPageState extends State<UserPage> {
 
 class _UserRightButton extends StatelessWidget {
   const _UserRightButton({
-    Key? key,
+    super.key,
     required this.title,
-  }) : super(key: key);
+  });
 
   final String title;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(
+      padding: const EdgeInsets.symmetric(
         vertical: 6,
         horizontal: 20,
       ),
-      margin: EdgeInsets.all(8),
+      margin: const EdgeInsets.all(8),
       alignment: Alignment.center,
-      child: Text(
-        title,
-        style: TextStyle(color: ColorPlate.orange),
-      ),
       decoration: BoxDecoration(
         border: Border.all(color: ColorPlate.orange),
         borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        title,
+        style: TextStyle(color: ColorPlate.orange),
       ),
     );
   }
@@ -233,15 +233,15 @@ class _UserTag extends StatelessWidget {
   final String? tag;
 
   const _UserTag({
-    Key? key,
+    super.key,
     this.tag,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      margin: EdgeInsets.symmetric(horizontal: 4),
-      padding: EdgeInsets.symmetric(
+      margin: const EdgeInsets.symmetric(horizontal: 4),
+      padding: const EdgeInsets.symmetric(
         vertical: 2,
         horizontal: 4,
       ),
@@ -261,8 +261,8 @@ class _UserTag extends StatelessWidget {
 
 class _UserVideoTable extends StatelessWidget {
   const _UserVideoTable({
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -270,10 +270,10 @@ class _UserVideoTable extends StatelessWidget {
       children: <Widget>[
         Container(
           color: ColorPlate.back1,
-          padding: EdgeInsets.symmetric(
+          padding: const EdgeInsets.symmetric(
             vertical: 12,
           ),
-          child: Row(
+          child: const Row(
             mainAxisAlignment: MainAxisAlignment.center,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: <Widget>[
@@ -284,7 +284,7 @@ class _UserVideoTable extends StatelessWidget {
           ),
         ),
         Container(
-          child: Row(
+          child: const Row(
             children: <Widget>[
               _SmallVideo(),
               _SmallVideo(),
@@ -293,7 +293,7 @@ class _UserVideoTable extends StatelessWidget {
           ),
         ),
         Container(
-          child: Row(
+          child: const Row(
             children: <Widget>[
               _SmallVideo(),
               _SmallVideo(),
@@ -302,7 +302,7 @@ class _UserVideoTable extends StatelessWidget {
           ),
         ),
         Container(
-          child: Row(
+          child: const Row(
             children: <Widget>[
               _SmallVideo(),
               _SmallVideo(),
@@ -311,7 +311,7 @@ class _UserVideoTable extends StatelessWidget {
           ),
         ),
         Container(
-          child: Row(
+          child: const Row(
             children: <Widget>[
               _SmallVideo(),
               _SmallVideo(),
@@ -320,7 +320,7 @@ class _UserVideoTable extends StatelessWidget {
           ),
         ),
         Container(
-          child: Row(
+          child: const Row(
             children: <Widget>[
               _SmallVideo(),
               _SmallVideo(),
@@ -329,7 +329,7 @@ class _UserVideoTable extends StatelessWidget {
           ),
         ),
         Container(
-          child: Row(
+          child: const Row(
             children: <Widget>[
               _SmallVideo(),
               _SmallVideo(),
@@ -338,7 +338,7 @@ class _UserVideoTable extends StatelessWidget {
           ),
         ),
         Container(
-          child: Row(
+          child: const Row(
             children: <Widget>[
               _SmallVideo(),
               _SmallVideo(),
@@ -347,7 +347,7 @@ class _UserVideoTable extends StatelessWidget {
           ),
         ),
         Container(
-          child: Row(
+          child: const Row(
             children: <Widget>[
               _SmallVideo(),
               _SmallVideo(),
@@ -362,8 +362,8 @@ class _UserVideoTable extends StatelessWidget {
 
 class _SmallVideo extends StatelessWidget {
   const _SmallVideo({
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -398,9 +398,9 @@ class _PointSelectTextButton extends StatelessWidget {
   const _PointSelectTextButton(
     this.isSelect,
     this.title, {
-    Key? key,
+    super.key,
     this.onTap,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -419,7 +419,7 @@ class _PointSelectTextButton extends StatelessWidget {
                 )
               : Container(),
           Container(
-            padding: EdgeInsets.only(left: 2),
+            padding: const EdgeInsets.only(left: 2),
             child: Text(
               title,
               style: isSelect
@@ -472,14 +472,14 @@ class TextGroup extends StatelessWidget {
   const TextGroup(
     this.title,
     this.tag, {
-    Key? key,
+    super.key,
     this.color,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(vertical: 0, horizontal: 8),
+      padding: const EdgeInsets.symmetric(vertical: 0, horizontal: 8),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.end,
         children: <Widget>[

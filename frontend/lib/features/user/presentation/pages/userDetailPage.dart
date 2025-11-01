@@ -3,6 +3,8 @@ import 'package:frontend/shared/widgets/tilTokAppBar.dart';
 import 'package:flutter/material.dart';
 
 class UserDetailPage extends StatefulWidget {
+  const UserDetailPage({super.key});
+
   @override
   _UserDetailPageState createState() => _UserDetailPageState();
 }
@@ -10,22 +12,22 @@ class UserDetailPage extends StatefulWidget {
 class _UserDetailPageState extends State<UserDetailPage> {
   @override
   Widget build(BuildContext context) {
-    Widget head = TikTokAppbar(
+    Widget head = const TikTokAppbar(
       title: '用户',
     );
     var userHead = Row(
       children: <Widget>[
         Expanded(
           child: Container(
-            padding: EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-            child: Text(
+            padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+            child: const Text(
               '个人信息',
               style: StandardTextStyle.smallWithOpacity,
             ),
           ),
         ),
         Container(
-          padding: EdgeInsets.symmetric(vertical: 10, horizontal: 20),
+          padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
           child: Text(
             '修改',
             style: StandardTextStyle.smallWithOpacity.apply(
@@ -43,49 +45,49 @@ class _UserDetailPageState extends State<UserDetailPage> {
         userHead,
         _UserInfoRow(
           title: '昵称',
-          rightIcon: Text(
+          rightIcon: const Text(
             '朱二蛋的枯燥生活',
             style: StandardTextStyle.small,
           ),
         ),
         _UserInfoRow(
           title: '头像',
-          rightIcon: Text(
+          rightIcon: const Text(
             '上传',
             style: StandardTextStyle.small,
           ),
         ),
         _UserInfoRow(
           title: '手机绑定',
-          rightIcon: Text(
+          rightIcon: const Text(
             '186****7767',
             style: StandardTextStyle.small,
           ),
         ),
         _UserInfoRow(
           title: '地址',
-          rightIcon: Text(
+          rightIcon: const Text(
             '深圳市南山区南海大道',
             style: StandardTextStyle.small,
           ),
         ),
         _UserInfoRow(
           title: '年龄',
-          rightIcon: Text(
+          rightIcon: const Text(
             '18',
             style: StandardTextStyle.small,
           ),
         ),
         _UserInfoRow(
           title: '用户性别',
-          rightIcon: Text(
+          rightIcon: const Text(
             '男',
             style: StandardTextStyle.small,
           ),
         ),
         _UserInfoRow(
           title: '职业',
-          rightIcon: Text(
+          rightIcon: const Text(
             '总裁',
             style: StandardTextStyle.small,
           ),
@@ -117,10 +119,10 @@ class _UserDetailPageState extends State<UserDetailPage> {
 }
 
 class _UserInfoRow extends StatelessWidget {
-  _UserInfoRow({
-    this.icon,
+  const _UserInfoRow({
     this.title,
     this.rightIcon,
+    this.icon,
     this.onTap,
   });
 
@@ -131,7 +133,7 @@ class _UserInfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Widget iconImg = Container(
+    Widget iconImg = SizedBox(
       height: 24,
       width: 24,
       child: icon,
@@ -139,10 +141,10 @@ class _UserInfoRow extends StatelessWidget {
 
     Widget row = Container(
       height: 48,
-      padding: EdgeInsets.fromLTRB(16, 0, 16, 0),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
       decoration: BoxDecoration(
         color: Colors.white.withOpacity(0.02),
-        border: Border(
+        border: const Border(
           bottom: BorderSide(color: Colors.white12),
         ),
       ),
@@ -151,17 +153,17 @@ class _UserInfoRow extends StatelessWidget {
           icon != null ? iconImg : Container(),
           Expanded(
             child: Container(
-              padding: EdgeInsets.only(left: 12),
+              padding: const EdgeInsets.only(left: 12),
               child: Text(
                 title!,
-                style: TextStyle(fontSize: 14),
+                style: const TextStyle(fontSize: 14),
               ),
             ),
           ),
           Opacity(
             opacity: 0.6,
             child: rightIcon ??
-                Icon(
+                const Icon(
                   Icons.arrow_forward_ios,
                   size: 12,
                 ),

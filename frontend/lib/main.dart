@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import 'pages/homePage.dart';
+import 'features/video/presentation/pages/homePage.dart';
 
 void main() {
   runApp(const ZiTokApp());

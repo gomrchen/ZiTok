@@ -8,11 +8,11 @@ import 'package:flutter/material.dart';
 /// 双击：点赞，双击后再次单击也是增加点赞爱心
 class TikTokVideoGesture extends StatefulWidget {
   const TikTokVideoGesture({
-    Key? key,
+    super.key,
     required this.child,
     this.onAddFavorite,
     this.onSingleTap,
-  }) : super(key: key);
+  });
 
   final Function? onAddFavorite;
   final Function? onSingleTap;
@@ -23,7 +23,7 @@ class TikTokVideoGesture extends StatefulWidget {
 }
 
 class _TikTokVideoGestureState extends State<TikTokVideoGesture> {
-  GlobalKey _key = GlobalKey();
+  final GlobalKey _key = GlobalKey();
 
   // 内部转换坐标点
   Offset _p(Offset p) {
@@ -97,11 +97,11 @@ class TikTokFavoriteAnimationIcon extends StatefulWidget {
   final Function? onAnimationComplete;
 
   const TikTokFavoriteAnimationIcon({
-    Key? key,
+    super.key,
     this.onAnimationComplete,
     this.position,
     this.size = 100,
-  }) : super(key: key);
+  });
 
   @override
   _TikTokFavoriteAnimationIconState createState() =>
@@ -129,7 +129,7 @@ class _TikTokFavoriteAnimationIconState
     _animationController = AnimationController(
       lowerBound: 0,
       upperBound: 1,
-      duration: Duration(milliseconds: 1600),
+      duration: const Duration(milliseconds: 1600),
       vsync: this,
     );
 
@@ -181,15 +181,15 @@ class _TikTokFavoriteAnimationIconState
       color: Colors.redAccent,
     );
     content = ShaderMask(
-      child: content,
       blendMode: BlendMode.srcATop,
       shaderCallback: (Rect bounds) => RadialGradient(
-        center: Alignment.topLeft.add(Alignment(0.66, 0.66)),
-        colors: [
+        center: Alignment.topLeft.add(const Alignment(0.66, 0.66)),
+        colors: const [
           Color(0xffEF6F6F),
           Color(0xffF03E3E),
         ],
       ).createShader(bounds),
+      child: content,
     );
     Widget body = Transform.rotate(
       angle: rotate,

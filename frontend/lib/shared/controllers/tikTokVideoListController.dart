@@ -132,6 +132,7 @@ class TikTokVideoListController extends ChangeNotifier {
   VPVideoController get currentPlayer => playerList[index.value];
 
   /// 销毁全部
+  @override
   void dispose() {
     // 销毁全部
     for (var player in playerList) {
@@ -172,7 +173,7 @@ Completer<void>? _syncLock;
 
 class VPVideoController extends TikTokVideoController<VideoPlayerController> {
   VideoPlayerController? _controller;
-  ValueNotifier<bool> _showPauseIcon = ValueNotifier<bool>(false);
+  final ValueNotifier<bool> _showPauseIcon = ValueNotifier<bool>(false);
 
   final UserVideo? videoInfo;
 
@@ -183,14 +184,12 @@ class VPVideoController extends TikTokVideoController<VideoPlayerController> {
     this.videoInfo,
     required ControllerBuilder<VideoPlayerController> builder,
     ControllerSetter<VideoPlayerController>? afterInit,
-  })  : this._builder = builder,
-        this._afterInit = afterInit;
+  })  : _builder = builder,
+        _afterInit = afterInit;
 
   @override
   VideoPlayerController get controller {
-    if (_controller == null) {
-      _controller = _builder.call();
-    }
+    _controller ??= _builder.call();
     return _controller!;
   }
 
@@ -220,10 +219,10 @@ class VPVideoController extends TikTokVideoController<VideoPlayerController> {
     if (!prepared) return;
     _prepared = false;
     await _syncCall(() async {
-      print('+++dispose ${this.hashCode}');
-      await this.controller.dispose();
+      print('+++dispose ${hashCode}');
+      await controller.dispose();
       _controller = null;
-      print('+++==dispose ${this.hashCode}');
+      print('+++==dispose ${hashCode}');
       _disposeLock = Completer<void>();
     });
   }
@@ -234,12 +233,12 @@ class VPVideoController extends TikTokVideoController<VideoPlayerController> {
   }) async {
     if (prepared) return;
     await _syncCall(() async {
-      print('+++initialize ${this.hashCode}');
-      await this.controller.initialize();
-      await this.controller.setLooping(true);
-      afterInit ??= this._afterInit;
-      await afterInit?.call(this.controller);
-      print('+++==initialize ${this.hashCode}');
+      print('+++initialize ${hashCode}');
+      await controller.initialize();
+      await controller.setLooping(true);
+      afterInit ??= _afterInit;
+      await afterInit?.call(controller);
+      print('+++==initialize ${hashCode}');
       _prepared = true;
     });
     if (_disposeLock != null) {
@@ -255,7 +254,7 @@ class VPVideoController extends TikTokVideoController<VideoPlayerController> {
     if (_disposeLock != null) {
       await _disposeLock?.future;
     }
-    await this.controller.pause();
+    await controller.pause();
     _showPauseIcon.value = true;
   }
 
@@ -266,7 +265,7 @@ class VPVideoController extends TikTokVideoController<VideoPlayerController> {
     if (_disposeLock != null) {
       await _disposeLock?.future;
     }
-    await this.controller.play();
+    await controller.play();
     _showPauseIcon.value = false;
   }
 

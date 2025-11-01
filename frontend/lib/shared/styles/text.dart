@@ -8,12 +8,12 @@ class AdMucisText extends StatelessWidget {
   final bool? enableOffset;
 
   const AdMucisText({
-    Key? key,
+    super.key,
     this.text,
     this.style,
     this.defaultStyle,
     this.enableOffset = false,
-  }) : super(key: key);
+  });
 
   const AdMucisText.small(
     String text, {

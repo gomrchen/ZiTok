@@ -6,10 +6,10 @@ class TodoPage extends StatelessWidget {
   final String? detail;
 
   const TodoPage({
-    Key? key,
+    super.key,
     this.title,
     this.detail,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -23,8 +23,8 @@ class TodoPage extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: <Widget>[
                 Container(
-                  padding: EdgeInsets.symmetric(vertical: 24, horizontal: 12),
-                  child: FlutterLogo(
+                  padding: const EdgeInsets.symmetric(vertical: 24, horizontal: 12),
+                  child: const FlutterLogo(
                     size: 120,
                   ),
                 ),
@@ -33,7 +33,7 @@ class TodoPage extends StatelessWidget {
                   style: StandardTextStyle.big,
                 ),
                 Container(
-                  margin: EdgeInsets.only(top: 12),
+                  margin: const EdgeInsets.only(top: 12),
                   child: Text(
                     detail ?? '正在施工中',
                     style: StandardTextStyle.smallWithOpacity,
@@ -46,7 +46,7 @@ class TodoPage extends StatelessWidget {
             child: Center(
               child: canpop
                   ? GestureDetector(
-                      child: Icon(
+                      child: const Icon(
                         Icons.clear,
                         size: 30,
                         color: Colors.red,
@@ -58,7 +58,7 @@ class TodoPage extends StatelessWidget {
                   : Container(),
             ),
           ),
-          Expanded(
+          const Expanded(
             child: Center(),
           ),
         ],

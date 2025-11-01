@@ -1,4 +1,4 @@
-import 'package:frontend/pages/msgDetailListPage.dart';
+import 'package:frontend/features/social/presentation/pages/msgDetailListPage.dart';
 import 'package:frontend/shared/styles/style.dart';
 import 'package:frontend/shared/widgets/tilTokAppBar.dart';
 import 'package:frontend/shared/widgets/userMsgRow.dart';

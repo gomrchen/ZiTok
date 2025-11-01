@@ -8,12 +8,12 @@ class UserMsgRow extends StatelessWidget {
   final bool reverse;
 
   const UserMsgRow({
-    Key? key,
+    super.key,
     this.title,
     this.desc,
     this.reverse = false,
     this.lead,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -32,7 +32,7 @@ class UserMsgRow extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: reverse ? list.reversed.toList() : list,
     );
-    var right = Column(
+    var right = const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         Text(
@@ -42,8 +42,8 @@ class UserMsgRow extends StatelessWidget {
       ],
     );
     var avatar = Container(
-      margin: EdgeInsets.fromLTRB(0, 8, 10, 8),
-      child: Container(
+      margin: const EdgeInsets.fromLTRB(0, 8, 10, 8),
+      child: SizedBox(
         height: 40,
         width: 40,
         child: lead ??
@@ -57,7 +57,7 @@ class UserMsgRow extends StatelessWidget {
     );
     return GestureDetector(
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
         child: Row(
           children: <Widget>[
             avatar,

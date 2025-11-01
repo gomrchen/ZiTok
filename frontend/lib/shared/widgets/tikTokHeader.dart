@@ -6,9 +6,9 @@ class TikTokHeader extends StatefulWidget {
   final VoidCallback? onSearch;
 
   const TikTokHeader({
-    Key? key,
+    super.key,
     this.onSearch,
-  }) : super(key: key);
+  });
 
   @override
   _TikTokHeaderState createState() => _TikTokHeaderState();
@@ -43,12 +43,13 @@ class _TikTokHeaderState extends State<TikTokHeader> {
     );
     return Container(
       // color: Colors.black.withOpacity(0.3),
-      padding: EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: <Widget>[
           Expanded(
             child: GestureDetector(
+              onTap: widget.onSearch,
               child: Container(
                 color: Colors.black.withOpacity(0),
                 padding: EdgeInsets.all(4),
@@ -58,7 +59,6 @@ class _TikTokHeaderState extends State<TikTokHeader> {
                   color: Colors.white.withOpacity(0.66),
                 ),
               ),
-              onTap: widget.onSearch,
             ),
           ),
           Expanded(
@@ -73,7 +73,7 @@ class _TikTokHeaderState extends State<TikTokHeader> {
             child: GestureDetector(
               child: Container(
                 color: Colors.black.withOpacity(0),
-                padding: EdgeInsets.all(4),
+                padding: const EdgeInsets.all(4),
                 alignment: Alignment.centerRight,
                 child: Icon(
                   Icons.tv,

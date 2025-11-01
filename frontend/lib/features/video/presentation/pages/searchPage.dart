@@ -5,9 +5,9 @@ class SearchPage extends StatefulWidget {
   final VoidCallback? onPop;
 
   const SearchPage({
-    Key? key,
+    super.key,
     this.onPop,
-  }) : super(key: key);
+  });
 
   @override
   _SearchPageState createState() => _SearchPageState();
@@ -22,33 +22,33 @@ class _SearchPageState extends State<SearchPage> {
       width: double.infinity,
       alignment: Alignment.center,
       child: Container(
-        padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         child: Row(
           children: <Widget>[
-            Icon(
+            const Icon(
               Icons.fullscreen,
               size: 24,
             ),
             Expanded(
               child: Container(
                 height: 32,
-                margin: EdgeInsets.only(right: 20, left: 12),
+                margin: const EdgeInsets.only(right: 20, left: 12),
                 decoration: BoxDecoration(
                   color: Colors.white.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                padding: EdgeInsets.only(left: 12),
+                padding: const EdgeInsets.only(left: 12),
                 child: Opacity(
                   opacity: 0.3,
                   child: Row(
                     children: <Widget>[
-                      Icon(
+                      const Icon(
                         Icons.search,
                         size: 20,
                       ),
                       Container(
-                        padding: EdgeInsets.only(left: 2, bottom: 2),
-                        child: Text(
+                        padding: const EdgeInsets.only(left: 2, bottom: 2),
+                        child: const Text(
                           '搜索内容',
                           style: StandardTextStyle.normal,
                         ),
@@ -59,11 +59,11 @@ class _SearchPageState extends State<SearchPage> {
               ),
             ),
             GestureDetector(
+              onTap: widget.onPop,
               child: Text(
                 '取消',
                 style: StandardTextStyle.normal.apply(color: ColorPlate.orange),
               ),
-              onTap: widget.onPop,
             ),
           ],
         ),
@@ -72,20 +72,20 @@ class _SearchPageState extends State<SearchPage> {
     Widget body = ListView(
       padding: EdgeInsets.zero,
       children: <Widget>[
-        _SearchSelectRow(),
-        _SearchSelectRow(),
-        _SearchSelectRow(),
-        _SearchSelectRow(),
-        _SearchSelectRow(),
+        const _SearchSelectRow(),
+        const _SearchSelectRow(),
+        const _SearchSelectRow(),
+        const _SearchSelectRow(),
+        const _SearchSelectRow(),
         Opacity(
           opacity: 0.6,
-          child: Container(
+          child: SizedBox(
             height: 46,
-            child: Center(child: Text('全部搜索记录')),
+            child: const Center(child: Text('全部搜索记录')),
           ),
         ),
         Container(
-          margin: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+          margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
           child: AspectRatio(
             aspectRatio: 4.0,
             child: Container(
@@ -126,29 +126,29 @@ class _SearchPageState extends State<SearchPage> {
 
 class _SearchSelectRow extends StatelessWidget {
   const _SearchSelectRow({
-    Key? key,
-  }) : super(key: key);
+    super.key,
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
       child: Row(
         children: <Widget>[
-          Icon(
+          const Icon(
             Icons.timelapse,
             size: 20,
           ),
           Expanded(
             child: Container(
-              padding: EdgeInsets.only(left: 8, bottom: 1),
-              child: Text(
+              padding: const EdgeInsets.only(left: 8, bottom: 1),
+              child: const Text(
                 '搜索热点',
                 style: StandardTextStyle.normal,
               ),
             ),
           ),
-          Icon(
+          const Icon(
             Icons.clear,
             size: 20,
           ),

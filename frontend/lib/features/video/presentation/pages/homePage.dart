@@ -1,8 +1,8 @@
 import 'package:frontend/mock/video.dart';
-import 'package:frontend/pages/cameraPage.dart';
-import 'package:frontend/pages/followPage.dart';
-import 'package:frontend/pages/searchPage.dart';
-import 'package:frontend/pages/userPage.dart';
+import 'package:frontend/features/video/presentation/pages/cameraPage.dart';
+import 'package:frontend/features/video/presentation/pages/followPage.dart';
+import 'package:frontend/features/video/presentation/pages/searchPage.dart';
+import 'package:frontend/features/user/presentation/pages/userPage.dart';
 import 'package:frontend/shared/styles/physics.dart';
 import 'package:frontend/shared/widgets/tikTokCommentBottomSheet.dart';
 import 'package:frontend/shared/widgets/tikTokHeader.dart';
@@ -16,7 +16,7 @@ import 'package:frontend/shared/utils/custom_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
-import 'msgPage.dart';
+import '../../../social/presentation/pages/msgPage.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
@@ -30,9 +30,9 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
 
   TikTokScaffoldController tkController = TikTokScaffoldController();
 
-  PageController _pageController = PageController();
+  final PageController _pageController = PageController();
 
-  TikTokVideoListController _videoListController = TikTokVideoListController();
+  final TikTokVideoListController _videoListController = TikTokVideoListController();
 
   /// 记录点赞
   Map<int, bool> favoriteMap = {};
@@ -109,7 +109,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         currentPage = MsgPage();
         break;
       case TikTokPageTag.me:
-        currentPage = UserPage(isSelfPage: true);
+        currentPage = const UserPage(isSelfPage: true);
         break;
     }
     double a = MediaQuery.of(context).size.aspectRatio;
@@ -176,8 +176,8 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
         // index: currentPage == null ? 0 : 1,
         children: <Widget>[
           PageView.builder(
-            key: Key('home'),
-            physics: QuickerScrollPhysics(),
+            key: const Key('home'),
+            physics: const QuickerScrollPhysics(),
             controller: _pageController,
             scrollDirection: Axis.vertical,
             itemCount: _videoListController.videoCount,
@@ -203,7 +203,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                     backgroundColor: Colors.white.withOpacity(0),
                     context: context,
                     builder: (BuildContext context) =>
-                        TikTokCommentBottomSheet(),
+                        const TikTokCommentBottomSheet(),
                   );
                 },
                 onShare: () {},
@@ -220,7 +220,7 @@ class _HomePageState extends State<HomePage> with WidgetsBindingObserver {
                 // 手势播放与自然播放都会产生暂停按钮状态变化，待处理
                 hidePauseIcon: !player.showPauseIcon.value,
                 aspectRatio: 9 / 16.0,
-                key: Key(data.url + '$i'),
+                key: Key('${data.url}$i'),
                 tag: data.url,
                 bottomPadding: hasBottomPadding ? 16.0 : 16.0,
                 userInfoWidget: VideoUserInfo(

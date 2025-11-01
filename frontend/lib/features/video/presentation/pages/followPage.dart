@@ -7,6 +7,8 @@ import 'package:frontend/shared/utils/custom_bottom_sheet.dart';
 import 'package:flutter/material.dart';
 
 class FollowPage extends StatefulWidget {
+  const FollowPage({super.key});
+
   @override
   _FollowPageState createState() => _FollowPageState();
 }
@@ -19,7 +21,7 @@ class _FollowPageState extends State<FollowPage> {
   Widget build(BuildContext context) {
     Widget head = TikTokSwitchAppbar(
       index: select,
-      list: ['推荐', '关注'],
+      list: const ['推荐', '关注'],
       onSwitch: (i) => setState(() => select = i),
     );
     Widget body = ListView.builder(
@@ -45,7 +47,7 @@ class _FollowPageState extends State<FollowPage> {
             CustomBottomSheet.showModalBottomSheet(
               backgroundColor: Colors.white.withOpacity(0),
               context: context,
-              builder: (BuildContext context) => TikTokCommentBottomSheet(),
+              builder: (BuildContext context) => const TikTokCommentBottomSheet(),
             );
           },
           onShare: () {},
@@ -74,13 +76,13 @@ class FollowRow extends StatelessWidget {
   final VoidCallback? onAddFavorite;
 
   const FollowRow({
-    Key? key,
+    super.key,
     this.isFavorite,
     this.onFavorite,
     this.onComment,
     this.onShare,
     this.onAddFavorite,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -103,7 +105,7 @@ class FollowRow extends StatelessWidget {
     );
     Widget userInfo = Row(
       children: <Widget>[
-        Container(
+        SizedBox(
           height: 32,
           width: 32,
           child: ClipOval(
@@ -113,8 +115,8 @@ class FollowRow extends StatelessWidget {
             ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.only(left: 8),
+        const Padding(
+          padding: EdgeInsets.only(left: 8),
           child: Text(
             '朱二蛋的枯燥生活',
             style: StandardTextStyle.normalW,
@@ -122,8 +124,8 @@ class FollowRow extends StatelessWidget {
         )
       ],
     );
-    Widget content = Padding(
-      padding: const EdgeInsets.fromLTRB(2, 6, 50, 8),
+    Widget content = const Padding(
+      padding: EdgeInsets.fromLTRB(2, 6, 50, 8),
       child: Text(
         '#原创 有钱人的生活就是这么朴实无华，且枯燥 #短视频',
         style: StandardTextStyle.normal,
@@ -131,12 +133,12 @@ class FollowRow extends StatelessWidget {
     );
     var buttonRow = Row(
       children: <Widget>[
-        Text(
+        const Text(
           '10-9',
           style: StandardTextStyle.smallWithOpacity,
         ),
         Expanded(child: Container()),
-        _RowButton(
+        const _RowButton(
           iconData: Icons.share,
           title: '分享',
         ),
@@ -163,7 +165,7 @@ class FollowRow extends StatelessWidget {
           ),
         ),
       ),
-      padding: EdgeInsets.fromLTRB(12, 8, 12, 0),
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
@@ -173,7 +175,7 @@ class FollowRow extends StatelessWidget {
           Opacity(
             opacity: 0.8,
             child: Container(
-              padding: EdgeInsets.fromLTRB(0, 10, 12, 8),
+              padding: const EdgeInsets.fromLTRB(0, 10, 12, 8),
               child: buttonRow,
             ),
           )
@@ -191,17 +193,18 @@ class _RowButton extends StatelessWidget {
   final VoidCallback? onTap;
 
   const _RowButton({
-    Key? key,
+    super.key,
     this.iconData,
     this.size,
     this.title,
     this.onTap,
     this.color,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
+      onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.only(left: 10),
         child: Row(
@@ -221,7 +224,6 @@ class _RowButton extends StatelessWidget {
           ],
         ),
       ),
-      onTap: onTap,
     );
   }
 }

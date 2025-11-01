@@ -3,6 +3,8 @@ import 'package:frontend/shared/widgets/tikTokVideoButtonColumn.dart';
 import 'package:flutter/material.dart';
 
 class CameraPage extends StatefulWidget {
+  const CameraPage({super.key});
+
   @override
   _CameraPageState createState() => _CameraPageState();
 }
@@ -10,7 +12,7 @@ class CameraPage extends StatefulWidget {
 class _CameraPageState extends State<CameraPage> {
   @override
   Widget build(BuildContext context) {
-    Widget rightButtons = Column(
+    Widget rightButtons = const Column(
       children: <Widget>[
         _CameraIconButton(
           icon: Icons.repeat,
@@ -37,7 +39,7 @@ class _CameraPageState extends State<CameraPage> {
     rightButtons = Opacity(
       opacity: 0.8,
       child: Container(
-        padding: EdgeInsets.only(right: 20, top: 12),
+        padding: const EdgeInsets.only(right: 20, top: 12),
         alignment: Alignment.topRight,
         child: Container(
           child: rightButtons,
@@ -45,14 +47,14 @@ class _CameraPageState extends State<CameraPage> {
       ),
     );
     Widget selectMusic = Container(
-      padding: EdgeInsets.only(left: 20, top: 20),
+      padding: const EdgeInsets.only(left: 20, top: 20),
       alignment: Alignment.topCenter,
       child: DefaultTextStyle(
         style: TextStyle(
           shadows: [
             Shadow(
               color: Colors.black.withOpacity(0.15),
-              offset: Offset(0, 1),
+              offset: const Offset(0, 1),
               blurRadius: 1,
             ),
           ],
@@ -60,14 +62,14 @@ class _CameraPageState extends State<CameraPage> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            IconToText(
+            const IconToText(
               Icons.music_note,
             ),
-            Text(
+            const Text(
               '选择音乐',
               style: StandardTextStyle.normal,
             ),
-            Container(width: 32, height: 12),
+            SizedBox(width: 32, height: 12),
           ],
         ),
       ),
@@ -75,26 +77,26 @@ class _CameraPageState extends State<CameraPage> {
 
     var closeButton = GestureDetector(
       child: Container(
-        padding: EdgeInsets.only(left: 20, top: 20),
+        padding: const EdgeInsets.only(left: 20, top: 20),
         alignment: Alignment.topLeft,
         child: Container(
-          child: Icon(Icons.clear),
+          child: const Icon(Icons.clear),
         ),
       ),
       onTap: () => Navigator.of(context).pop(),
     );
 
     var cameraButton = Container(
-      padding: EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: 12),
       alignment: Alignment.bottomCenter,
       child: Container(
         height: 80,
-        padding: EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 20),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.center,
           mainAxisAlignment: MainAxisAlignment.center,
           children: <Widget>[
-            _SidePhotoButton(title: '道具'),
+            const _SidePhotoButton(title: '道具'),
             Expanded(
               child: Center(
                 child: Container(
@@ -112,7 +114,7 @@ class _CameraPageState extends State<CameraPage> {
                 ),
               ),
             ),
-            _SidePhotoButton(title: '上传'),
+            const _SidePhotoButton(title: '上传'),
           ],
         ),
       ),
@@ -140,16 +142,16 @@ class _SidePhotoButton extends StatelessWidget {
   final String? title;
 
   const _SidePhotoButton({
-    Key? key,
+    super.key,
     this.title,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return Column(
       children: <Widget>[
         Container(
-          margin: EdgeInsets.only(top: 20),
+          margin: const EdgeInsets.only(top: 20),
           height: 32,
           width: 32,
           decoration: BoxDecoration(
@@ -177,20 +179,20 @@ class _CameraIconButton extends StatelessWidget {
   final String? title;
 
   const _CameraIconButton({
-    Key? key,
+    super.key,
     this.icon,
     this.title,
-  }) : super(key: key);
+  });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.symmetric(vertical: 8),
       child: DefaultTextStyle(
         style: TextStyle(shadows: [
           Shadow(
             color: Colors.black.withOpacity(0.15),
-            offset: Offset(0, 1),
+            offset: const Offset(0, 1),
             blurRadius: 1,
           ),
         ]),
