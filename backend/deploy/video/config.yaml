@@ -1,0 +1,101 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: tiktok-video-log-pv
+spec:
+  capacity:
+    storage: 128Mi
+  volumeMode: Filesystem
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: local-path
+  local:
+    path: /data/video/logs
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: kubernetes.io/hostname
+              operator: In
+              values:
+                - docker-desktop
+
+---
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: tiktok-video-log-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 128Mi
+
+---
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: tiktok-video-config
+data:
+  config.yaml: |-
+      system:
+        os: "linux"
+        status: "debug"
+        worker_id: 2
+        data_center_id: 1
+
+      service:
+        user:
+          service_name: "user"
+          svc_address: "tiktok-user-svc:10001" # etcd register
+        video:
+          service_name: "video"
+          address: "0.0.0.0:10002"
+          svc_address: "tiktok-video-svc:10002" # etcd register
+        interaction:
+          service_name: "interaction"
+          svc_address: "tiktok-interaction-svc:10003" # etcd register
+        relation:
+          service_name: "relation"
+          svc_address: "tiktok-relation-svc:10004" # etcd register
+
+
+      mysql:
+        username: "root"
+        password: "123456"
+        address: "mysql:3306"
+        database: "tiktok"
+        charset: "utf8mb4"
+
+      redis:
+        host: "tiktok-video-redis-svc"
+        port: "6379"
+        database: 0
+        network: "tcp"
+        password: "tiktokpassword"
+
+      etcd:
+        user: "tiktok"
+        password: "tiktok"
+        endpoint: "etcd-svc:2379"
+        service_prefix: "service/"
+        for_text: "text"
+
+      qiniu:
+        access_key: ""
+        secret_key: ""
+        avatar_path: "static/avatars/"
+        video_path: "static/videos/"
+        cover_path: "static/videos/covers/"
+        default_avatar_path: "static/avatars/default.jpg"
+        bucket: "mutezebra-tiktok"
+        domain: ""
+
+      jaeger:
+        collector_endpoint: "http://jaeger-svc:14268/api/traces"
+        agent_host_port: "jaeger-svc:6831"
+
