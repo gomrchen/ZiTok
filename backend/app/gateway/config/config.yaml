@@ -1,0 +1,40 @@
+system:
+  os: "linux"
+  status: "debug"
+  worker_id: 1
+  data_center_id: 1
+
+service:
+  gateway:
+    service_name: "gateway"
+    address: "0.0.0.0:4000"
+  user:
+    service_name: "user"
+  video:
+    service_name: "video"
+  relation:
+    service_name: "relation"
+  interaction:
+    service_name: "interaction"
+
+mysql:
+  username: "root"
+  password: "123456"
+  address: "127.0.0.1:3306"
+  database: "tiktok"
+  charset: "utf8mb4"
+
+etcd:
+  user: "tiktok"
+  password: "tiktok"
+  endpoint: "127.0.0.1:2379"
+  service_prefix: "service/"
+  for_text: "text"
+
+kafka:
+  address: "gateway-kafka-svc:9093"
+  network: "tcp"
+
+jaeger:
+  collector_endpoint: "http://127.0.0.1:14268/api/traces"
+  agent_host_port: "127.0.0.1:5775"

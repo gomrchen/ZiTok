@@ -1,0 +1,45 @@
+system:
+  os: "linux"
+  status: "debug"
+  worker_id: 2
+  data_center_id: 1
+
+service:
+  user:
+    service_name: "user"
+  video:
+    service_name: "video"
+  relation:
+    service_name: "relation"
+  interaction:
+    service_name: "interaction"
+    address: "0.0.0.0:10004"
+    svc_address: "127.0.0.1:10004" # etcd register
+
+mysql:
+  username: "root"
+  password: "123456"
+  address: "127.0.0.1:3306"
+  database: "tiktok"
+  charset: "utf8mb4"
+
+etcd:
+  user: "tiktok"
+  password: "tiktok"
+  endpoint: "127.0.0.1:2379"
+  service_prefix: "service/"
+  for_text: "text"
+
+qiniu:
+  access_key: ""
+  secret_key: ""
+  avatar_path: "static/avatars/"
+  video_path: "static/videos/"
+  cover_path: "static/videos/covers/"
+  default_avatar_path: "static/avatars/default.jpg"
+  bucket: "mutezebra-tiktok"
+  domain: ""
+
+jaeger:
+  collector_endpoint: "http://127.0.0.1:14268/api/traces"
+  agent_host_port: "127.0.0.1:5775"

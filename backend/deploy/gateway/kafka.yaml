@@ -1,0 +1,67 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway-kafka-svc
+spec:
+  ports:
+    - port: 9092
+      targetPort: 9092
+      name: "9092-port"
+    - port: 9093
+      targetPort: 9093
+      name: "9093-port"
+  selector:
+    app: gateway-kafka-pod
+
+---
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway-kafka-dep
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: gateway-kafka-pod
+  template:
+    metadata:
+      labels:
+        app: gateway-kafka-pod
+    spec:
+      containers:
+        - name: kafka
+          image: bitnami/kafka:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9092
+            - containerPort: 9093
+#          volumeMounts:
+#            - name: kafka-data
+#              mountPath: /bitnami/kafka
+          env:
+            - name: KAFKA_CFG_LISTENERS
+              value: "PLAINTEXT://:9092,CONTROLLER://:9093"
+            - name: KAFKA_CFG_ADVERTISED_LISTENERS
+              value: "PLAINTEXT://localhost:9092"
+            - name: KAFKA_CFG_CONTROLLER_LISTENER_NAMES
+              value: "CONTROLLER"
+            - name: KAFKA_CFG_NODE_ID
+              value: "1"
+            - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
+              value: "PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT"
+            - name: KAFKA_CFG_PROCESS_ROLES
+              value: "broker,controller"
+            - name: KAFKA_CFG_CONTROLLER_QUORUM_VOTERS
+              value: "1@localhost:9093"
+            - name: KAFKA_CFG_INTER_BROKER_LISTENER_NAME
+              value: "PLAINTEXT"
+            - name: KAFKA_KRAFT_CLUSTER_ID
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.uid # 使用 Deployment 的 UID 作为 Cluster ID
+#      volumes:
+#        - name: kafka-data
+#          persistentVolumeClaim:
+#            claimName: gateway-kafka-pvc
+

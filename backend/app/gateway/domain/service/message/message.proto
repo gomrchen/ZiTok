@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+option go_package = "./message";
+
+message Message {
+    int32 msg_type = 1;
+    bool have_read = 2;
+    int32 page_size = 3;
+    int32 page_num = 4;
+    string content = 5;
+    string time_start = 6;
+    string time_end = 7;
+    int64 group_id = 8;
+    int64 from = 9;
+    int64 to = 10;
+    int64 create_at = 11;
+    int64 u_time_since = 12;
+    int64 u_time_end = 13;
+}
