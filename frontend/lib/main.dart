@@ -1,20 +1,24 @@
 import 'package:flutter/material.dart';
 
+import 'pages/homePage.dart';
+
 void main() {
-  runApp(const MainApp());
+  runApp(const ZiTokApp());
 }
 
-class MainApp extends StatelessWidget {
-  const MainApp({super.key});
+class ZiTokApp extends StatelessWidget {
+  const ZiTokApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return const MaterialApp(
-      home: Scaffold(
-        body: Center(
-          child: Text('Hello World!'),
-        ),
+    return MaterialApp(
+      title: 'ZiTok',
+      theme: ThemeData(
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.deepPurple),
+        useMaterial3: true,
       ),
+      debugShowCheckedModeBanner: false,
+      home: const HomePage(),
     );
   }
 }
