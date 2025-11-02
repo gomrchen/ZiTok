@@ -1,0 +1,50 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: tiktok-video-svc
+spec:
+  type: NodePort
+  selector:
+    app: tiktok-video-pod
+  ports:
+    - protocol: TCP
+      port: 10002
+      targetPort: 10002
+      nodePort: 30002
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tiktok-video-dep
+spec:
+  selector:
+    matchLabels:
+      app: tiktok-video-pod
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: tiktok-video-pod
+    spec:
+      containers:
+        - name: service-video
+          image: mutezebra/tiktok-video:2.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 10002
+          volumeMounts:
+            - name: config
+              mountPath: /app/config/config.yaml
+              subPath: config.yaml
+            - name: logs
+              mountPath: /app/logs
+      volumes:
+        - name: config
+          configMap:
+            name: tiktok-video-config
+            items:
+              - key: config.yaml
+                path: config.yaml
+        - name: logs
+          persistentVolumeClaim:
+            claimName: tiktok-video-log-pvc
