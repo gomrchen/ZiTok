@@ -75,6 +75,47 @@ class ProfilePage extends StatelessWidget {
   }
 }
 
+/// 右上角菜单入口按钮（跳转设置页）
+class _MenuActionButton extends StatelessWidget {
+  const _MenuActionButton();
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Tooltip(
+      message: '设置',
+      child: Semantics(
+        button: true,
+        label: '打开设置',
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: () {
+              // push 到设置页，保留返回动画
+              context.push('/settings');
+            },
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: cs.surfaceVariant.withOpacity(0.7),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Icon(Icons.dehaze, color: cs.onSurface, size: 20),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 class _ProfileHeader extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -90,69 +131,78 @@ class _ProfileHeader extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 顶部平直背景：使用渐变兜底，避免资源缺失导致的异常
-          Container(
-            height: headerHeight,
-            width: double.infinity,
-            decoration: const BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Color(0xFF2BD2C4), // 图二主色近似：明亮青绿
-                  Color(0xFFEFF9F7), // 渐隐到浅色
-                ],
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-              child: Align(
-                alignment: Alignment.bottomLeft,
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    CircleAvatar(
-                      radius: avatarRadius,
-                      backgroundColor: const Color(0xFF2BD2C4),
-                      child: Icon(Icons.pets, color: cs.onPrimary, size: 24),
-                    ),
-                    const SizedBox(width: Spacing.md),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            nickname,
-                            style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 20),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+          // 顶部平直背景：使用渐变兜底，并在右上角叠加菜单图标
+          Stack(
+            children: [
+              Container(
+                height: headerHeight,
+                width: double.infinity,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Color(0xFF2BD2C4), // 图二主色近似：明亮青绿
+                      Color(0xFFEFF9F7), // 渐隐到浅色
+                    ],
+                  ),
+                ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+                  child: Align(
+                    alignment: Alignment.bottomLeft,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        CircleAvatar(
+                          radius: avatarRadius,
+                          backgroundColor: const Color(0xFF2BD2C4),
+                          child: Icon(Icons.pets, color: cs.onPrimary, size: 24),
+                        ),
+                        const SizedBox(width: Spacing.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                nickname,
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 20),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                '抖音号：46082144372',
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70, fontSize: 12),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '抖音号：46082144372',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70, fontSize: 12),
+                        ),
+                        const SizedBox(width: Spacing.sm),
+                        TextButton(
+                          style: TextButton.styleFrom(
+                            backgroundColor: Colors.white,
+                            foregroundColor: const Color(0xFF2BD2C4),
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                            // Flutter 当前版本的 styleFrom.overlayColor 接受 Color? 类型
+                            overlayColor: const Color(0x1F2BD2C4),
                           ),
-                        ],
-                      ),
+                          onPressed: () => context.push('/profile/edit'),
+                          child: const Text('编辑主页'),
+                        ),
+                      ],
                     ),
-                    const SizedBox(width: Spacing.sm),
-                    TextButton(
-                      style: TextButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: const Color(0xFF2BD2C4),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        // Flutter 当前版本的 styleFrom.overlayColor 接受 Color? 类型
-                        overlayColor: const Color(0x1F2BD2C4),
-                      ),
-                      onPressed: () => context.push('/profile/edit'),
-                      child: const Text('编辑主页'),
-                    ),
-                  ],
+                  ),
                 ),
               ),
-            ),
+              const Positioned(
+                right: Spacing.md,
+                top: Spacing.sm,
+                child: _MenuActionButton(),
+              ),
+            ],
           ),
           // 简介
           Padding(

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/video_provider.dart';
 import '../../models/video.dart';
+import '../../widgets/advanced_video_player.dart';
+import 'widgets/video_detail_content.dart';
+import 'package:go_router/go_router.dart';
 
 class VideoDetailPage extends StatelessWidget {
   final String id;
@@ -18,53 +20,38 @@ class VideoDetailPage extends StatelessWidget {
         orElse: () => const Video(id: ''),
       ),
     );
-    return DefaultTabController(
-      length: 2,
-      child: Scaffold(
-        appBar: AppBar(
-          title: Text(video.title ?? '未知视频'),
-          bottom: const TabBar(tabs: [Tab(text: '详情'), Tab(text: '评论')]),
-          actions: [
-          IconButton(onPressed: () => context.go('/video/$id/notes'), icon: const Icon(Icons.note))
-          ],
-        ),
-        body: TabBarView(
-          children: [
-            ListView(
-              children: [
-                LayoutBuilder(
-                  builder: (context, constraints) {
-                    final w = constraints.maxWidth;
-                    final h = (w / 16 * 9).clamp(0.0, MediaQuery.of(context).size.height * 0.6);
-                    return Container(
-                      color: Theme.of(context).colorScheme.surface,
-                      child: SizedBox(
-                        width: w,
-                        height: h,
-                        child: Image.network(
-                          video.coverUrl ?? 'https://picsum.photos/seed/${video.id}/800/450',
-                          fit: BoxFit.contain,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                ListTile(
-                  title: Text(video.title ?? '未知视频'),
-                  subtitle: Text('👍 ${video.likes ?? 0} · 👁️ ${video.views ?? 0}'),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Wrap(
-                    spacing: 8,
-                    children: (video.tags).map((t) => Chip(label: Text(t))).toList(),
-                  ),
-                ),
+    // 上下分区：上半视频播放器 + 下半内容滚动区
+    return Scaffold(
+      appBar: null, // 移除顶部标题行
+      body: Column(
+        children: [
+          // 上半：高级视频播放器，宽度自适应
+          Padding(
+            padding: const EdgeInsets.only(top: 0),
+            child: AdvancedVideoPlayer(
+              sources: [
+                VideoSource(label: '原画', url: video.videoUrl ?? (video.coverUrl ?? '')),
               ],
+              initialLabel: '原画',
+              autoPlay: true,
+              looping: false,
+              onBack: () {
+                debugPrint('VideoDetailPage: onBack pressed');
+                if (Navigator.of(context).canPop()) {
+                  debugPrint('VideoDetailPage: Navigator.pop');
+                  Navigator.of(context).pop();
+                } else {
+                  debugPrint('VideoDetailPage: fallback go(/home)');
+                  context.go('/home');
+                }
+              },
             ),
-            const Center(child: Text('评论区占位')),
-          ],
-        ),
+          ),
+          // 下半：内容展示区（评论 / 简介 / 笔记）
+          Expanded(
+            child: VideoDetailContent(video: video),
+          ),
+        ],
       ),
     );
   }
