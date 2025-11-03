@@ -146,7 +146,7 @@ class _ProfileHeader extends StatelessWidget {
                         // Flutter 当前版本的 styleFrom.overlayColor 接受 Color? 类型
                         overlayColor: const Color(0x1F2BD2C4),
                       ),
-                      onPressed: () => context.go('/profile/edit'),
+                      onPressed: () => context.push('/profile/edit'),
                       child: const Text('编辑主页'),
                     ),
                   ],

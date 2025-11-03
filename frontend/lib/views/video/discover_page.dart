@@ -176,7 +176,7 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('@${widget.video.author}', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white)),
+              Text('@${widget.video.uid ?? '未知作者'}', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white)),
               const SizedBox(height: 8),
               Text('Video description here. #hashtag #anothertag', style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70)),
               const SizedBox(height: 8),

@@ -11,7 +11,6 @@ import '../views/video/video_detail_page.dart';
 import '../views/notes/video_notes_page.dart';
 import '../views/messages/messages_page.dart';
 import '../views/chat/chat_page.dart';
-
 import '../views/profile/edit_profile_page.dart';
 import '../views/settings/settings_page.dart';
 

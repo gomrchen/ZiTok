@@ -1,4 +1,4 @@
-bitnami/etcd:3.5.12
+bitnami/etcd:latest
 jaegertracing/all-in-one:latest
 mysql:latest
 bitnami/kafka:latest

@@ -116,15 +116,18 @@ class VideoProvider extends ChangeNotifier {
     if (idx >= 0) {
       final v = _follow[idx];
       final liked = _likedVideoIds.contains(videoId);
-      final int newLikes = liked ? (v.likes - 1).clamp(0, 0x7fffffff).toInt() : v.likes + 1;
+      final currentLikes = v.likes ?? 0;
+      final int newLikes = liked ? (currentLikes > 0 ? currentLikes - 1 : 0) : currentLikes + 1;
       _follow[idx] = Video(
         id: v.id,
+        uid: v.uid,
         title: v.title,
+        intro: v.intro,
         coverUrl: v.coverUrl,
         videoUrl: v.videoUrl,
-        durationSeconds: v.durationSeconds,
-        author: v.author,
+        stars: v.stars,
         likes: newLikes,
+        views: v.views,
         tags: v.tags,
       );
       if (liked) {

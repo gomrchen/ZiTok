@@ -17,24 +17,37 @@ class VideoCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Image.network(video.coverUrl, fit: BoxFit.cover),
+            LayoutBuilder(
+              builder: (context, constraints) {
+                final w = constraints.maxWidth;
+                final h = (w / 16 * 9).clamp(0.0, MediaQuery.of(context).size.height * 0.35);
+                return Container(
+                  color: Theme.of(context).colorScheme.surface,
+                  child: SizedBox(
+                    width: w,
+                    height: h,
+                    child: Image.network(
+                      video.coverUrl ?? 'https://picsum.photos/seed/${video.id}/640/360',
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                );
+              },
             ),
             Padding(
               padding: const EdgeInsets.all(Spacing.md),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(video.title, style: Theme.of(context).textTheme.titleMedium),
+                  Text(video.title ?? '未命名视频', style: Theme.of(context).textTheme.titleMedium),
                   const SizedBox(height: Spacing.sm),
                   Row(
                     children: [
-                      Text('${video.durationSeconds}s · ${video.author}', style: Theme.of(context).textTheme.bodySmall),
+                      Text('👍 ${video.likes ?? 0} · 👁️ ${video.views ?? 0}', style: Theme.of(context).textTheme.bodySmall),
                       const Spacer(),
                       const Icon(Icons.favorite, size: 16),
                       const SizedBox(width: 4),
-                      Text('${video.likes}', style: Theme.of(context).textTheme.bodySmall),
+                      Text('${video.likes ?? 0}', style: Theme.of(context).textTheme.bodySmall),
                     ],
                   )
                 ],

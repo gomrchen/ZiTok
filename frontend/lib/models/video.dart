@@ -1,23 +1,40 @@
 class Video {
   final String id;
-  final String title;
-  final String coverUrl;
-  final String videoUrl;
-  final int durationSeconds;
-  final String author;
-  final int likes;
+  final String? uid;
+  final String? title;
+  final String? intro;
+  final String? coverUrl;
+  final String? videoUrl;
+  final int? stars;
+  final int? likes;
+  final int? views;
   final List<String> tags;
 
   const Video({
     required this.id,
-    required this.title,
-    required this.coverUrl,
-    required this.videoUrl,
-    required this.durationSeconds,
-    required this.author,
-    required this.likes,
-    required this.tags,
+    this.uid,
+    this.title,
+    this.intro,
+    this.coverUrl,
+    this.videoUrl,
+    this.stars,
+    this.likes,
+    this.views,
+    this.tags = const [],
   });
+
+  factory Video.fromJson(Map<String, dynamic> j) => Video(
+        id: (j['id'] ?? '').toString(),
+        uid: j['uid']?.toString(),
+        videoUrl: j['video_url'] as String?,
+        coverUrl: j['cover_url'] as String?,
+        intro: j['intro'] as String?,
+        title: j['title'] as String?,
+        stars: j['starts'] is int ? j['starts'] as int : int.tryParse('${j['starts']}'),
+        likes: j['likes'] is int ? j['likes'] as int : int.tryParse('${j['likes']}'),
+        views: j['views'] is int ? j['views'] as int : int.tryParse('${j['views']}'),
+        tags: (j['tags'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
+      );
 }
 
 class VideoQuery {

@@ -19,6 +19,8 @@ class AppTheme {
       colorScheme: colorScheme,
       scaffoldBackgroundColor: colors.background,
       useMaterial3: true,
+      // 使用本地中文系统字体，避免 Web 引擎远程加载字体
+      fontFamily: 'Microsoft YaHei',
       visualDensity: VisualDensity.adaptivePlatformDensity,
       navigationBarTheme: NavigationBarThemeData(
         height: 64,
