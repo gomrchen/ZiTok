@@ -124,9 +124,13 @@ class _FollowListItem extends StatelessWidget {
           // 头部：作者信息与推荐标记
           Row(
             children: [
-              CircleAvatar(child: Text(video.author.isNotEmpty ? video.author.characters.first : '?')),
+              CircleAvatar(
+                child: Text((video.title ?? video.uid ?? '视频').isNotEmpty
+                    ? (video.title ?? video.uid ?? '视频').substring(0, 1)
+                    : '?'),
+              ),
               const SizedBox(width: Spacing.sm),
-              Expanded(child: Text(video.author, style: theme.textTheme.titleSmall)),
+              Expanded(child: Text(video.title ?? (video.uid ?? '未知'), style: theme.textTheme.titleSmall)),
               if (isRecommended)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -148,7 +152,7 @@ class _FollowListItem extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: Radii.md,
                 child: CachedNetworkImage(
-                  imageUrl: video.coverUrl,
+                  imageUrl: video.coverUrl ?? 'https://picsum.photos/seed/${video.id}/640/360',
                   fit: BoxFit.cover,
                   placeholder: (_, __) => Container(color: Colors.grey.shade200, child: const Center(child: Icon(Icons.play_circle_outline, size: 48, color: Colors.grey))),
                 ),
@@ -168,7 +172,7 @@ class _FollowListItem extends StatelessWidget {
               Row(children: [
                 _IconAction(icon: Icons.favorite_border, onPressed: onLike),
                 const SizedBox(width: 4),
-                Text('${video.likes}', style: theme.textTheme.bodySmall),
+                Text('${video.likes ?? 0}', style: theme.textTheme.bodySmall),
               ]),
             ],
           ),

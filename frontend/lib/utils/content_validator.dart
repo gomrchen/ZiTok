@@ -16,7 +16,7 @@ class ContentValidator {
   static String summarize(String text, {int maxLen = 100}) {
     final t = text.trim();
     if (t.length <= maxLen) return t;
-    return t.substring(0, maxLen) + '…';
+    return '${t.substring(0, maxLen)}…';
   }
 
   static List<String> extractTags(String text) {

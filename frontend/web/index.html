@@ -31,6 +31,21 @@
 
   <title>frontend</title>
   <link rel="manifest" href="manifest.json">
+  
+  <!-- 字体策略：强制使用本地系统字体，禁用远程字体加载 -->
+  <style>
+    /* 禁用 Flutter Web 引擎的默认字体加载行为 */
+    @font-face {
+      font-family: 'Noto Sans SC';
+      src: local('Microsoft YaHei'), local('PingFang SC'), local('Hiragino Sans GB'), local('Source Han Sans SC'), local('WenQuanYi Micro Hei');
+      font-display: block;
+    }
+    
+    /* 全局字体回退策略 */
+    * {
+      font-family: 'Microsoft YaHei', 'PingFang SC', 'Hiragino Sans GB', 'Source Han Sans SC', 'WenQuanYi Micro Hei', 'Segoe UI', system-ui, -apple-system, sans-serif !important;
+    }
+  </style>
 </head>
 <body>
   <script src="flutter_bootstrap.js" async></script>

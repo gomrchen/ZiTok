@@ -9,7 +9,7 @@ class AuthService {
   Future<Response<dynamic>> login({required String phone, required String password}) {
     if (Env.isDev) {
       return Future.value(Response(
-        requestOptions: RequestOptions(path: '/api/v1/auth/login'),
+        requestOptions: RequestOptions(path: '/api/user/login'),
         data: {
           'code': 200,
           'message': 'success',
@@ -21,7 +21,7 @@ class AuthService {
         statusCode: 200,
       ));
     }
-    return client.dio.post('/api/v1/auth/login', data: {
+    return client.dio.post('/api/user/login', data: {
       'phone': phone,
       'password': password,
     });
@@ -30,7 +30,7 @@ class AuthService {
   Future<Response<dynamic>> register({required String phone, required String otp, String? password}) {
     if (Env.isDev) {
       return Future.value(Response(
-        requestOptions: RequestOptions(path: '/api/v1/auth/register'),
+        requestOptions: RequestOptions(path: '/api/user/register'),
         data: {
           'code': 200,
           'message': 'success',
@@ -42,7 +42,7 @@ class AuthService {
         statusCode: 200,
       ));
     }
-    return client.dio.post('/api/v1/auth/register', data: {
+    return client.dio.post('/api/user/register', data: {
       'phone': phone,
       'otp': otp,
       if (password != null) 'password': password,
@@ -52,7 +52,7 @@ class AuthService {
   Future<Response<dynamic>> profile() {
     if (Env.isDev) {
       return Future.value(Response(
-        requestOptions: RequestOptions(path: '/api/v1/user/profile'),
+        requestOptions: RequestOptions(path: '/api/user/auth/info'),
         data: {
           'code': 200,
           'message': 'success',
@@ -66,6 +66,6 @@ class AuthService {
         statusCode: 200,
       ));
     }
-    return client.dio.get('/api/v1/user/profile');
+    return client.dio.get('/api/user/auth/info');
   }
 }

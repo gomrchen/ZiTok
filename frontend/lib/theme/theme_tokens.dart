@@ -55,8 +55,40 @@ class AppColors {
 
 class TypographyTokens {
   // 标题略大以贴合登录/欢迎页主标题视觉
-  static const TextStyle h1 = TextStyle(fontSize: 26, fontWeight: FontWeight.w700);
-  static const TextStyle h2 = TextStyle(fontSize: 20, fontWeight: FontWeight.w600);
-  static const TextStyle body = TextStyle(fontSize: 14, fontWeight: FontWeight.w400);
-  static const TextStyle caption = TextStyle(fontSize: 12, fontWeight: FontWeight.w400);
+  static const List<String> _fallback = <String>[
+    'Segoe UI',
+    'Microsoft YaHei',
+    'PingFang SC',
+    'Hiragino Sans GB',
+    'Helvetica Neue',
+    'Arial',
+    'system-ui',
+    'sans-serif',
+  ];
+
+  static const TextStyle h1 = TextStyle(
+    fontSize: 26,
+    fontWeight: FontWeight.w700,
+    // 强制使用本地中文系统字体，避免 Web 引擎尝试远程拉取 Noto Sans SC
+    fontFamily: 'Microsoft YaHei',
+    fontFamilyFallback: _fallback,
+  );
+  static const TextStyle h2 = TextStyle(
+    fontSize: 20,
+    fontWeight: FontWeight.w600,
+    fontFamily: 'Microsoft YaHei',
+    fontFamilyFallback: _fallback,
+  );
+  static const TextStyle body = TextStyle(
+    fontSize: 14,
+    fontWeight: FontWeight.w400,
+    fontFamily: 'Microsoft YaHei',
+    fontFamilyFallback: _fallback,
+  );
+  static const TextStyle caption = TextStyle(
+    fontSize: 12,
+    fontWeight: FontWeight.w400,
+    fontFamily: 'Microsoft YaHei',
+    fontFamilyFallback: _fallback,
+  );
 }

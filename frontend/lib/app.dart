@@ -11,7 +11,8 @@ import 'services/auth_service.dart';
 import 'repositories/auth_repository.dart';
 import 'providers/auth_provider.dart';
 import 'repositories/video_repository.dart';
-import 'services/mock/mock_video_service.dart';
+import 'services/video_service.dart';
+import 'services/cache.dart';
 import 'providers/video_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/messaging_provider.dart';
@@ -41,7 +42,10 @@ class ZitokApp extends StatelessWidget {
       authService: AuthService(AppBootstrap.apiClient),
       prefs: AppBootstrap.prefs,
     );
-    final videoRepository = VideoRepository(mock: MockVideoService());
+    final videoRepository = VideoRepository(
+      api: VideoService(AppBootstrap.apiClient.dio),
+      cache: CacheManager(AppBootstrap.prefs),
+    );
 
     return MultiProvider(
       providers: [

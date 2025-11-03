@@ -1,757 +1,248 @@
-# ZiTok 项目开发规范文档
-
-## 项目概述
-
-ZiTok 是一个基于 Flutter 的短视频社交应用，采用 Clean Architecture 架构模式，支持视频播放、用户社交、笔记分享等功能。本文档定义了项目的开发规范、代码质量要求和开发流程标准。
-
-## 1. 项目架构规范
-
-### 1.1 目录结构规范
-
-```
-lib/
-├── core/                    # 核心基础设施
-│   ├── constants/          # 全局常量
-│   ├── network/            # 网络层
-│   │   ├── api_client.dart # API客户端
-│   │   ├── exceptions/     # 网络异常
-│   │   └── interceptors/   # 请求拦截器
-│   ├── storage/            # 本地存储
-│   └── utils/              # 工具类
-├── features/               # 业务功能模块
-│   ├── video/              # 视频模块
-│   ├── user/               # 用户模块
-│   ├── social/             # 社交模块
-│   └── notes/              # 笔记模块
-├── shared/                 # 共享组件
-│   ├── models/             # 共享数据模型
-│   ├── widgets/            # 共享UI组件
-│   └── styles/             # 样式定义
-└── main.dart               # 应用入口
-```
-
-### 1.2 Clean Architecture 分层规范
-
-每个功能模块必须遵循以下三层架构：
-
-#### Data Layer (数据层)
-```
-features/{module}/data/
-├── datasources/            # 数据源（API、本地数据库）
-├── models/                 # 数据模型（继承自实体）
-└── repositories/           # 仓库实现
-```
-
-#### Domain Layer (领域层)
-```
-features/{module}/domain/
-├── entities/               # 业务实体
-├── repositories/           # 仓库接口
-└── usecases/              # 用例（业务逻辑）
-```
-
-#### Presentation Layer (表现层)
-```
-features/{module}/presentation/
-├── bloc/                   # 状态管理（BLoC）
-├── pages/                  # 页面组件
-└── widgets/               # 模块专用组件
-```
-
-### 1.3 前端组件组织方式
-
-#### 1.3.1 组件分类
-- **Pages**: 完整的页面组件，对应路由
-- **Widgets**: 可复用的UI组件
-- **Shared Widgets**: 跨模块共享的组件
-
-#### 1.3.2 组件命名规范
-- 页面组件：`{功能名}Page`（如：`VideoPlayerPage`）
-- 业务组件：`{功能名}Widget`（如：`VideoCardWidget`）
-- 通用组件：`{功能描述}Widget`（如：`LoadingWidget`）
-
-#### 1.3.3 组件文件结构
-```dart
-// 组件文件示例
-class VideoCardWidget extends StatelessWidget {
-  // 1. 构造函数参数
-  const VideoCardWidget({
-    super.key,
-    required this.video,
-    this.onTap,
-  });
-
-  // 2. 属性定义
-  final VideoModel video;
-  final VoidCallback? onTap;
-
-  // 3. build方法
-  @override
-  Widget build(BuildContext context) {
-    // 实现
-  }
-
-  // 4. 私有方法
-  void _handleTap() {
-    // 实现
-  }
-}
-```
-
-### 1.4 API调用规范
-
-#### 1.4.1 API客户端使用
-```dart
-// 统一使用ApiClient进行网络请求
-class VideoRepository {
-  final ApiClient _apiClient;
-  
-  VideoRepository(this._apiClient);
-  
-  Future<List<VideoModel>> getVideos() async {
-    try {
-      final response = await _apiClient.get('/videos');
-      return (response.data['data'] as List)
-          .map((json) => VideoModel.fromJson(json))
-          .toList();
-    } catch (e) {
-      throw ApiException(
-        code: 'GET_VIDEOS_FAILED',
-        message: '获取视频列表失败',
-      );
-    }
-  }
-}
-```
-
-#### 1.4.2 API端点规范
-- 基础URL：通过`AppConstants.apiBaseUrl`配置
-- 版本控制：`/api/v1/`
-- 资源命名：使用复数形式（如：`/videos`、`/users`）
-- 查询参数：使用下划线命名（如：`page_size`、`user_id`）
-
-#### 1.4.3 请求响应格式
-```dart
-// 标准API响应格式
-{
-  "code": 200,
-  "message": "success",
-  "data": {}, // 或 []
-  "timestamp": "2024-01-01T00:00:00Z"
-}
-
-// 分页响应格式
-{
-  "code": 200,
-  "message": "success",
-  "data": {
-    "items": [],
-    "total": 100,
-    "page": 1,
-    "page_size": 20,
-    "has_more": true
-  }
-}
-```
-
-### 1.5 状态管理方案
-
-#### 1.5.1 BLoC模式规范
-```dart
-// 事件定义
-abstract class VideoEvent {}
-class LoadVideos extends VideoEvent {}
-class RefreshVideos extends VideoEvent {}
-
-// 状态定义
-abstract class VideoState {}
-class VideoInitial extends VideoState {}
-class VideoLoading extends VideoState {}
-class VideoLoaded extends VideoState {
-  final List<VideoModel> videos;
-  VideoLoaded(this.videos);
-}
-class VideoError extends VideoState {
-  final String message;
-  VideoError(this.message);
-}
-
-// BLoC实现
-class VideoBloc extends Bloc<VideoEvent, VideoState> {
-  final VideoRepository _repository;
-  
-  VideoBloc(this._repository) : super(VideoInitial()) {
-    on<LoadVideos>(_onLoadVideos);
-    on<RefreshVideos>(_onRefreshVideos);
-  }
-  
-  Future<void> _onLoadVideos(
-    LoadVideos event,
-    Emitter<VideoState> emit,
-  ) async {
-    emit(VideoLoading());
-    try {
-      final videos = await _repository.getVideos();
-      emit(VideoLoaded(videos));
-    } catch (e) {
-      emit(VideoError(e.toString()));
-    }
-  }
-}
-```
-
-#### 1.5.2 状态管理层级
-- **全局状态**: 用户认证、主题设置、网络状态
-- **页面状态**: 页面级别的数据和UI状态
-- **组件状态**: 组件内部的临时状态
-
-## 2. 代码质量要求
-
-### 2.1 代码风格指南
-
-#### 2.1.1 Dart代码规范
-遵循 [Effective Dart](https://dart.dev/guides/language/effective-dart) 规范：
-
-```dart
-// 好的示例
-class VideoPlayerController {
-  final String videoUrl;
-  bool _isPlaying = false;
-  
-  VideoPlayerController({required this.videoUrl});
-  
-  Future<void> play() async {
-    if (!_isPlaying) {
-      _isPlaying = true;
-      await _startPlayback();
-    }
-  }
-  
-  Future<void> _startPlayback() async {
-    // 实现播放逻辑
-  }
-}
-```
-
-#### 2.1.2 命名规范
-- **类名**: PascalCase（如：`VideoPlayerWidget`）
-- **方法名**: camelCase（如：`playVideo`）
-- **变量名**: camelCase（如：`videoUrl`）
-- **常量名**: lowerCamelCase（如：`maxVideoSize`）
-- **私有成员**: 以下划线开头（如：`_isPlaying`）
-
-#### 2.1.3 注释规范
-```dart
-/// 视频播放器组件
-/// 
-/// 支持本地和网络视频播放，提供播放控制功能
-/// 
-/// 示例用法：
-/// ```dart
-/// VideoPlayer(
-///   videoUrl: 'https://example.com/video.mp4',
-///   autoPlay: true,
-/// )
-/// ```
-class VideoPlayer extends StatefulWidget {
-  /// 视频URL地址
-  final String videoUrl;
-  
-  /// 是否自动播放
-  final bool autoPlay;
-  
-  const VideoPlayer({
-    super.key,
-    required this.videoUrl,
-    this.autoPlay = false,
-  });
-}
-```
-
-### 2.2 性能优化标准
-
-#### 2.2.1 Widget优化
-```dart
-// 使用const构造函数
-const Text('Hello World');
-
-// 使用Builder减少重建范围
-Builder(
-  builder: (context) => ExpensiveWidget(),
-);
-
-// 合理使用StatelessWidget和StatefulWidget
-class StaticContent extends StatelessWidget {
-  const StaticContent({super.key});
-  
-  @override
-  Widget build(BuildContext context) {
-    return const Text('Static content');
-  }
-}
-```
-
-#### 2.2.2 列表优化
-```dart
-// 使用ListView.builder处理大量数据
-ListView.builder(
-  itemCount: items.length,
-  itemBuilder: (context, index) {
-    return VideoCard(video: items[index]);
-  },
-);
-
-// 使用AutomaticKeepAliveClientMixin保持状态
-class VideoCard extends StatefulWidget {
-  // ...
-}
-
-class _VideoCardState extends State<VideoCard> 
-    with AutomaticKeepAliveClientMixin {
-  @override
-  bool get wantKeepAlive => true;
-  
-  @override
-  Widget build(BuildContext context) {
-    super.build(context);
-    // ...
-  }
-}
-```
-
-#### 2.2.3 图片优化
-```dart
-// 使用CachedNetworkImage缓存网络图片
-CachedNetworkImage(
-  imageUrl: video.coverUrl,
-  placeholder: (context, url) => const CircularProgressIndicator(),
-  errorWidget: (context, url, error) => const Icon(Icons.error),
-  fit: BoxFit.cover,
-);
-```
-
-#### 2.2.4 内存管理
-```dart
-class VideoPlayerPage extends StatefulWidget {
-  @override
-  _VideoPlayerPageState createState() => _VideoPlayerPageState();
-}
-
-class _VideoPlayerPageState extends State<VideoPlayerPage> {
-  late VideoPlayerController _controller;
-  
-  @override
-  void initState() {
-    super.initState();
-    _controller = VideoPlayerController.network(widget.videoUrl);
-  }
-  
-  @override
-  void dispose() {
-    _controller.dispose(); // 释放资源
-    super.dispose();
-  }
-}
-```
-
-### 2.3 错误处理机制
-
-#### 2.3.1 异常分类
-```dart
-// API异常
-class ApiException implements Exception {
-  final String code;
-  final String message;
-  final int? statusCode;
-  
-  const ApiException({
-    required this.code,
-    required this.message,
-    this.statusCode,
-  });
-}
-
-// 业务异常
-class BusinessException implements Exception {
-  final String code;
-  final String message;
-  
-  const BusinessException({
-    required this.code,
-    required this.message,
-  });
-}
-```
-
-#### 2.3.2 错误处理策略
-```dart
-// Repository层错误处理
-Future<List<VideoModel>> getVideos() async {
-  try {
-    final response = await _apiClient.get('/videos');
-    return _parseVideos(response.data);
-  } on DioException catch (e) {
-    if (e.type == DioExceptionType.connectionTimeout) {
-      throw const ApiException(
-        code: 'TIMEOUT',
-        message: '请求超时，请检查网络连接',
-      );
-    }
-    throw ApiException(
-      code: 'NETWORK_ERROR',
-      message: '网络请求失败',
-      statusCode: e.response?.statusCode,
-    );
-  } catch (e) {
-    throw ApiException(
-      code: 'UNKNOWN_ERROR',
-      message: '未知错误',
-    );
-  }
-}
-
-// BLoC层错误处理
-Future<void> _onLoadVideos(
-  LoadVideos event,
-  Emitter<VideoState> emit,
-) async {
-  emit(VideoLoading());
-  try {
-    final videos = await _repository.getVideos();
-    emit(VideoLoaded(videos));
-  } on ApiException catch (e) {
-    emit(VideoError(e.message));
-  } catch (e) {
-    emit(VideoError('加载视频失败'));
-  }
-}
-```
-
-#### 2.3.3 用户友好的错误展示
-```dart
-// 错误页面组件
-class ErrorWidget extends StatelessWidget {
-  final String message;
-  final VoidCallback? onRetry;
-  
-  const ErrorWidget({
-    super.key,
-    required this.message,
-    this.onRetry,
-  });
-  
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.error_outline, size: 64),
-          const SizedBox(height: 16),
-          Text(message),
-          if (onRetry != null) ...[
-            const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: onRetry,
-              child: const Text('重试'),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-}
-```
-
-## 3. 开发流程规范
-
-### 3.1 分支管理策略
-
-#### 3.1.1 分支类型
-- **main**: 主分支，生产环境代码
-- **develop**: 开发分支，集成最新功能
-- **feature/{功能名}**: 功能分支
-- **hotfix/{修复内容}**: 紧急修复分支
-- **release/{版本号}**: 发布分支
-
-#### 3.1.2 分支命名规范
-```bash
-# 功能分支
-feature/video-player
-feature/user-profile
-feature/social-sharing
-
-# 修复分支
-hotfix/video-crash-fix
-hotfix/login-error-fix
-
-# 发布分支
-release/v1.0.0
-release/v1.1.0
-```
-
-#### 3.1.3 工作流程
-1. 从`develop`分支创建`feature`分支
-2. 在`feature`分支上开发功能
-3. 完成后创建Pull Request到`develop`
-4. 代码审查通过后合并到`develop`
-5. 发布时从`develop`创建`release`分支
-6. 测试通过后合并到`main`并打标签
-
-### 3.2 代码审查标准
-
-#### 3.2.1 审查检查项
-- [ ] 代码符合项目规范
-- [ ] 功能实现正确
-- [ ] 错误处理完善
-- [ ] 性能考虑合理
-- [ ] 测试覆盖充分
-- [ ] 文档更新及时
-
-#### 3.2.2 Pull Request模板
-```markdown
-## 功能描述
-简要描述本次提交的功能或修复
-
-## 变更内容
-- [ ] 新增功能
-- [ ] Bug修复
-- [ ] 性能优化
-- [ ] 代码重构
-- [ ] 文档更新
-
-## 测试说明
-描述如何测试本次变更
-
-## 截图/录屏
-如有UI变更，请提供截图或录屏
-
-## 检查清单
-- [ ] 代码已自测
-- [ ] 单元测试已添加/更新
-- [ ] 文档已更新
-- [ ] 无编译警告
-```
-
-### 3.3 测试覆盖率要求
-
-#### 3.3.1 测试分类
-- **单元测试**: 测试单个函数或类
-- **Widget测试**: 测试UI组件
-- **集成测试**: 测试完整功能流程
-
-#### 3.3.2 覆盖率目标
-- 核心业务逻辑：≥90%
-- Repository层：≥80%
-- BLoC层：≥80%
-- Widget层：≥70%
-- 整体覆盖率：≥75%
-
-#### 3.3.3 测试示例
-```dart
-// 单元测试示例
-void main() {
-  group('VideoRepository', () {
-    late VideoRepository repository;
-    late MockApiClient mockApiClient;
-    
-    setUp(() {
-      mockApiClient = MockApiClient();
-      repository = VideoRepository(mockApiClient);
-    });
-    
-    test('should return videos when API call is successful', () async {
-      // Arrange
-      when(mockApiClient.get('/videos'))
-          .thenAnswer((_) async => Response(
-                data: {'data': [mockVideoJson]},
-                statusCode: 200,
-              ));
-      
-      // Act
-      final result = await repository.getVideos();
-      
-      // Assert
-      expect(result, isA<List<VideoModel>>());
-      expect(result.length, 1);
-    });
-  });
-}
-
-// Widget测试示例
-void main() {
-  testWidgets('VideoCard should display video title', (tester) async {
-    // Arrange
-    const video = VideoModel(
-      id: '1',
-      title: 'Test Video',
-      videoUrl: 'https://example.com/video.mp4',
-    );
-    
-    // Act
-    await tester.pumpWidget(
-      MaterialApp(
-        home: VideoCard(video: video),
-      ),
-    );
-    
-    // Assert
-    expect(find.text('Test Video'), findsOneWidget);
-  });
-}
-```
-
-### 3.4 持续集成/持续部署
-
-#### 3.4.1 CI/CD流程
-```yaml
-# .github/workflows/ci.yml
-name: CI/CD Pipeline
-
-on:
-  push:
-    branches: [main, develop]
-  pull_request:
-    branches: [main, develop]
-
-jobs:
-  test:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - uses: subosito/flutter-action@v2
-        with:
-          flutter-version: '3.9.2'
-      - run: flutter pub get
-      - run: flutter analyze
-      - run: flutter test --coverage
-      - run: flutter build apk --debug
-```
-
-#### 3.4.2 代码质量检查
-- **静态分析**: `flutter analyze`
-- **代码格式**: `dart format`
-- **测试运行**: `flutter test`
-- **覆盖率检查**: `flutter test --coverage`
-
-## 4. 开发工具和配置
-
-### 4.1 开发环境配置
-
-#### 4.1.1 Flutter版本
-- Flutter SDK: 3.9.2+
-- Dart SDK: 3.0.0+
-
-#### 4.1.2 IDE配置
-推荐使用VS Code或Android Studio，安装以下插件：
-- Flutter
-- Dart
-- Flutter Widget Snippets
-- Bracket Pair Colorizer
-
-#### 4.1.3 代码格式化配置
-```yaml
-# analysis_options.yaml
-include: package:flutter_lints/flutter.yaml
-
-analyzer:
-  exclude:
-    - "**/*.g.dart"
-    - "**/*.freezed.dart"
-
-linter:
-  rules:
-    prefer_const_constructors: true
-    prefer_const_literals_to_create_immutables: true
-    avoid_print: true
-    prefer_single_quotes: true
-```
-
-### 4.2 依赖管理
-
-#### 4.2.1 核心依赖
+# 知音App 前端开发提示词与项目开发规则（统一版）
+
+> 本文件统一包含两部分内容：
+> 1) 优化后的提示词（用于驱动 trae 以 Flutter+Provider+GoRouter+Dio 实现前端）；
+> 2) 项目开发规则（projects_rules.md）。
+>
+> 关联文档与资源：
+> - 系统设计说明书：`f:\CodeStore\Projects\zitok_frontend\zitok\系统设计说明书.md`
+> - 产品需求文档（PRD）：`f:\CodeStore\Projects\zitok_frontend\zitok\知音App-产品需求文档(PRD).md`
+> - UI 参考图：`f:\CodeStore\Projects\zitok_frontend\zitok\img\*.png`
+>
+> 目标平台：Flutter 移动端（Android/iOS），可后续扩展到 Web。
+>
+>
+---
+
+## 一、优化后的提示词（供 trae 执行）
+
+你将以 Flutter + Provider 实现“知音App”（视频与笔记结合的知识向社交短视频平台）的移动端前端。请严格依据 PRD 与系统设计说明书，并参照项目 `img` 目录中的界面图完成页面与交互，实现 P0 必须功能优先：用户系统、视频管理、推荐基础、笔记功能。同时搭建稳定的网络层与本地存储核心件，便于与后端（Golang）对接和联调。
+
+- 技术栈与依赖（建议）：
+  - 状态管理：`provider`
+  - 网络：`dio`（拦截器、重试、超时、BaseOptions）
+  - 序列化：`json_serializable` + `build_runner` + `json_annotation`
+  - 本地存储：`shared_preferences`（轻量配置）、`hive`+`hive_flutter`（离线数据与列表缓存）
+  - 视频播放：`video_player` + `chewie`
+  - 图片与资源：`cached_network_image`、`flutter_svg`
+  - 日志与工具：`logger`、`intl`
+  - 路由：`go_router`（或保持 Navigator 2.0 方案，优先 go_router）
+
+- 项目目录结构（请创建并按此落地）：
+  - `lib/`
+    - `main.dart`
+    - `src/app.dart`（根部件与 MultiProvider 注入）
+    - `src/config/`（环境与常量，如 `app_config.dart`、`env.dart`）
+    - `src/routes/`（`app_router.dart` 路由定义与守卫）
+    - `src/theme/`（主题与样式）
+    - `src/utils/`（工具与扩展，如 `validators.dart`、`date_time.dart`）
+    - `src/models/`（数据模型，含 `*.g.dart`）
+    - `src/services/`（纯网络服务层：`auth_service.dart`、`video_service.dart`、`note_service.dart` 等）
+    - `src/repositories/`（仓库层，聚合服务与本地存储：`auth_repository.dart` 等）
+    - `src/providers/`（`ChangeNotifier`：`auth_provider.dart`、`feed_provider.dart`、`video_provider.dart`、`notes_provider.dart`、`profile_provider.dart`、`messaging_provider.dart`）
+    - `src/widgets/`（通用组件）
+    - `src/views/`（按功能分包：`auth/`、`home/`、`video/`、`notes/`、`profile/`、`messages/`、`create/`）
+  - `test/`（模块化单测）
+
+- 路由与页面清单（对应 `img` 目录）：
+  - `/welcome` → 欢迎页（`欢迎界面.png`）
+  - `/auth/login` → 登录（`登录界面.png`）
+  - `/auth/register` → 注册（`注册界面.png`）
+  - `/home/discover` → 发现 Feed（`主界面发现.png`）
+  - `/home/featured` → 精选双列 Feed（`主界面精选.png`）
+  - `/video/:id` → 视频详情（含“详情/评论”Tab，`视频详情界面-详情-评论区.png`）
+  - `/video/:id/notes` → 视频关联笔记 Tab（`视频详情界面-笔记.png`）
+  - `/create` → 创作页（视频+文档，`创作界面.png`、`创作界面-上传笔记状态.png`）
+  - `/messages` → 私信列表（`私信界面.png`）
+  - `/chat/:conversationId` → 聊天（`聊天界面.png`）
+  - `/profile/edit` → 资料编辑（`个人资料编辑界面.png`）
+  - `/profile/:id/notes` → 个人笔记（`个人界面-笔记.png`）
+  - `/profile/:id/favorites` → 个人收藏（`个人界面-收藏.png`）
+
+- 状态管理要求：
+  - 在 `src/app.dart` 顶层以 `MultiProvider` 注入各 Provider。
+  - Provider 职责单一：页面状态与轻业务，重业务走 `repositories/`。
+  - 统一使用不可变 Model（`copyWith`），Provider 内部维护 UI 状态（loading/error/empty/data）。
+
+- 网络层要求：
+  - 以 `Dio` 封装 `ApiClient`，配置拦截器：日志、鉴权（JWT）、错误码转换、网络重试（指数退避）。
+  - 统一响应格式（按后端约定）：
+    ```json
+    { "code": 200, "message": "success", "data": {}, "timestamp": 1640995200 }
+    ```
+  - 将后端错误码映射到前端异常类型：
+    - 40001: 手机号已注册 → `AuthError.phoneExists`
+    - 40002: 验证码无效 → `AuthError.invalidOtp`
+    - 40003: 账户封禁 → `AuthError.banned`
+    - 40101: 令牌过期 → 触发刷新或强制重新登录
+    - 50001~50005: 视频相关错误 → `VideoError.*`
+    - 60001~60004: 社交相关错误 → `SocialError.*`
+    - 70001~70005: 笔记相关错误 → `NoteError.*`
+    - 80001~80004: 推荐/搜索相关错误 → `RecommendError.*`
+
+- 本地存储要求：
+  - `SharedPreferences`：存 JWT、用户基础配置、首启标记。
+  - `Hive`：模块化 Box，例如：`user_box`、`notes_box`、`feed_cache_box`、`messages_box`。
+  - 离线策略：Feed 与笔记支持离线查看；网络恢复后增量同步（按系统设计说明书的同步策略）。
+
+- 后端对接（Golang）接口约定（示例，按系统设计说明书）：
+  - Auth：`POST /api/v1/auth/register`、`POST /api/v1/auth/verify`、`POST /api/v1/auth/login`、`POST /api/v1/auth/refresh`、`POST /api/v1/auth/logout`
+  - User：`GET /api/v1/user/profile`、`PUT /api/v1/user/profile`、`GET /api/v1/user/notifications`
+  - Video：`POST /api/v1/video/upload/init`、`POST /api/v1/video/upload/complete`、`GET /api/v1/video/{id}`、`GET /api/v1/video/{id}/stats`
+  - Feed：`GET /api/v1/recommend/feed`、`GET /api/v1/feed/featured`、`GET /api/v1/search?q=...`
+  - Notes：`POST /api/v1/note/create`、`PUT /api/v1/note/{id}`、`GET /api/v1/note/video/{videoId}`、`GET /api/v1/note/user/{userId}`
+  - Social：`POST /api/v1/social/like`、`POST /api/v1/social/comment`、`POST /api/v1/social/follow`、`DELETE /api/v1/social/follow/{id}`
+  - Messaging：`GET /api/v1/messages`、`POST /api/v1/messages`、`GET /api/v1/messages/{conversationId}`
+
+- 开发里程碑（先做 P0）：
+  1) 用户系统：注册/登录/资料编辑/权限控制（P0）
+  2) 视频管理：上传流程 UI、播放、基础信息展示（P0）
+  3) 推荐基础：发现与精选 Feed、行为上报（埋点）（P0）
+  4) 社交功能：点赞、评论、关注、取消关注、私信列表、聊天（P0）
+  5) 笔记功能：笔记上传、编辑、删除、列表展示，笔记作为视频的附件上传，笔记与视频的关联通过视频 ID 实现。（P0）
+
+- 任务执行顺序（Cursor 落地步骤）：
+  1) 初始化依赖与目录结构；配置 `analysis_options.yaml`
+  2) 建立 `ApiClient`、拦截器、统一响应与错误映射
+  3) 完成 `repositories/` 与核心 `providers/`（Auth/Feed/Video/Notes）
+  4) 按路由清单逐页实现 UI 与交互，贴合 `img` 参考图
+  5) 打通认证与基本数据流（登录后加载个性化 Feed）
+  6) 视频详情与笔记联动；时间戳标记与截图占位
+  7) 提交基础单测；联调后端并完成错误处理与重试
+
+- 验收标准（节选）：
+  - 登录/注册 < 500ms 响应，失败给出明确提示
+  - 视频首帧 < 1s、切换 < 200ms、缓冲 < 0.5s（良好网络）
+  - Feed 上下滑动流畅（>60fps）、精选双列加载稳定
+  - 笔记创建 < 200ms、本地→云端增量同步可验证
+  - 错误码转义清晰、令牌过期自动刷新或退出
+
+---
+
+## 二、项目开发规则（projects_rules.md）
+
+- 目录结构与命名
+  - 遵循上文目录；文件名 `snake_case`，类名 `PascalCase`，Provider 以 `*Provider` 结尾，Service 以 `*Service` 结尾，Repository 以 `*Repository` 结尾。
+  - Model 不含业务逻辑，仅数据与 `fromJson/toJson`、`copyWith`。
+
+- Provider 使用规范
+  - 仅维护 UI 态与轻业务；重业务（网络/存储聚合）下沉至 Repository。
+  - 暴露只读状态（data/error/loading）；提供明确的动作方法（如 `login`、`loadFeed`）。
+  - 禁止在 Provider 中直接操作 `Dio`；通过 Service/Repository 访问。
+
+- 网络层规范
+  - `ApiClient` 统一配置：BaseURL（多环境）、超时（连接 10s/读写 20s）、`User-Agent`、`Accept-Language`。
+  - 拦截器：
+    - Auth：JWT 注入与刷新（401 → 刷新令牌；失败则登出）。
+    - Logger：开发环境详细日志，生产环境精简。
+    - Retry：网络错误指数退避，最多 3 次。
+  - 统一响应解包：检测 `code` 字段，成功返回 `data`，失败抛业务异常。
+
+- 本地存储规范
+  - `SharedPreferences`：`access_token`、`refresh_token`、`user_id`、`onboarding_done`。
+  - `Hive`：
+    - `user_box` 保存用户画像与偏好；
+    - `feed_cache_box` 保存最近 Feed；
+    - `notes_box` 保存用户笔记（含版本与同步状态）；
+    - `messages_box` 保存最近会话与消息快照。
+  - 离线优先：列表页先读本地缓存，再并发拉取更新，合并去重。
+
+- 模型与序列化
+  - 使用 `json_serializable`；`DateTime` 统一 ISO 8601；数字类型与枚举严格匹配后端协议。
+  - 大对象分页加载；避免一次性全量取回。
+
+- 错误处理与重试
+  - 将错误码映射到可读提示；避免“失败请重试”的笼统文案。
+  - 网络断开：进入离线模式（Feed/笔记可浏览），恢复后提示增量同步。
+
+- 日志与监控
+  - `logger` 记录关键操作与异常；屏蔽敏感数据（手机号中间 4 位脱敏）。
+  - 后续可接入埋点 SDK（点击、播放、完播、笔记创建等）。
+
+- 主题与设计系统
+  - 统一颜色与字号，抽象 `AppTheme`；支持明暗主题切换。
+  - 组件库自建于 `src/widgets/`，避免页面内重复样式。
+
+- 资源管理
+  - 图片与 SVG 统一走 `assets/`，在 `pubspec.yaml` 显式声明。
+  - 网络图片使用 `cached_network_image`，配置占位与失败重试。
+
+- 路由与导航
+  - 使用 `go_router`；路由常量集中管理；认证路由守卫（未登录跳转 `/auth/login`）。
+  - 详情页参数采用路径参数（如 `/video/:id`）。
+
+- 性能与可访问性
+  - 列表虚拟化与懒加载；避免重绘与重复请求。
+  - 文本对比度达标；元素触控区域最小 44dp。
+
+- 国际化与时区
+  - 使用 `intl`；所有时间统一为服务器 UTC，前端按本地化显示。
+
+- 测试策略
+  - 单测优先：Provider、Repository、ApiClient 解包与错误映射。
+  - UI 可作金丝雀测试（Smoke Tests），确保关键路径可用。
+
+- 构建与多环境
+  - `--dart-define=BASE_URL`、`--dart-define=ENV=dev|staging|prod`；
+  - 在 `src/config/env.dart` 读取并暴露。
+
+- 安全与权限
+  - 避免在日志/崩溃中输出敏感信息；
+  - Token 过期自动刷新；刷新失败清理状态并退出登录。
+
+- Git 提交与分支
+  - 分支：`feature/*`、`fix/*`、`release/*`。
+  - 提交信息：`feat: `、`fix: `、`refactor: `、`docs: `、`test: ` 等规范前缀。
+
+- 文档与注释
+  - 关键模块（Provider/Repository/Service/Model/Widget/View/Page）需文件头简述职责；
+  - README 更新主要页面与依赖说明，联调注意事项。
+
+- 与后端联调流程
+  1) 对齐接口定义与错误码；
+  2) 本地模拟数据与环境切换；
+  3) 打通鉴权与推荐 Feed；
+  4) 视频详情与笔记联动；
+  5) 问题复盘与接口微调。
+
+- 代码评审与质量门槛
+  - `flutter analyze` 无警告；关键模块需单测通过；
+  - PR 需包含截图或说明（页面变更/接口改动）。
+
+---
+
+### 依赖建议（pubspec.yaml 片段参考）
+
 ```yaml
 dependencies:
   flutter:
     sdk: flutter
-  
-  # 状态管理
-  flutter_bloc: ^8.1.3
-  
-  # 网络请求
-  dio: ^5.3.2
-  
-  # 本地存储
-  shared_preferences: ^2.2.2
-  
-  # 图片缓存
-  cached_network_image: ^3.3.0
-  
-  # 路由管理
-  go_router: ^12.1.1
-  
-  # JSON序列化
-  json_annotation: ^4.8.1
+  provider: ^6.1.2
+  dio: ^5.5.0
+  json_annotation: ^4.9.0
+  shared_preferences: ^2.3.3
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  video_player: ^2.9.1
+  chewie: ^1.7.5
+  cached_network_image: ^3.3.1
+  flutter_svg: ^2.0.9
+  go_router: ^14.2.0
+  intl: ^0.19.0
+  logger: ^2.2.0
 
 dev_dependencies:
+  build_runner: ^2.4.9
+  json_serializable: ^6.8.0
   flutter_test:
     sdk: flutter
-  flutter_lints: ^2.0.0
-  
-  # 代码生成
-  build_runner: ^2.4.7
-  json_serializable: ^6.7.1
-  
-  # 测试工具
-  mockito: ^5.4.2
 ```
-
-## 5. 安全规范
-
-### 5.1 数据安全
-- 敏感数据加密存储
-- API密钥安全管理
-- 用户隐私保护
-
-### 5.2 网络安全
-- HTTPS通信
-- 证书验证
-- 请求签名验证
-
-### 5.3 代码安全
-- 输入验证
-- SQL注入防护
-- XSS攻击防护
-
-## 6. 文档规范
-
-### 6.1 代码文档
-- 所有公共API必须有文档注释
-- 复杂逻辑需要详细说明
-- 示例代码要完整可运行
-
-### 6.2 项目文档
-- README.md：项目介绍和快速开始
-- CHANGELOG.md：版本变更记录
-- API.md：接口文档
-
-## 7. 版本发布规范
-
-### 7.1 版本号规范
-采用语义化版本控制（Semantic Versioning）：
-- 主版本号：不兼容的API修改
-- 次版本号：向下兼容的功能性新增
-- 修订号：向下兼容的问题修正
-
-### 7.2 发布流程
-1. 更新版本号
-2. 更新CHANGELOG
-3. 创建发布分支
-4. 测试验证
-5. 合并到主分支
-6. 创建发布标签
-7. 发布到应用商店
 
 ---
 
-本文档将随着项目发展持续更新，所有团队成员都有责任遵守这些规范，确保项目的高质量和可维护性。
+### 开发小贴士
+- 使用env文件切换开发与生产环境从而实现mock数据与真实数据的切换。
+- 优先完成 P0 路由与 Provider 骨架，随后逐页贴合 `img` 参考图。
+- 统一按钮/卡片/标签等通用组件，减少页面内重复样式代码。
+- 遵循“视图（UI）→Provider（状态）→Repository（业务）→Service（网络）→后端”的自上而下调用链。
+- 当后端接口未就绪时，用本地 `mock/*.json` 与 `Hive` 提供假数据，保持页面联通性。

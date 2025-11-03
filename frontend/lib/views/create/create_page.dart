@@ -233,7 +233,7 @@ class _CreatePageState extends State<CreatePage> {
     if (mdFileName != null && !ContentValidator.isSupportedMarkdown(mdFileName!)) {
       return 'Markdown 文件扩展名不正确';
     }
-    final illegal = ContentValidator.findIllegal(_descCtl.text + '\n' + mdContent);
+    final illegal = ContentValidator.findIllegal('${_descCtl.text}\n$mdContent');
     if (illegal != null) return '内容含不合规词：$illegal';
     return null;
   }
