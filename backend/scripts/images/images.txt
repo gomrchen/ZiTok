@@ -1,6 +1,0 @@
-bitnami/etcd:latest
-jaegertracing/all-in-one:latest
-mysql:latest
-bitnami/kafka:latest
-provectuslabs/kafka-ui:latest
-redis:6.0.8

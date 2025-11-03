@@ -1,0 +1,82 @@
+# NOTICE: copy and rename this file to config.yaml
+# NOTICE: some config need to complete
+
+# nodes only need to set this item
+etcd-addr: etcd:2379
+
+# etcd server need to complete these items
+server:
+  jwt-secret: MTAxNTkwMTg1Mw==
+  version: "1.0"
+  name: tiktok
+
+snowflake:
+  worker-id: 0
+  datancenter-id: 0
+
+mysql:
+  addr: mysql:3306
+  database: tiktok
+  username: tiktok
+  password: tiktok
+  charset: utf8mb4
+
+# you need to complete this config to use video service
+oss:
+  endpoint: https://s3.cn-south-1.qiniucs.com
+  accessKey-id: zpcgO6vSfHRcwqbsLu0coGykrljeVZtff3FGYDDh
+  accessKey-secret: LImDlP5JsaitZwbzFhxlch98uffumOFdZ9a018iY
+  bucketname: ziktok
+  main-directory: ziktok
+
+elasticsearch:
+  addr: elasticsearch:9200
+  host: elasticsearch
+
+etcd:
+  addr: etcd:2379
+
+rabbitmq:
+  addr: rabiitmq:5672
+  username: tiktok
+  password: tiktok
+
+redis:
+  addr: redis:6379
+  password: tiktok
+
+jaeger:
+  addr: jaeger:6831
+
+# if you deploy in different machines, remember to modify IP.
+services:
+  api:
+    name: api
+    load-balance: false
+    addr:
+      - 0.0.0.0:10001
+  user:
+    name: user
+    load-balance: false
+    addr:
+      - 0.0.0.0:10002
+  chat:
+    name: chat
+    load-balance: false
+    addr:
+      - 0.0.0.0:10003
+  follow:
+    name: follow
+    load-balance: false
+    addr:
+      - 0.0.0.0:10004
+  interaction:
+    name: interaction
+    load-balance: false
+    addr:
+      - 0.0.0.0:10005
+  video:
+    name: video
+    load-balance: false
+    addr:
+      - 0.0.0.0:10006
