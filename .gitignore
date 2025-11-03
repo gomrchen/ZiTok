@@ -1,8 +1,8 @@
 # ZiTok 单仓库 .gitignore
-# 覆盖通用与 Go 后端；Flutter 规则由 frontend/.gitignore 管理
+# 适配重构后的 Go 后端；Flutter 规则由 frontend/.gitignore 管理
 
 # ----------------------
-# 通用临时/日志文件
+# 通用临时 / 日志文件
 # ----------------------
 *.log
 logs/
@@ -23,7 +23,7 @@ desktop.ini
 *.lnk
 
 # -------------
-# 编辑器/IDE
+# 编辑器 / IDE
 # -------------
 .vscode/
 .idea/
@@ -44,22 +44,60 @@ desktop.ini
 *.key
 *.crt
 
-# -----------
-# Go 后端
-# -----------
+# -------------------------
+# Go 后端：构建产物 / 覆盖率 / 工作区
+# -------------------------
+# 构建产物
 backend/bin/
+backend/**/bin/
+backend/output/
+backend/**/output/
+
+# 覆盖率与分析文件
 backend/coverage/
+backend/**/coverage/
 backend/**/*.cov
 backend/**/*.cover
 backend/**/*.coverprofile
 backend/**/*.lcov
+backend/**/*.prof
+backend/**/*.pprof
+
+# Go 工作区文件（根或后端子仓）
+go.work
+go.work.sum
 backend/go.work
 backend/go.work.sum
+
+# Go 构建二进制与测试产物（仅后端）
 backend/**/*.exe
 backend/**/*.dll
 backend/**/*.so
 backend/**/*.dylib
 backend/**/*.test
 backend/**/*.out
+
+# -------------------------
+# 本地开发数据（容器卷 / 运行时数据）——请勿提交
+# -------------------------
+backend/data/
+backend/deploy/data/
+backend/deploy/*/data/
+backend/**/data/
+
+# 本地缓存
+backend/.cache/
+backend/**/.cache/
+
+# Postman 本地环境（保留 API 定义）
+backend/.postman/environments/
+backend/.postman/*-env*.json
+
+# -------------------------
+# 代码生成（按需忽略）
+# -------------------------
+# 目前 kitex_gen 已在仓库中维护，不忽略；如需改为构建时生成，解除注释：
+# backend/kitex_gen/
+# backend/cmd/api/output/
 
 # 前端 Flutter 客户端已有独立 .gitignore，这里不重复规则
