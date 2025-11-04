@@ -1,45 +1,31 @@
-FROM golang:1.23 AS builder
-
-ARG SERVICE
+FROM golang:1.20 AS builder
 
 ENV TZ=Asia/Shanghai
-ENV GO111MODULE=on
 ENV CGO_ENABLED=0
-ENV GOPROXY=https://goproxy.cn,direct
 ENV GOOS=linux
-ENV GOARCH=amd64
+ENV GOPROXY=https://goproxy.cn,direct
 
 RUN mkdir -p /app
-RUN mkdir -p /app/publish
 
 WORKDIR /app
-COPY . .
 
+ADD . /app
 RUN go mod tidy
-RUN go build -ldflags="-w -s" -o ./main app/${SERVICE}/cmd/main.go
+RUN make build-all
 
-WORKDIR /app
-RUN cp main publish/ && \
-    cp -r app/${SERVICE}/config publish/
 
-FROM alpine:latest
+FROM alpine
 
-ARG SERVICE
-ARG PORT
-
+RUN apk update --no-cache && apk add --no-cache ca-certificates tzdata
 ENV TZ=Asia/Shanghai
-ENV SERVICE=${SERVICE}
-ENV PORT=${PORT}
+ENV service=api
 
-RUN sed -i 's#https\?://dl-cdn.alpinelinux.org/alpine#https://mirrors.tuna.tsinghua.edu.cn/alpine#g' /etc/apk/repositories
-RUN apk update --no-cache && apk --no-cache add ca-certificates tzdata bash
+RUN apk update
+RUN apk add --no-cache ffmpeg
 
 WORKDIR /app
+COPY --from=builder /app/output /app/output
+COPY --from=builder /app/config /app/config
+COPY --from=builder /app/docker-entrypoint.sh /app/docker-entrypoint.sh
 
-COPY --from=builder /app/publish .
-RUN mkdir -p "logs"
-
-# 指定运行时环境变量
-EXPOSE ${PORT}
-
-ENTRYPOINT ["./main"]
+CMD ["sh", "./docker-entrypoint.sh"]
