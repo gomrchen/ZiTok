@@ -13,4 +13,5 @@ var (
 func Init() {
 	InitUserRPC()
 	InitInteractionRPC()
+	InitFollowRPC()
 }

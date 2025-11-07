@@ -36,4 +36,10 @@ var (
 
 	// Chat
 	CharacterLimitError = NewErrNo(CharacterLimitErrorCode, "character limit error")
+
+	// Video
+	VideoNotFoundError = NewErrNo(VideoNotFoundErrorCode, "video not found")
+
+	// Note
+	NoteNotFoundError = NewErrNo(NoteNotFoundErrorCode, "note not found")
 )

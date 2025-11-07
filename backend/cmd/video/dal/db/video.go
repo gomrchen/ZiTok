@@ -58,3 +58,11 @@ func GetVideoIDByUid(ctx context.Context, uid int64) (videoIDList []int64, err e
 	}
 	return
 }
+
+func GetVideoInfoByFriendIDs(ctx context.Context, friendIDs []int64) ([]Video, error) {
+	var videoResp []Video
+	if err := DB.WithContext(ctx).Where("user_id IN ?", friendIDs).Order("created_at DESC").Find(&videoResp).Error; err != nil {
+		return nil, err
+	}
+	return videoResp, nil
+}
