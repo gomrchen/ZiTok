@@ -6,7 +6,7 @@ import (
 	"context"
 	"flag"
 	"fmt"
-
+	"github.com/hertz-contrib/cors"
 	sentinel "github.com/alibaba/sentinel-golang/api"
 	"github.com/alibaba/sentinel-golang/core/flow"
 	"github.com/cloudwego/hertz/pkg/app"
@@ -72,6 +72,15 @@ func main() {
 		server.WithHandleMethodNotAllowed(true),
 		server.WithMaxRequestBodySize(1<<31),
 	)
+
+	r.Use(cors.New(cors.Config{
+		AllowOrigins: []string{"*"},
+		AllowMethods: []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders: []string{"Authorization", "Content-Type"},
+		ExposeHeaders: []string{"Content-Length"},
+		AllowCredentials: false,
+		MaxAge: 86400,
+	}))
 
 	// Recovery 错误恢复
 	r.Use(recovery.Recovery(recovery.WithRecoveryHandler(recoveryHandler)))
