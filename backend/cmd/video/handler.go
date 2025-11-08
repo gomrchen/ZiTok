@@ -199,3 +199,25 @@ func (s *VideoServiceImpl) PutVideo(ctx context.Context, req *video.PutVideoRequ
 	resp.Base = pack.BuildBaseResp(nil)
 	return resp, nil
 }
+
+// GetFriendVideoList implements the VideoServiceImpl interface.
+func (s *VideoServiceImpl) GetFriendVideoList(ctx context.Context, req *video.GetFriendVideoListRequest) (resp *video.GetFriendVideoListResponse, err error) {
+	resp = new(video.GetFriendVideoListResponse)
+
+	if _, err := utils.CheckToken(req.Token); err != nil {
+		resp.Base = pack.BuildBaseResp(errno.AuthorizationFailedError)
+		return resp, nil
+	}
+
+	videoList, userList, favoriteCountList, commentCountList, isFavoriteList, err := service.NewVideoService(ctx).GetFriendVideoList(req)
+	if err != nil {
+		klog.Error(err)
+		resp.Base = pack.BuildBaseResp(err)
+		return resp, nil
+	}
+
+	resp.Base = pack.BuildBaseResp(nil)
+	resp.VideoList = pack.VideoList(videoList, userList, favoriteCountList, commentCountList, isFavoriteList)
+
+	return
+}

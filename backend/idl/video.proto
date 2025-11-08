@@ -96,6 +96,15 @@ message GetVideoIDByUidResponse{
     repeated int64 video_id = 2;
 }
 
+message GetFriendVideoListRequest {
+    string token = 1;
+}
+
+message GetFriendVideoListResponse {
+    BaseResp base = 1;
+    repeated Video video_list = 2;
+}
+
 service VideoService {
     rpc Feed(FeedRequest) returns (FeedResponse){};
     rpc PutVideo(PutVideoRequest) returns (PutVideoResponse){};
@@ -103,4 +112,5 @@ service VideoService {
     rpc GetPublishList(GetPublishListRequest)returns (GetPublishListResponse){};
     rpc GetWorkCount(GetWorkCountRequest)returns (GetWorkCountResponse){};
     rpc GetVideoIDByUid(GetVideoIDByUidRequset) returns (GetVideoIDByUidResponse){};
+    rpc GetFriendVideoList(GetFriendVideoListRequest) returns (GetFriendVideoListResponse){};
 }

@@ -15,6 +15,7 @@ const (
 	RedisDBFollow      = 2
 	RedisDBInteraction = 3
 	RedisDBVideo       = 4
+	RedisDBNote        = 5
 	CommentExpiredTime = 1 * time.Hour
 	LikeExpiredTime    = 1 * time.Hour
 	NoDataExpiredTime  = 1 * time.Minute
@@ -39,6 +40,7 @@ const (
 	FollowServiceName      = "follow"
 	ChatServiceName        = "chat"
 	VideoServiceName       = "video"
+	NoteServiceName        = "note"
 
 	// db table name
 	UserTableName     = "user"
@@ -47,6 +49,7 @@ const (
 	FavoriteTableName = "favorite"
 	FollowTableName   = "follow"
 	VideoTableName    = "video"
+	NoteTableName     = "note"
 
 	// snowflake
 	SnowflakeWorkerID     = 0

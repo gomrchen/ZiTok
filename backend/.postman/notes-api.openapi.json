@@ -1,0 +1,737 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "ZiTok Notes & Friend Video API",
+    "description": "笔记和好友视频相关接口",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "笔记接口"
+    },
+    {
+      "name": "视频接口"
+    }
+  ],
+  "paths": {
+    "/douyin/note/create/": {
+      "post": {
+        "summary": "创建笔记",
+        "description": "创建新的笔记，支持附件笔记和用户笔记两种类型",
+        "tags": [
+          "笔记接口"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token", "video_id", "content", "type"],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "用户鉴权token",
+                    "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                  },
+                  "video_id": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "视频ID",
+                    "example": 123456
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "笔记内容（markdown格式）",
+                    "example": "# 笔记标题\n\n这是笔记内容，支持**markdown**格式"
+                  },
+                  "type": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "笔记类型：1-附件笔记（只有视频发布者能修改），2-用户笔记（不限）",
+                    "enum": [1, 2],
+                    "example": 2
+                  }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["token", "video_id", "content", "type"],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "用户鉴权token"
+                  },
+                  "video_id": {
+                    "type": "string",
+                    "description": "视频ID"
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "笔记内容（markdown格式）"
+                  },
+                  "type": {
+                    "type": "string",
+                    "description": "笔记类型：1-附件笔记，2-用户笔记"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status_code": {
+                      "type": "integer",
+                      "format": "int64",
+                      "example": 0
+                    },
+                    "status_msg": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "note": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "format": "int64",
+                          "example": 100001
+                        },
+                        "video_id": {
+                          "type": "integer",
+                          "format": "int64",
+                          "example": 123456
+                        },
+                        "user_id": {
+                          "type": "integer",
+                          "format": "int64",
+                          "example": 10000
+                        },
+                        "content": {
+                          "type": "string",
+                          "example": "# 笔记标题\n\n这是笔记内容"
+                        },
+                        "type": {
+                          "type": "integer",
+                          "format": "int64",
+                          "example": 2
+                        },
+                        "created_at": {
+                          "type": "string",
+                          "example": "2024-01-01 12:00:00"
+                        },
+                        "updated_at": {
+                          "type": "string",
+                          "example": "2024-01-01 12:00:00"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/douyin/note/": {
+      "get": {
+        "summary": "获取笔记",
+        "description": "根据笔记ID获取单个笔记信息",
+        "tags": [
+          "笔记接口"
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "description": "用户鉴权token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          {
+            "name": "note_id",
+            "in": "query",
+            "description": "笔记ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 100001
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status_code": {
+                      "type": "integer",
+                      "format": "int64",
+                      "example": 0
+                    },
+                    "status_msg": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "note": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "integer",
+                          "format": "int64"
+                        },
+                        "video_id": {
+                          "type": "integer",
+                          "format": "int64"
+                        },
+                        "user_id": {
+                          "type": "integer",
+                          "format": "int64"
+                        },
+                        "content": {
+                          "type": "string"
+                        },
+                        "type": {
+                          "type": "integer",
+                          "format": "int64"
+                        },
+                        "created_at": {
+                          "type": "string"
+                        },
+                        "updated_at": {
+                          "type": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "put": {
+        "summary": "更新笔记",
+        "description": "更新笔记内容，附件笔记只有视频发布者能修改，用户笔记只有创建者能修改",
+        "tags": [
+          "笔记接口"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token", "note_id", "content"],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "用户鉴权token"
+                  },
+                  "note_id": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "笔记ID"
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "更新后的笔记内容（markdown格式）"
+                  }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["token", "note_id", "content"],
+                "properties": {
+                  "token": {
+                    "type": "string"
+                  },
+                  "note_id": {
+                    "type": "string"
+                  },
+                  "content": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status_code": {
+                      "type": "integer",
+                      "format": "int64",
+                      "example": 0
+                    },
+                    "status_msg": {
+                      "type": "string",
+                      "example": "success"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "summary": "删除笔记",
+        "description": "删除笔记，附件笔记只有视频发布者能删除，用户笔记只有创建者能删除",
+        "tags": [
+          "笔记接口"
+        ],
+        "parameters": [],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token", "note_id"],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "用户鉴权token"
+                  },
+                  "note_id": {
+                    "type": "integer",
+                    "format": "int64",
+                    "description": "笔记ID"
+                  }
+                }
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["token", "note_id"],
+                "properties": {
+                  "token": {
+                    "type": "string"
+                  },
+                  "note_id": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status_code": {
+                      "type": "integer",
+                      "format": "int64",
+                      "example": 0
+                    },
+                    "status_msg": {
+                      "type": "string",
+                      "example": "success"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/douyin/note/video/": {
+      "get": {
+        "summary": "根据视频ID获取笔记列表",
+        "description": "获取指定视频的所有笔记，按创建时间倒序排列",
+        "tags": [
+          "笔记接口"
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "description": "用户鉴权token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "video_id",
+            "in": "query",
+            "description": "视频ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 123456
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status_code": {
+                      "type": "integer",
+                      "format": "int64",
+                      "example": 0
+                    },
+                    "status_msg": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "notes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "format": "int64"
+                          },
+                          "video_id": {
+                            "type": "integer",
+                            "format": "int64"
+                          },
+                          "user_id": {
+                            "type": "integer",
+                            "format": "int64"
+                          },
+                          "content": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "integer",
+                            "format": "int64"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/douyin/note/user/": {
+      "get": {
+        "summary": "根据用户ID获取笔记列表",
+        "description": "获取指定用户的所有笔记，按创建时间倒序排列",
+        "tags": [
+          "笔记接口"
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "description": "用户鉴权token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "description": "用户ID",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "example": 10000
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status_code": {
+                      "type": "integer",
+                      "format": "int64",
+                      "example": 0
+                    },
+                    "status_msg": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "notes": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "format": "int64"
+                          },
+                          "video_id": {
+                            "type": "integer",
+                            "format": "int64"
+                          },
+                          "user_id": {
+                            "type": "integer",
+                            "format": "int64"
+                          },
+                          "content": {
+                            "type": "string"
+                          },
+                          "type": {
+                            "type": "integer",
+                            "format": "int64"
+                          },
+                          "created_at": {
+                            "type": "string"
+                          },
+                          "updated_at": {
+                            "type": "string"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/douyin/video/friend/list/": {
+      "get": {
+        "summary": "获取好友发布视频列表",
+        "description": "获取当前用户的好友发布的所有视频，好友定义为双方互相关注的用户",
+        "tags": [
+          "视频接口"
+        ],
+        "parameters": [
+          {
+            "name": "token",
+            "in": "query",
+            "description": "用户鉴权token",
+            "required": true,
+            "schema": {
+              "type": "string"
+            },
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status_code": {
+                      "type": "integer",
+                      "format": "int64",
+                      "example": 0
+                    },
+                    "status_msg": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "video_list": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "integer",
+                            "format": "int64",
+                            "example": 123456
+                          },
+                          "author": {
+                            "type": "object",
+                            "properties": {
+                              "id": {
+                                "type": "integer",
+                                "format": "int64"
+                              },
+                              "name": {
+                                "type": "string"
+                              },
+                              "follow_count": {
+                                "type": "integer",
+                                "format": "int64"
+                              },
+                              "follower_count": {
+                                "type": "integer",
+                                "format": "int64"
+                              },
+                              "is_follow": {
+                                "type": "boolean"
+                              },
+                              "avatar": {
+                                "type": "string"
+                              },
+                              "background_image": {
+                                "type": "string"
+                              },
+                              "signature": {
+                                "type": "string"
+                              },
+                              "total_favorited": {
+                                "type": "integer",
+                                "format": "int64"
+                              },
+                              "work_count": {
+                                "type": "integer",
+                                "format": "int64"
+                              },
+                              "favorite_count": {
+                                "type": "integer",
+                                "format": "int64"
+                              }
+                            }
+                          },
+                          "play_url": {
+                            "type": "string",
+                            "example": "https://example.com/video.mp4"
+                          },
+                          "cover_url": {
+                            "type": "string",
+                            "example": "https://example.com/cover.jpg"
+                          },
+                          "favorite_count": {
+                            "type": "integer",
+                            "format": "int64",
+                            "example": 100
+                          },
+                          "comment_count": {
+                            "type": "integer",
+                            "format": "int64",
+                            "example": 50
+                          },
+                          "is_favorite": {
+                            "type": "boolean",
+                            "example": true
+                          },
+                          "title": {
+                            "type": "string",
+                            "example": "视频标题"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Note": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "笔记ID"
+          },
+          "video_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "视频ID"
+          },
+          "user_id": {
+            "type": "integer",
+            "format": "int64",
+            "description": "用户ID"
+          },
+          "content": {
+            "type": "string",
+            "description": "笔记内容（markdown格式）"
+          },
+          "type": {
+            "type": "integer",
+            "format": "int64",
+            "description": "笔记类型：1-附件笔记，2-用户笔记",
+            "enum": [1, 2]
+          },
+          "created_at": {
+            "type": "string",
+            "description": "创建时间",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "description": "更新时间",
+            "format": "date-time"
+          }
+        }
+      },
+      "BaseResponse": {
+        "type": "object",
+        "properties": {
+          "status_code": {
+            "type": "integer",
+            "format": "int64",
+            "description": "状态码，0表示成功"
+          },
+          "status_msg": {
+            "type": "string",
+            "description": "状态信息"
+          }
+        }
+      }
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:10001",
+      "description": "开发环境"
+    }
+  ]
+}
+

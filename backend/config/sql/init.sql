@@ -119,3 +119,49 @@ create table tiktok.`message` (
             references tiktok.`user` (`id`)
             on delete cascade
 ) engine=InnoDB default charset=utf8mb4;
+
+create table tiktok.`note`
+(
+    `id`         bigint auto_increment not null,
+    `video_id`   bigint                              not null,
+    `user_id`    bigint                              not null,
+    `content`    text                                not null comment 'markdown content',
+    `type`       tinyint   default 2                 not null comment '1: attachment note, 2: user note',
+    `created_at` timestamp default current_timestamp not null,
+    `updated_at` timestamp default current_timestamp not null on update current_timestamp comment 'update profile time',
+    `deleted_at` timestamp default null null,
+    constraint `id`
+        primary key (`id`),
+        index `video_id_idx` (`video_id`),
+        index `user_id_idx` (`user_id`),
+    constraint `note_user`
+        foreign key (`user_id`)
+            references tiktok.`user` (`id`)
+            on delete cascade,
+    constraint `note_video`
+        foreign key (`video_id`)
+            references tiktok.`video` (`id`)
+            on delete cascade
+) engine=InnoDB default charset=utf8mb4;
+
+create table tiktok.`note_favorite`
+(
+    `id`         bigint auto_increment not null,
+    `user_id`    bigint                              not null,
+    `note_id`    bigint                              not null,
+    `status`     tinyint   default 1                 not null comment '1: favorite, 0: unfavorite',
+    `created_at` timestamp default current_timestamp not null,
+    `updated_at` timestamp default current_timestamp not null on update current_timestamp comment 'update profile time',
+    `deleted_at` timestamp default null null,
+    constraint `id`
+        primary key (`id`),
+        index `uid_nid_idx` (`user_id`, `note_id`),
+    constraint `note_favorite_user`
+        foreign key (`user_id`)
+            references tiktok.`user` (`id`)
+            on delete cascade,
+    constraint `note_favorite_note`
+        foreign key (`note_id`)
+            references tiktok.`note` (`id`)
+            on delete cascade
+) engine=InnoDB default charset=utf8mb4;

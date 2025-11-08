@@ -24,4 +24,6 @@ const (
 	NotFollowErrorCode         = 10011 // 尚未取关
 	AlreadyFollowErrorCode     = 10012 // 已经关注
 	CharacterLimitErrorCode    = 10013 // 消息字数错误
+	VideoNotFoundErrorCode     = 10014 // 视频不存在
+	NoteNotFoundErrorCode      = 10015 // 笔记不存在
 )
