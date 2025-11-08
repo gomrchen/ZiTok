@@ -1,82 +1,100 @@
-# NOTICE: copy and rename this file to config.yaml
-# NOTICE: some config need to complete
-
-# nodes only need to set this item
-etcd-addr: etcd:2379
-
-# etcd server need to complete these items
 server:
-  jwt-secret: MTAxNTkwMTg1Mw==
-  version: "1.0"
-  name: tiktok
+  name: "videoHub"
+  mode: "dev"
+  max_connections: 1000
+  max_qps: 100
 
-snowflake:
-  worker-id: 0
-  datancenter-id: 0
+otel:
+  collector_addr: "127.0.0.1:4317"
+
+user:
+  name: "UserService"
+  rpc_addr: ":8897"
+  default_avatar: "http://localhost:8080/avatars/default.jpg"
+
+video:
+  name: "video"
+  rpc_addr: ":8891"
 
 mysql:
-  addr: mysql:3306
-  database: tiktok
-  username: tiktok
-  password: tiktok
-  charset: utf8mb4
-
-# you need to complete this config to use video service
-oss:
-  endpoint: https://s3.cn-south-1.qiniucs.com
-  accessKey-id: zpcgO6vSfHRcwqbsLu0coGykrljeVZtff3FGYDDh
-  accessKey-secret: LImDlP5JsaitZwbzFhxlch98uffumOFdZ9a018iY
-  bucketname: ziktok
-  main-directory: ziktok
-
-elasticsearch:
-  addr: elasticsearch:9200
-  host: elasticsearch
-
-etcd:
-  addr: etcd:2379
-
-rabbitmq:
-  addr: rabiitmq:5672
-  username: tiktok
-  password: tiktok
+  host: "127.0.0.1"
+  port: 3306
+  username: "videohub"
+  password: "videohub"
+  database: "videohub"
 
 redis:
-  addr: redis:6379
-  password: tiktok
+  host: "127.0.0.1"
+  port: 6379
+  password: "videohub"
+  db:
+    user: 0      # 用户服务
+    video: 0     # 视频服务
+    social: 0    # 社交服务
 
-jaeger:
-  addr: jaeger:6831
+etcd:
+  addr: "127.0.0.1:2379"
 
-# if you deploy in different machines, remember to modify IP.
-services:
-  api:
-    name: api
-    load-balance: false
-    addr:
-      - 0.0.0.0:10001
-  user:
-    name: user
-    load-balance: false
-    addr:
-      - 0.0.0.0:10002
-  chat:
-    name: chat
-    load-balance: false
-    addr:
-      - 0.0.0.0:10003
-  follow:
-    name: follow
-    load-balance: false
-    addr:
-      - 0.0.0.0:10004
-  interaction:
-    name: interaction
-    load-balance: false
-    addr:
-      - 0.0.0.0:10005
+kafka:
+  network: "tcp"
+  address: "127.0.0.1:9092"
+  user: "videohub"
+  password: "videohub-password"
+
+jwt:
+  secret: "videoHub_jwt_secret_v1"
+  expires_time: 86400  
+
+gateway:
+  addr: ":8080"
+
+elasticsearch:
+  addr: "127.0.0.1:9200"
+
+upyun:
+  operator: "yxrxy"
+  password: ""
+  ussDomain: "https://v0.api.upyun.com/yxrxy-video-upyun"
+  imageDomain: "http://yxrxy-image-upyun.test.upcdn.net"  
+  videoDomain: "http://yxrxy-video-upyun.test.upcdn.net" 
+
+upload:
+  avatar:
+    max_size: 5242880  # 5MB
+    allowed_types: ["image/jpeg", "image/png"]
+    upload_dir: "src/storage/avatars"
+    base_url: "http://localhost:8080/avatars"
   video:
-    name: video
-    load-balance: false
-    addr:
-      - 0.0.0.0:10006
+    max_size: 104857600  # 100MB
+    allowed_types: ["video/mp4", "video/quicktime"]
+    upload_dir: "src/storage/videos"
+    cover_dir: "src/storage/covers"
+    base_url: "http://localhost:8080/videos"
+
+api_key:
+  key: ""
+  base_url: "https://api.openai.com/v1" # 官网
+  proxy: "http://127.0.0.1:7897" # clash的
+
+social:
+  name: "social"
+  rpc_addr: ":8893"
+  http_addr: ":8083"  # WebSocket服务HTTP地址
+  chat:
+    max_message_length: 2000        # 消息最大长度
+    message_page_size: 50           # 每次加载的消息数量
+  file:
+    max_size: 10485760             # 聊天文件最大大小（10MB）
+    allowed_types:                  # 允许的文件类型
+      - "image/jpeg"
+      - "image/png"
+      - "image/gif"
+      - "video/mp4"
+      - "application/pdf"
+      - "application/msword"
+    upload_dir: "src/storage/chat"  # 聊天文件存储目录
+    base_url: "http://localhost:8080/chat"  # 聊天文件访问基础URL
+
+interactions:
+  name: "interactions"
+  rpc_addr: ":8895"

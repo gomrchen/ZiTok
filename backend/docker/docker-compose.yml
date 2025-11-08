@@ -1,0 +1,225 @@
+services:
+  # Redis 服务，用于缓存、会话管理等，提供键值存储功能
+  videohub-redis:
+    container_name: videohub-redis
+    image: redis:bookworm
+    volumes:
+      - ./data/redis:/data
+    ports:
+      - "6379:6379"
+    env_file:
+      - "./env/redis.env"
+    networks:
+      - videohub
+
+  # MySQL 服务，提供关系型数据库，用于存储结构化数据
+  videohub-mysql:
+    container_name: videohub-mysql
+    image: mysql:8.0
+    env_file:
+      - "./env/mysql.env"
+    ports:
+      - "3306:3306"
+    networks:
+      - videohub
+    volumes:
+      - ../config/sql:/docker-entrypoint-initdb.d
+      - ./data/mysql:/var/lib/mysql
+
+  otel-collector:
+    container_name: videohub-otel-collector
+    image: otel/opentelemetry-collector:latest
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ../config/otel-collector/otel-collector-config.yaml:/etc/otel-collector-config.yaml
+    ports:
+      - "4317:4317"   # OTLP gRPC receiver
+      - "4318:4318"   # OTLP http receiver
+      - "8888:8888"   # Prometheus metrics exposed by the collector
+      - "8889:8889"   # Prometheus exporter metrics
+    networks:
+      - videohub
+
+  # Jaeger 服务，用于分布式链路追踪
+  jaeger:
+    container_name: videohub-jaeger
+    image: jaegertracing/all-in-one:latest
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+      - COLLECTOR_OTLP_HTTP_PORT=4318
+      - COLLECTOR_OTLP_GRPC_PORT=4317
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "14250:14250"  # Jaeger gRPC receiver
+      - "14268:14268"  # Jaeger HTTP receiver
+      - "6831:6831/udp"  # Jaeger UDP receiver
+    networks:
+      - videohub
+
+  # Prometheus 服务，时序数据库和指标采集
+  prometheus:
+    container_name: videohub-prometheus
+    image: prom/prometheus:latest
+    user: "65534:65534"  # nobody:nogroup
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../config/prometheus:/etc/prometheus
+      - ./data/prometheus:/prometheus
+    networks:
+      - videohub
+
+  # Grafana 服务，监控数据可视化
+  grafana:
+    container_name: videohub-grafana
+    image: grafana/grafana:latest
+    user: "472:472"  # grafana:grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - "3080:3000"
+    volumes:
+      - ../config/grafana/provisioning:/etc/grafana/provisioning
+      - ../config/grafana/dashboards:/var/lib/grafana/dashboards
+      - ./data/grafana:/var/lib/grafana
+    networks:
+      - videohub
+
+  # Node Exporter 服务，系统级指标收集
+  node-exporter:
+    container_name: videohub-node-exporter
+    image: prom/node-exporter:latest
+    ports:
+      - "9100:9100"
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--path.rootfs=/rootfs'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+    networks:
+      - videohub
+
+  # AlertManager 服务，告警通知管理
+  alertmanager:
+    container_name: videohub-alertmanager
+    image: prom/alertmanager:latest
+    ports:
+      - "9093:9093"
+    volumes:
+      - ../config/alertmanager:/etc/alertmanager
+      - ./data/alertmanager:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - videohub
+
+  # etcd 服务，分布式键值存储系统，用于服务发现、配置管理
+  videohub-etcd:
+    container_name: videohub-etcd
+    image: quay.io/coreos/etcd:v3.5.5
+    restart: always
+    ports:
+      - 2379:2379
+      - 2380:2380
+    env_file:
+      - "./env/etcd.env"
+    volumes:
+      - ./script:/script
+      - ../config:/config
+      - ./data/etcd:/etcd-data
+    networks:
+      - videohub
+    entrypoint: [ "sh", "-c", "chmod +x /script/etcd-monitor.sh && /script/etcd-monitor.sh & exec etcd" ]
+
+  # Kafka 服务，分布式流处理平台，用于构建实时数据管道和流应用
+  kafka:
+    container_name: videohub-kafka
+    image: bitnami/kafka:latest
+    restart: always
+    user: root
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    env_file:
+      - ./env/kafka.env
+    volumes:
+      - ./data/kafka:/bitnami/kafka
+    networks:
+      - videohub
+      
+  elasticsearch:
+    image: elasticsearch:8.4.2
+    container_name: videohub-elasticsearch
+    user: "1000:1000"  # 使用当前用户的UID和GID
+    env_file:
+      - ./env/es.env
+    healthcheck:
+      test: [ "CMD-SHELL", "curl -sf http://elasticsearch:9200/_cluster/health || exit 1" ]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - ../config/elasticsearch/config:/usr/share/elasticsearch/config
+      - ./data/elasticsearch:/usr/share/elasticsearch/data
+      - ../config/elasticsearch/plugins:/usr/share/elasticsearch/plugins
+    ports:
+      - "9200:9200"
+    restart: always
+    networks:
+      - videohub
+    mem_limit: 750m
+
+  kibana:
+    image: kibana:8.4.2
+    container_name: videohub-kibana
+    user: "1000:1000"  # kibana:kibana
+    env_file:
+      - ./env/kibana.env
+    depends_on:
+      - elasticsearch
+    ports:
+      - "5601:5601"
+    volumes:
+      - ../config/kibana:/usr/share/kibana/config
+      - ./data/kibana:/usr/share/kibana/data
+    networks:
+      - videohub
+    mem_limit: 350m
+    
+  frontend:
+    container_name: videohub-frontend
+    build: 
+      context: ..
+      dockerfile: docker/Dockerfile.frontend
+    ports:
+      - "80:80"
+    restart: always
+    networks:
+      - videohub
+    volumes:
+      - ../config/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+    env_file:
+      - "./env/frontend.env"
+
+networks:
+  videohub:
+    driver: bridge
+    name: videohub

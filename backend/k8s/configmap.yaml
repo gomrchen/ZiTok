@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: videohub-config
+  namespace: videohub
+data:
+  # MySQL 配置
+  MYSQL_ROOT_PASSWORD: "123456"
+  MYSQL_DATABASE: "videohub"
+  MYSQL_USER: "videohub"
+  MYSQL_PASSWORD: "videohub"
+  
+  # Redis 配置
+  REDIS_PASSWORD: "videohub"
+  
+  # ETCD 配置
+  ETCD_NAME: "etcd-0"
+  ETCD_INITIAL_CLUSTER: "etcd-0=http://$(POD_IP):2381"
+  ETCD_INITIAL_CLUSTER_STATE: "new"
+  ETCD_INITIAL_CLUSTER_TOKEN: "videohub-etcd"
+  ETCD_LISTEN_PEER_URLS: "http://0.0.0.0:2381"
+  ETCD_LISTEN_CLIENT_URLS: "http://0.0.0.0:2380"
+  ETCD_ADVERTISE_PEER_URLS: "http://$(POD_IP):2381"
+  ETCD_ADVERTISE_CLIENT_URLS: "http://etcd:2380"
+  
+  # Kafka 配置
+  KAFKA_CFG_ZOOKEEPER_CONNECT: "zookeeper:2181"
+  KAFKA_CFG_LISTENERS: "PLAINTEXT://:9092,SASL_PLAINTEXT://:9093"
+  KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT,SASL_PLAINTEXT:SASL_PLAINTEXT"
+  KAFKA_CFG_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092,SASL_PLAINTEXT://kafka:9093"
+  KAFKA_CFG_SASL_ENABLED_MECHANISMS: "PLAIN"
+  KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL: "PLAIN"
+  KAFKA_CFG_LISTENER_NAME_SASL_PLAINTEXT_PLAIN_SASL_JAAS_CONFIG: "org.apache.kafka.common.security.plain.PlainLoginModule required username=\"videohub\" password=\"videohub-password\";"
+  
+  # Elasticsearch 配置
+  discovery.type: "single-node"
+  xpack.security.enabled: "false"
+  
+  # 应用配置
+  ETCD_ADDR: "etcd:2380"
+  MYSQL_ADDR: "mysql:3306"
+  REDIS_ADDR: "redis:6379"
+  KAFKA_ADDR: "kafka:9093"
+  ELASTICSEARCH_ADDR: "elasticsearch:9200"
+  OTEL_COLLECTOR_ADDR: "otel-collector:4317"
+  
+  # Kafka SASL 配置
+  KAFKA_USER: "videohub"
+  KAFKA_PASSWORD: "videohub-password"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+  namespace: videohub
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 15s
+      evaluation_interval: 15s
+
+    rule_files:
+      # - "first_rules.yml"
+      # - "second_rules.yml"
+
+    scrape_configs:
+      - job_name: 'prometheus'
+        static_configs:
+          - targets: ['localhost:9090']
+
+      - job_name: 'videohub-services'
+        static_configs:
+          - targets: ['gateway:8080', 'user:8080', 'video:8080', 'interaction:8080', 'social:8080']
+        metrics_path: /metrics 

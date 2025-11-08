@@ -1,0 +1,794 @@
+# MySQL 部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mysql
+  namespace: videohub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+      - name: mysql
+        image: mysql:8.0
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 3306
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: MYSQL_ROOT_PASSWORD
+        - name: MYSQL_DATABASE
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: MYSQL_DATABASE
+        - name: MYSQL_USER
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: MYSQL_USER
+        - name: MYSQL_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: MYSQL_PASSWORD
+        volumeMounts:
+        - name: mysql-data
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: mysql-data
+        persistentVolumeClaim:
+          claimName: mysql-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: videohub
+spec:
+  selector:
+    app: mysql
+  ports:
+  - port: 3306
+    targetPort: 3306
+---
+# Redis 部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: videohub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:bookworm
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 6379
+        command: ["redis-server", "--requirepass", "$(REDIS_PASSWORD)"]
+        env:
+        - name: REDIS_PASSWORD
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: REDIS_PASSWORD
+        volumeMounts:
+        - name: redis-data
+          mountPath: /data
+      volumes:
+      - name: redis-data
+        persistentVolumeClaim:
+          claimName: redis-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: videohub
+spec:
+  selector:
+    app: redis
+  ports:
+  - port: 6379
+    targetPort: 6379
+---
+# ETCD 部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: etcd
+  namespace: videohub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: etcd
+  template:
+    metadata:
+      labels:
+        app: etcd
+    spec:
+      securityContext:
+        fsGroup: 1001
+        runAsUser: 1001
+        runAsGroup: 1001
+      containers:
+      - name: etcd
+        image: quay.io/coreos/etcd:v3.5.5
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 2380
+        - containerPort: 2381
+        env:
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        - name: ETCD_NAME
+          value: "etcd-0"
+        - name: ETCD_INITIAL_CLUSTER
+          value: "etcd-0=http://$(POD_IP):2381"
+        - name: ETCD_INITIAL_CLUSTER_STATE
+          value: "new"
+        - name: ETCD_INITIAL_CLUSTER_TOKEN
+          value: "videohub-etcd"
+        - name: ETCD_LISTEN_PEER_URLS
+          value: "http://0.0.0.0:2381"
+        - name: ETCD_LISTEN_CLIENT_URLS
+          value: "http://0.0.0.0:2380"
+        - name: ETCD_ADVERTISE_PEER_URLS
+          value: "http://$(POD_IP):2381"
+        - name: ETCD_ADVERTISE_CLIENT_URLS
+          value: "http://$(POD_IP):2380"
+        - name: ETCD_DATA_DIR
+          value: "/etcd-data"
+        volumeMounts:
+        - name: etcd-data
+          mountPath: /etcd-data
+      volumes:
+      - name: etcd-data
+        persistentVolumeClaim:
+          claimName: etcd-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: etcd
+  namespace: videohub
+spec:
+  selector:
+    app: etcd
+  ports:
+  - port: 2380
+    targetPort: 2380
+    name: client
+  - port: 2381
+    targetPort: 2381
+    name: peer
+---
+# Kafka 部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kafka
+  namespace: videohub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      securityContext:
+        fsGroup: 0
+        runAsUser: 0
+        runAsGroup: 0
+      initContainers:
+      - name: init-kafka-data
+        image: busybox:1.35
+        imagePullPolicy: Never
+        command: ['sh', '-c', 'mkdir -p /opt/bitnami/kafka/data && chown -R 1001:1001 /opt/bitnami/kafka/data']
+        volumeMounts:
+        - name: kafka-data
+          mountPath: /opt/bitnami/kafka/data
+          subPath: data
+        securityContext:
+          runAsUser: 0
+      containers:
+      - name: kafka
+        image: bitnami/kafka:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 9092
+        - containerPort: 9093
+        env:
+        - name: KAFKA_CFG_ZOOKEEPER_CONNECT
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: KAFKA_CFG_ZOOKEEPER_CONNECT
+        - name: KAFKA_CFG_LISTENERS
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: KAFKA_CFG_LISTENERS
+        - name: KAFKA_CFG_ADVERTISED_LISTENERS
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: KAFKA_CFG_ADVERTISED_LISTENERS
+        - name: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP
+        - name: KAFKA_CFG_SASL_ENABLED_MECHANISMS
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: KAFKA_CFG_SASL_ENABLED_MECHANISMS
+        - name: KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: KAFKA_CFG_SASL_MECHANISM_INTER_BROKER_PROTOCOL
+        - name: KAFKA_CFG_LISTENER_NAME_SASL_PLAINTEXT_PLAIN_SASL_JAAS_CONFIG
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: KAFKA_CFG_LISTENER_NAME_SASL_PLAINTEXT_PLAIN_SASL_JAAS_CONFIG
+        volumeMounts:
+        - name: kafka-data
+          mountPath: /opt/bitnami/kafka/data
+      volumes:
+      - name: kafka-data
+        persistentVolumeClaim:
+          claimName: kafka-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  namespace: videohub
+spec:
+  selector:
+    app: kafka
+  ports:
+  - port: 9092
+    targetPort: 9092
+    name: kafka
+  - port: 9093
+    targetPort: 9093
+    name: kafka-internal
+---
+# Zookeeper 部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zookeeper
+  namespace: videohub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: zookeeper
+  template:
+    metadata:
+      labels:
+        app: zookeeper
+    spec:
+      securityContext:
+        fsGroup: 0
+        runAsUser: 0
+        runAsGroup: 0
+      initContainers:
+      - name: init-zookeeper-data
+        image: busybox:1.35
+        imagePullPolicy: Never
+        command: ['sh', '-c', 'mkdir -p /opt/bitnami/zookeeper/data && chown -R 1001:1001 /opt/bitnami/zookeeper/data']
+        volumeMounts:
+        - name: zookeeper-data
+          mountPath: /opt/bitnami/zookeeper/data
+          subPath: data
+        securityContext:
+          runAsUser: 0
+      containers:
+      - name: zookeeper
+        image: bitnami/zookeeper:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 2181
+        env:
+        - name: ALLOW_ANONYMOUS_LOGIN
+          value: "yes"
+        volumeMounts:
+        - name: zookeeper-data
+          mountPath: /opt/bitnami/zookeeper/data
+          subPath: data
+      volumes:
+      - name: zookeeper-data
+        persistentVolumeClaim:
+          claimName: zookeeper-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: zookeeper
+  namespace: videohub
+spec:
+  selector:
+    app: zookeeper
+  ports:
+  - port: 2181
+    targetPort: 2181
+    name: zookeeper
+---
+# Elasticsearch 部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: elasticsearch
+  namespace: videohub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: elasticsearch
+  template:
+    metadata:
+      labels:
+        app: elasticsearch
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsGroup: 1000
+      initContainers:
+      - name: init-elasticsearch-data
+        image: busybox:1.35
+        imagePullPolicy: Never
+        command: ['sh', '-c', 'chown -R 1000:1000 /usr/share/elasticsearch/data']
+        volumeMounts:
+        - name: elasticsearch-data
+          mountPath: /usr/share/elasticsearch/data
+        securityContext:
+          runAsUser: 0
+      containers:
+      - name: elasticsearch
+        image: elasticsearch:8.4.2
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 9200
+        env:
+        - name: discovery.type
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: discovery.type
+        - name: xpack.security.enabled
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: xpack.security.enabled
+        resources:
+          limits:
+            memory: 2Gi
+          requests:
+            memory: 1Gi
+        volumeMounts:
+        - name: elasticsearch-data
+          mountPath: /usr/share/elasticsearch/data
+      volumes:
+      - name: elasticsearch-data
+        persistentVolumeClaim:
+          claimName: elasticsearch-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: elasticsearch
+  namespace: videohub
+spec:
+  selector:
+    app: elasticsearch
+  ports:
+  - port: 9200
+    targetPort: 9200
+    name: elasticsearch
+---
+# Kibana 部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: kibana
+  namespace: videohub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kibana
+  template:
+    metadata:
+      labels:
+        app: kibana
+    spec:
+      securityContext:
+        fsGroup: 1000
+        runAsUser: 1000
+        runAsGroup: 1000
+      initContainers:
+      - name: init-kibana-data
+        image: busybox:1.35
+        imagePullPolicy: Never
+        command: ['sh', '-c', 'chown -R 1000:1000 /usr/share/kibana/data']
+        volumeMounts:
+        - name: kibana-data
+          mountPath: /usr/share/kibana/data
+        securityContext:
+          runAsUser: 0
+      containers:
+      - name: kibana
+        image: kibana:8.4.2
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 5601
+        env:
+        - name: ELASTICSEARCH_HOSTS
+          value: "http://elasticsearch:9200"
+        volumeMounts:
+        - name: kibana-data
+          mountPath: /usr/share/kibana/data
+      volumes:
+      - name: kibana-data
+        persistentVolumeClaim:
+          claimName: kibana-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kibana
+  namespace: videohub
+spec:
+  selector:
+    app: kibana
+  ports:
+  - port: 5601
+    targetPort: 5601
+    name: kibana
+---
+# Prometheus 部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  namespace: videohub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+    spec:
+      securityContext:
+        fsGroup: 65534
+        runAsUser: 65534
+        runAsGroup: 65534
+      initContainers:
+      - name: init-prometheus-data
+        image: busybox:1.35
+        imagePullPolicy: Never
+        command: ['sh', '-c', 'chown -R 65534:65534 /prometheus']
+        volumeMounts:
+        - name: prometheus-data
+          mountPath: /prometheus
+        securityContext:
+          runAsUser: 0
+      containers:
+      - name: prometheus
+        image: prom/prometheus:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 9090
+        command: ["prometheus"]
+        args:
+        - '--config.file=/etc/prometheus/prometheus.yml'
+        - '--storage.tsdb.path=/prometheus'
+        - '--web.console.libraries=/etc/prometheus/console_libraries'
+        - '--web.console.templates=/etc/prometheus/consoles'
+        - '--storage.tsdb.retention.time=200h'
+        - '--web.enable-lifecycle'
+        volumeMounts:
+        - name: prometheus-config
+          mountPath: /etc/prometheus
+        - name: prometheus-data
+          mountPath: /prometheus
+      volumes:
+      - name: prometheus-config
+        configMap:
+          name: prometheus-config
+      - name: prometheus-data
+        persistentVolumeClaim:
+          claimName: prometheus-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  namespace: videohub
+spec:
+  selector:
+    app: prometheus
+  ports:
+  - port: 9090
+    targetPort: 9090
+    name: prometheus
+---
+# Grafana 部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+  namespace: videohub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      securityContext:
+        fsGroup: 472
+        runAsUser: 472
+        runAsGroup: 472
+      initContainers:
+      - name: init-grafana-data
+        image: busybox:1.35
+        imagePullPolicy: Never
+        command: ['sh', '-c', 'chown -R 472:472 /var/lib/grafana']
+        volumeMounts:
+        - name: grafana-data
+          mountPath: /var/lib/grafana
+        securityContext:
+          runAsUser: 0
+      containers:
+      - name: grafana
+        image: grafana/grafana:latest
+        imagePullPolicy: Never
+        ports:
+        - containerPort: 3000
+        env:
+        - name: GF_SECURITY_ADMIN_PASSWORD
+          value: "admin"
+        - name: GF_USERS_ALLOW_SIGN_UP
+          value: "false"
+        volumeMounts:
+        - name: grafana-data
+          mountPath: /var/lib/grafana
+      volumes:
+      - name: grafana-data
+        persistentVolumeClaim:
+          claimName: grafana-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana
+  namespace: videohub
+spec:
+  selector:
+    app: grafana
+  ports:
+  - port: 3000
+    targetPort: 3000
+    name: grafana 
+---
+# OpenTelemetry Collector 部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  namespace: videohub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-collector
+  template:
+    metadata:
+      labels:
+        app: otel-collector
+    spec:
+      containers:
+      - name: otel-collector
+        image: docker.io/otel/opentelemetry-collector:latest
+        imagePullPolicy: Never
+        args: ["--config", "/etc/otel-collector-config.yaml"]
+        ports:
+        - containerPort: 4317  # OTLP gRPC receiver
+        - containerPort: 4318  # OTLP http receiver
+        - containerPort: 8888  # Prometheus metrics exposed by the collector
+        - containerPort: 8889  # Prometheus exporter metrics
+        volumeMounts:
+        - name: otel-config
+          mountPath: /etc/otel-collector-config.yaml
+          subPath: otel-collector-config.yaml
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: otel-config
+        configMap:
+          name: otel-collector-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+  namespace: videohub
+spec:
+  selector:
+    app: otel-collector
+  ports:
+  - port: 4317
+    targetPort: 4317
+    name: otlp-grpc
+  - port: 4318
+    targetPort: 4318
+    name: otlp-http
+  - port: 8888
+    targetPort: 8888
+    name: metrics
+  - port: 8889
+    targetPort: 8889
+    name: prometheus
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: otel-collector-config
+  namespace: videohub
+data:
+  otel-collector-config.yaml: |
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+            endpoint: 0.0.0.0:4317
+          http:
+            endpoint: 0.0.0.0:4318
+
+    processors:
+      batch:
+        timeout: 1s
+        send_batch_size: 1024
+
+    exporters:
+      debug:
+        verbosity: detailed
+      prometheus:
+        endpoint: 0.0.0.0:8889
+        namespace: videohub
+      otlp:
+        endpoint: jaeger:4317
+        tls:
+          insecure: true
+
+    extensions:
+      health_check:
+      pprof:
+        endpoint: :1888
+      zpages:
+        endpoint: :55679
+
+    service:
+      extensions: [health_check, pprof, zpages]
+      pipelines:
+        metrics:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [prometheus, debug]
+        traces:
+          receivers: [otlp]
+          processors: [batch]
+          exporters: [otlp, debug] 
+---
+# Jaeger 部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: jaeger
+  namespace: videohub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: jaeger
+  template:
+    metadata:
+      labels:
+        app: jaeger
+    spec:
+      containers:
+      - name: jaeger
+        image: jaegertracing/all-in-one:latest
+        imagePullPolicy: Never
+        env:
+        - name: COLLECTOR_OTLP_ENABLED
+          value: "true"
+        - name: COLLECTOR_OTLP_HTTP_PORT
+          value: "4318"
+        - name: COLLECTOR_OTLP_GRPC_PORT
+          value: "4317"
+        ports:
+        - containerPort: 16686  # Jaeger UI
+        - containerPort: 14250  # Jaeger gRPC receiver
+        - containerPort: 14268  # Jaeger HTTP receiver
+        - containerPort: 6831   # Jaeger UDP receiver
+        - containerPort: 4317   # OTLP gRPC
+        - containerPort: 4318   # OTLP HTTP
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "200m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: jaeger
+  namespace: videohub
+spec:
+  selector:
+    app: jaeger
+  ports:
+  - port: 16686
+    targetPort: 16686
+    name: ui
+  - port: 14250
+    targetPort: 14250
+    name: grpc
+  - port: 14268
+    targetPort: 14268
+    name: http
+  - port: 6831
+    targetPort: 6831
+    name: udp
+  - port: 4317
+    targetPort: 4317
+    name: otlp-grpc
+  - port: 4318
+    targetPort: 4318
+    name: otlp-http 

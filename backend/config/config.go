@@ -2,136 +2,304 @@ package config
 
 import (
 	"errors"
-	"log"
+	"fmt"
 	"os"
 
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/fsnotify/fsnotify"
+	"github.com/redis/go-redis/v9"
 	"github.com/spf13/viper"
-
 	_ "github.com/spf13/viper/remote"
 )
 
-var (
-	Server        *server
-	Mysql         *mySQL
-	Snowflake     *snowflake
-	Service       *service
-	Jaeger        *jaeger
-	Etcd          *etcd
-	RabbitMQ      *rabbitMQ
-	Redis         *redis
-	OSS           *oss
-	Elasticsearch *elasticsearch
+type MySQLConfig struct {
+	Host     string
+	Port     int
+	Username string
+	Password string
+	Database string
+}
 
-	runtime_viper = viper.New()
+type RedisConfig struct {
+	Host     string
+	Port     int
+	Password string
+	DB       struct {
+		User   int `mapstructure:"user"`
+		Video  int `mapstructure:"video"`
+		Social int `mapstructure:"social"`
+	} `mapstructure:"db"`
+}
+
+type KafkaConfig struct {
+	Network  string
+	Address  string
+	User     string
+	Password string
+}
+
+type JWTConfig struct {
+	SecretKey   string `mapstructure:"secret"`
+	ExpiresTime int    `mapstructure:"expires_time"`
+}
+
+type GatewayConfig struct {
+	Addr string `mapstructure:"addr"`
+}
+
+type ServerConfig struct {
+	Name           string
+	Mode           string
+	MaxConnections int64 `mapstructure:"max_connections"`
+	MaxQPS         int64 `mapstructure:"max_qps"`
+}
+
+type ServiceConfig struct {
+	Name string `mapstructure:"name"`
+}
+
+type ServicesConfig struct {
+	User        ServiceConfig `mapstructure:"user"`
+	Video       ServiceConfig `mapstructure:"video"`
+	Social      ServiceConfig `mapstructure:"social"`
+	Interaction ServiceConfig `mapstructure:"interaction"`
+	Gateway     ServiceConfig `mapstructure:"gateway"`
+}
+
+type OtelConfig struct {
+	CollectorAddr string `mapstructure:"collector_addr"`
+}
+
+type UserConfig struct {
+	Name          string
+	RPCAddr       string `mapstructure:"rpc_addr"`
+	DefaultAvatar string `mapstructure:"default_avatar"`
+}
+
+type UploadConfig struct {
+	Avatar struct {
+		MaxSize      int      `mapstructure:"max_size"`
+		AllowedTypes []string `mapstructure:"allowed_types"`
+		UploadDir    string   `mapstructure:"upload_dir"`
+		BaseURL      string   `mapstructure:"base_url"`
+	} `mapstructure:"avatar"`
+	Video struct {
+		MaxSize      int      `mapstructure:"max_size"`
+		AllowedTypes []string `mapstructure:"allowed_types"`
+		UploadDir    string   `mapstructure:"upload_dir"`
+		BaseURL      string   `mapstructure:"base_url"`
+		CoverDir     string   `mapstructure:"cover_dir"`
+	} `mapstructure:"video"`
+}
+
+type VideoConfig struct {
+	Name    string
+	RPCAddr string `mapstructure:"rpc_addr"`
+}
+
+type ElasticsearchConfig struct {
+	Addr string `mapstructure:"addr"`
+}
+
+type SocialConfig struct {
+	Name     string
+	RPCAddr  string `mapstructure:"rpc_addr"`
+	HTTPAddr string `mapstructure:"http_addr"`
+	Chat     struct {
+		MaxGroupMembers   int `mapstructure:"max_group_members"`
+		MaxMessageLength  int `mapstructure:"max_message_length"`
+		MaxGroupsPerUser  int `mapstructure:"max_groups_per_user"`
+		MaxFriendsPerUser int `mapstructure:"max_friends_per_user"`
+		MessagePageSize   int `mapstructure:"message_page_size"`
+		HistoryDays       int `mapstructure:"history_days"`
+	} `mapstructure:"chat"`
+	File struct {
+		MaxSize      int      `mapstructure:"max_size"`
+		AllowedTypes []string `mapstructure:"allowed_types"`
+		UploadDir    string   `mapstructure:"upload_dir"`
+		BaseURL      string   `mapstructure:"base_url"`
+	} `mapstructure:"file"`
+}
+
+type EtcdConfig struct {
+	Addr string `mapstructure:"addr"`
+}
+
+type VideoInteractionsConfig struct {
+	Name    string
+	RPCAddr string `mapstructure:"rpc_addr"`
+}
+
+type UpyunConfig struct {
+	Operator    string
+	Password    string
+	UssDomain   string
+	ImageDomain string
+	VideoDomain string
+}
+
+type ApiKeyConfig struct {
+	Key     string `mapstructure:"key"`
+	BaseURL string `mapstructure:"base_url"`
+	Proxy   string `mapstructure:"proxy"`
+}
+
+var (
+	Server            *ServerConfig
+	Services          *ServicesConfig
+	MySQL             *MySQLConfig
+	Redis             *RedisConfig
+	Kafka             *KafkaConfig
+	JWT               *JWTConfig
+	Upload            *UploadConfig
+	User              *UserConfig
+	Video             *VideoConfig
+	Social            *SocialConfig
+	Gateway           *GatewayConfig
+	Etcd              *EtcdConfig
+	VideoInteractions *VideoInteractionsConfig
+	Otel              *OtelConfig
+	Elasticsearch     *ElasticsearchConfig
+	Upyun             *UpyunConfig
+	ApiKey            *ApiKeyConfig
+	runtimeViper      = viper.New()
 )
 
-func Init(path string, service string) {
-	runtime_viper.SetConfigType("yaml")
+const (
+	remoteProvider = "etcd3"
+	remotePath     = "/config"
+	remoteFileName = "config"
+	remoteFileType = "yaml"
+)
+
+type Config struct {
+	Server            ServerConfig
+	Services          ServicesConfig
+	MySQL             MySQLConfig
+	Redis             RedisConfig
+	Kafka             KafkaConfig
+	JWT               JWTConfig
+	Upload            UploadConfig
+	User              UserConfig
+	Video             VideoConfig
+	Social            SocialConfig
+	Gateway           GatewayConfig
+	Etcd              EtcdConfig
+	VideoInteractions VideoInteractionsConfig
+	Otel              OtelConfig
+	Elasticsearch     ElasticsearchConfig
+	Upyun             UpyunConfig
+	ApiKey            ApiKeyConfig `mapstructure:"api_key"`
+}
+
+// Init 初始化配置，支持从etcd远程获取配置
+func Init(service string) {
+	// 从环境变量获取etcd地址
 	etcdAddr := os.Getenv("ETCD_ADDR")
-
 	if etcdAddr == "" {
-		panic(errors.New("not found etcd addr in env"))
+		panic("ETCD_ADDR environment variable is not set")
 	}
+	fmt.Printf("Using etcd address: %s\n", etcdAddr)
 
-	Etcd = &etcd{Addr: etcdAddr}
-
-	// use etcd for config save
-	err := runtime_viper.AddRemoteProvider("etcd3", Etcd.Addr, "/config/config.yaml")
-
+	// 配置远程provider
+	err := runtimeViper.AddRemoteProvider(remoteProvider, etcdAddr, remotePath)
 	if err != nil {
-		panic(err)
+		panic(fmt.Sprintf("Failed to add remote provider: %v", err))
 	}
 
-	klog.Infof("config path: %v\n", path)
+	runtimeViper.SetConfigName(remoteFileName)
+	runtimeViper.SetConfigType(remoteFileType)
 
-	if err := runtime_viper.ReadRemoteConfig(); err != nil {
-		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
-			klog.Fatal("could not find config files")
-		} else {
-			klog.Fatal("read config error: %v", err)
+	// 读取远程配置
+	if err := runtimeViper.ReadRemoteConfig(); err != nil {
+		var configFileNotFoundError viper.ConfigFileNotFoundError
+		if errors.As(err, &configFileNotFoundError) {
+			panic("Could not find config files")
 		}
-		klog.Fatal(err)
+		panic(fmt.Sprintf("Failed to read remote config: %v", err))
 	}
 
-	configMapping(service)
+	// 映射配置到结构体
+	configMapping()
 
-	klog.Infof("all keys: %v\n", runtime_viper.AllKeys())
-
-	// 持续监听配置
-	runtime_viper.OnConfigChange(func(e fsnotify.Event) {
-		klog.Infof("config file changed: %v\n", e.String())
+	// 设置配置变更监听
+	runtimeViper.OnConfigChange(func(e fsnotify.Event) {
+		fmt.Printf("Config file changed: %s\n", e.Name)
+		configMapping() // 重新加载配置
 	})
-	runtime_viper.WatchConfig()
+	runtimeViper.WatchConfig()
 }
 
-func configMapping(srv string) {
-	c := new(config)
-	if err := runtime_viper.Unmarshal(&c); err != nil {
-		log.Fatal(err)
+// configMapping 将配置映射到全局变量
+func configMapping() {
+	conf := &Config{}
+	if err := runtimeViper.Unmarshal(conf); err != nil {
+		panic(fmt.Sprintf("Failed to unmarshal config: %v", err))
 	}
-	Snowflake = &c.Snowflake
 
-	Server = &c.Server
-	Server.Secret = []byte(runtime_viper.GetString("server.jwt-secret"))
-
-	Jaeger = &c.Jaeger
-	Mysql = &c.MySQL
-	RabbitMQ = &c.RabbitMQ
-	Redis = &c.Redis
-	OSS = &c.OSS
-	Elasticsearch = &c.Elasticsearch
-	Service = GetService(srv)
+	// 更新全局配置变量
+	Server = &conf.Server
+	Services = &conf.Services
+	MySQL = &conf.MySQL
+	Redis = &conf.Redis
+	Kafka = &conf.Kafka
+	JWT = &conf.JWT
+	Upload = &conf.Upload
+	User = &conf.User
+	Video = &conf.Video
+	Social = &conf.Social
+	Gateway = &conf.Gateway
+	Etcd = &conf.Etcd
+	VideoInteractions = &conf.VideoInteractions
+	Otel = &conf.Otel
+	Elasticsearch = &conf.Elasticsearch
+	Upyun = &conf.Upyun
+	ApiKey = &conf.ApiKey
 }
 
-func GetService(srvname string) *service {
-	addrlist := runtime_viper.GetStringSlice("services." + srvname + ".addr")
-
-	return &service{
-		Name:     runtime_viper.GetString("services." + srvname + ".name"),
-		AddrList: addrlist,
-		LB:       runtime_viper.GetBool("services." + srvname + ".load-balance"),
+// GetDSN 获取MySQL连接字符串
+func GetDSN() string {
+	if MySQL == nil {
+		panic("MySQL config is not initialized")
 	}
+	return fmt.Sprintf("%s:%s@tcp(%s:%d)/%s?charset=utf8mb4&parseTime=True&loc=Local",
+		MySQL.Username,
+		MySQL.Password,
+		MySQL.Host,
+		MySQL.Port,
+		MySQL.Database,
+	)
 }
 
-// Init any essentials for ci testing
-func InitForTest() {
-	Snowflake = &snowflake{
-		WorkerID:      0,
-		DatancenterID: 0,
+// GetRedisClient 获取Redis客户端实例
+func GetRedisClient(db int) *redis.Client {
+	if Redis == nil {
+		panic("Redis config is not initialized")
+	}
+	return redis.NewClient(&redis.Options{
+		Addr:     fmt.Sprintf("%s:%d", Redis.Host, Redis.Port),
+		Password: Redis.Password,
+		DB:       db,
+	})
+}
+
+// GetServiceName 根据服务类型获取服务名称
+func GetServiceName(serviceType string) string {
+	if Services == nil {
+		panic("Services config is not initialized")
 	}
 
-	Server = &server{
-		Version: "1.0",
-		Name:    "tiktok",
-		Secret:  []byte("MTAxNTkwMTg1Mw=="),
-	}
-
-	Jaeger = &jaeger{
-		Addr: "127.0.0.1:6831",
-	}
-
-	Etcd = &etcd{
-		Addr: "127.0.0.1:2379",
-	}
-
-	Mysql = &mySQL{
-		Addr:     "127.0.0.1:3306",
-		Database: "tiktok",
-		Username: "tiktok",
-		Password: "tiktok",
-		Charset:  "utf8mb4",
-	}
-
-	RabbitMQ = &rabbitMQ{
-		Addr:     "127.0.0.1:5672",
-		Username: "tiktok",
-		Password: "tiktok",
-	}
-
-	Redis = &redis{
-		Addr:     "127.0.0.1:6379",
-		Password: "tiktok",
+	switch serviceType {
+	case "user":
+		return Services.User.Name
+	case "video":
+		return Services.Video.Name
+	case "social":
+		return Services.Social.Name
+	case "interaction":
+		return Services.Interaction.Name
+	case "gateway":
+		return Services.Gateway.Name
+	default:
+		return Server.Name // 默认返回通用服务名
 	}
 }

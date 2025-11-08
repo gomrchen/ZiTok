@@ -3,93 +3,33 @@ package constants
 import "time"
 
 const (
-	// auth
-	JWTValue = "MTAxNTkwMTg1Mw=="
-	StartID  = 10000
+	// 文件权限
+	DirPermission  = 0o755
+	FilePermission = 0o644
 
-	// Viper config
-	// etcdAddress = "http://127.0.0.1:2379"
+	// WebSocket 相关
+	WebSocketPingRatio = 9.0 / 10.0
 
-	// redis
-	ReidsDB_Chat       = 1
-	RedisDBFollow      = 2
-	RedisDBInteraction = 3
-	RedisDBVideo       = 4
-	RedisDBNote        = 5
-	CommentExpiredTime = 1 * time.Hour
-	LikeExpiredTime    = 1 * time.Hour
-	NoDataExpiredTime  = 1 * time.Minute
-	LockTime           = 1 * time.Second
-	LockWaitTime       = 5 * time.Millisecond
-	MaxRetryTimes      = 3
-	UserLikeKey        = "user:like"
-	VideoLikeCountKey  = "video:like:count"
-	CountKey           = "count"
-	CommentKey         = "comment"
-	CommentNXKey       = "commentNX"
-	CountNXKey         = "countNX"
-	// RPC
-	MuxConnection  = 1
-	RPCTimeout     = 3 * time.Second
-	ConnectTimeout = 50 * time.Millisecond
+	// 缓存时间
+	DayInHours   = 24
+	MonthInDays  = 30
+	TokenExpiry  = time.Hour * DayInHours
+	TokenExpiry2 = time.Hour * DayInHours * MonthInDays
 
-	// service name
-	APIServiceName         = "api"
-	UserServiceName        = "user"
-	InteractionServiceName = "interaction"
-	FollowServiceName      = "follow"
-	ChatServiceName        = "chat"
-	VideoServiceName       = "video"
-	NoteServiceName        = "note"
+	// 默认分页
+	DefaultPageSize = 10
+	MaxPageSize     = 100
+	DefaultPage     = 1
 
-	// db table name
-	UserTableName     = "user"
-	ChatTableName     = "message"
-	CommentTableName  = "comment"
-	FavoriteTableName = "favorite"
-	FollowTableName   = "follow"
-	VideoTableName    = "video"
-	NoteTableName     = "note"
+	// Kafka 相关
+	DefaultKafkaPartitions = 50
 
-	// snowflake
-	SnowflakeWorkerID     = 0
-	SnowflakeDatacenterID = 0
+	// 视频评分权重
+	VideoScoreWeight = 1.5
 
-	// limit
-	MaxConnections  = 1000
-	MaxQPS          = 100
-	MaxVideoSize    = 300000
-	MaxListLength   = 100
-	MaxIdleConns    = 10
-	MaxGoroutines   = 10
-	MaxOpenConns    = 100
-	ConnMaxLifetime = 10 * time.Second
+	// OpenAI 相关
+	DefaultMaxTokens = 200
 
-	// Aliyun SDK
-	UplaodRoutines = 3 // 并发数量
-	PartSize       = 100 * 1024
-
-	// page
-	PageNum  = 1
-	PageSize = 10
-
-	// ffmpeg
-	FrameNum = 1
-
-	// interaction type
-	AddComment    = 1
-	DeleteComment = 2
-	Like          = 1
-	Dislike       = 2
-
-	// follow type
-	FollowAction   = 1
-	UnFollowAction = 2
-
-	// follow limit
-	Interval         = 1 * time.Second
-	ActionRate       = 100
-	FollowListRate   = 200
-	FollowerListRate = 200
-	FriendListRate   = 200
+	// 时间转换
+	MillisecondsPerSecond = 1000
 )

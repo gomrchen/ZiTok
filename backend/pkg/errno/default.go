@@ -1,45 +1,38 @@
+/*
+Copyright 2024 The west2-online Authors.
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 // This file is be designed to define any common error so that we can use it in any service simply.
 
 package errno
 
+// 一些常用的的错误, 如果你懒得单独定义也可以直接使用
 var (
-	// Success
-	Success = NewErrNo(SuccessCode, "Success")
+	Success = NewErrNo(SuccessCode, "ok")
 
-	ServiceError             = NewErrNo(ServiceErrorCode, "service is unable to start successfully")
-	ServiceInternalError     = NewErrNo(ServiceErrorCode, "service internal error")
-	ParamError               = NewErrNo(ParamErrorCode, "parameter error")
-	AuthorizationFailedError = NewErrNo(AuthorizationFailedErrCode, "authorization failed")
+	ParamVerifyError  = NewErrNo(ParamVerifyErrorCode, "parameter validation failed")
+	ParamMissingError = NewErrNo(ParamMissingErrorCode, "missing parameter")
 
-	// User
-	UserExistedError = NewErrNo(ParamErrorCode, "user existed")
+	AuthInvalid             = NewErrNo(AuthInvalidCode, "authentication failure")
+	AuthAccessExpired       = NewErrNo(AuthAccessExpiredCode, "token expiration")
+	AuthNoToken             = NewErrNo(AuthNoTokenCode, "lack of token")
+	AuthNoOperatePermission = NewErrNo(AuthNoOperatePermissionCode, "No permission to operate")
 
-	// Comment
-	UnexpectedTypeError     = NewErrNo(UnexpectedTypeErrorCode, "unexpected type")
-	NotImplementError       = NewErrNo(NotImplementErrorCode, "not implement")
-	SensitiveWordsError     = NewErrNo(SensitiveWordsErrorCode, "existed sensitive words")
-	SensitiveWordsHTTPError = NewErrNo(ServiceErrorCode, "sensitive-words api error")
+	InternalServiceError = NewErrNo(InternalServiceErrorCode, "internal server error")
+	OSOperationError     = NewErrNo(OSOperateErrorCode, "os operation failed")
+	IOOperationError     = NewErrNo(IOOperateErrorCode, "io operation failed")
 
-	// Favorite
-	LikeNoExistError      = NewErrNo(LikeNoExistErrorCode, "you did not like the video")
-	LikeAlreadyExistError = NewErrNo(LikeAlreadyExistErrorCode, "you already like the video")
-
-	// Video
-	FileUploadError = NewErrNo(FileUploadErrorCode, "upload meet error")
-	NotVideoFile    = NewErrNo(FileUploadError.ErrorCode, "not video file")
-
-	// Follow
-	FollowYourselfError = NewErrNo(FollowYourselfErrorCode, "you should not follow yourself")
-	NotFollowError      = NewErrNo(NotFollowErrorCode, "you are not following this user")
-	AlreadyFollowError  = NewErrNo(AlreadyFollowErrorCode, "you already follow this user")
-	UserNotFoundError   = NewErrNo(ParamErrorCode, "user not found")
-
-	// Chat
-	CharacterLimitError = NewErrNo(CharacterLimitErrorCode, "character limit error")
-
-	// Video
-	VideoNotFoundError = NewErrNo(VideoNotFoundErrorCode, "video not found")
-
-	// Note
-	NoteNotFoundError = NewErrNo(NoteNotFoundErrorCode, "note not found")
+	UpYunFileError = NewErrNo(UpYunFileErrorCode, "upyun operation failed")
 )

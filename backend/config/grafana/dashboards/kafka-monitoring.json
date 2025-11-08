@@ -1,0 +1,19 @@
+{
+  "title": "Kafka 监控",
+  "panels": [
+    {
+      "title": "Kafka 消费速率",
+      "type": "stat",
+      "targets": [{"expr": "sum(rate(kafka_server_brokertopicmetrics_messagesin_total[5m])) by (topic)"}],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+    },
+    {
+      "title": "Kafka Lag",
+      "type": "stat",
+      "targets": [{"expr": "sum(kafka_consumer_group_lag) by (group, topic)"}],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+    }
+  ],
+  "time": {"from": "now-1h", "to": "now"},
+  "refresh": "5s"
+}

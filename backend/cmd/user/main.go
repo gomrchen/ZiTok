@@ -1,117 +1,71 @@
 package main
 
 import (
-	"flag"
-	"fmt"
+	"context"
+	"log"
 	"net"
+	"net/http"
 
-	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/cloudwego/kitex/pkg/limit"
 	"github.com/cloudwego/kitex/pkg/rpcinfo"
 	"github.com/cloudwego/kitex/server"
-	"github.com/elastic/go-elasticsearch"
-	kitexlogrus "github.com/kitex-contrib/obs-opentelemetry/logging/logrus"
+	"github.com/kitex-contrib/obs-opentelemetry/tracing"
 	etcd "github.com/kitex-contrib/registry-etcd"
-	trace "github.com/kitex-contrib/tracer-opentracing"
-	"github.com/ozline/tiktok/cmd/user/dal"
-	"github.com/ozline/tiktok/cmd/user/rpc"
-	"github.com/ozline/tiktok/config"
-	user "github.com/ozline/tiktok/kitex_gen/user/userservice"
-	"github.com/ozline/tiktok/pkg/constants"
-	"github.com/ozline/tiktok/pkg/eslogrus"
-	"github.com/ozline/tiktok/pkg/tracer"
-	"github.com/ozline/tiktok/pkg/utils"
-	"github.com/sirupsen/logrus"
+	"github.com/yxrxy/videoHub/app/user"
+	"github.com/yxrxy/videoHub/config"
+	"github.com/yxrxy/videoHub/kitex_gen/user/userservice"
+	"github.com/yxrxy/videoHub/pkg/base"
+	"github.com/yxrxy/videoHub/pkg/middleware"
+
+	_ "net/http/pprof"
 )
 
-var (
-	path       *string
-	listenAddr string // listen port
-
-	EsClient *elasticsearch.Client
-)
-
-func Init() {
-	// config init
-	path = flag.String("config", "./config", "config path")
-	flag.Parse()
-	config.Init(*path, constants.UserServiceName)
-
-	// others
-	dal.Init()
-	tracer.InitJaeger(constants.UserServiceName)
-
-	rpc.Init()
-
-	EsInit()
-	klog.SetLevel(klog.LevelDebug)
-	klog.SetLogger(kitexlogrus.NewLogger(kitexlogrus.WithHook(EsHookLog())))
-}
-
-func EsHookLog() *eslogrus.ElasticHook {
-	hook, err := eslogrus.NewElasticHook(EsClient, config.Elasticsearch.Host, logrus.DebugLevel, constants.UserServiceName)
-	if err != nil {
-		panic(err)
-	}
-
-	return hook
-}
-
-func EsInit() {
-	esConn := fmt.Sprintf("http://%s", config.Elasticsearch.Addr)
-	cfg := elasticsearch.Config{
-		Addresses: []string{esConn},
-	}
-	client, err := elasticsearch.NewClient(cfg)
-	if err != nil {
-		panic(err)
-	}
-	EsClient = client
+func init() {
+	config.Init("user")
 }
 
 func main() {
-	Init() // 做一些中间件的初始化
-
+	go func() {
+		http.ListenAndServe("0.0.0.0:6060", nil)
+	}()
 	r, err := etcd.NewEtcdRegistry([]string{config.Etcd.Addr})
-
 	if err != nil {
-		panic(err)
+		log.Fatalf("User: new etcd registry failed, err: %v", err)
 	}
-
-	// get available port from config set
-	for index, addr := range config.Service.AddrList {
-		if ok := utils.AddrCheck(addr); ok {
-			listenAddr = addr
-			break
-		}
-
-		if index == len(config.Service.AddrList)-1 {
-			klog.Fatal("not available port from config")
-		}
-	}
-
+	listenAddr := config.User.RPCAddr
 	addr, err := net.ResolveTCPAddr("tcp", listenAddr)
-
 	if err != nil {
-		panic(err)
+		log.Fatalf("User: resolve tcp addr failed, err: %v", err)
 	}
+	p := base.TelemetryProvider("UserService", config.Otel.CollectorAddr)
+	defer func() {
+		if err := p.Shutdown(context.Background()); err != nil {
+			log.Fatalf("User: shutdown telemetry provider failed, err: %v", err)
+		}
+	}()
 
-	svr := user.NewServer(
-		new(UserServiceImpl),
+	svr := userservice.NewServer(
+		// 注入依赖
+		user.InjectUserHandler(),
+		server.WithSuite(tracing.NewServerSuite()),
 		server.WithServerBasicInfo(&rpcinfo.EndpointBasicInfo{
-			ServiceName: constants.UserServiceName,
+			// 配置文件的值是在运行时才能获取到的，Kitex 无法在编译时验证它是否正确
+			ServiceName: "UserService",
 		}),
 		server.WithMuxTransport(),
 		server.WithServiceAddr(addr),
 		server.WithRegistry(r),
-		server.WithSuite(trace.NewDefaultServerSuite()),
 		server.WithLimit(&limit.Option{
-			MaxConnections: constants.MaxConnections,
-			MaxQPS:         constants.MaxQPS,
+			MaxConnections: int(config.Server.MaxConnections),
+			MaxQPS:         int(config.Server.MaxQPS),
 		}),
-	)
 
+		server.WithMiddleware(middleware.ErrorLog()),
+		server.WithMiddleware(middleware.Metrics()),
+		server.WithMiddleware(middleware.Respond()),
+	)
 	if err = svr.Run(); err != nil {
-		panic(err)
+		log.Printf("User: run server failed, err: %v", err)
+		return
 	}
 }
