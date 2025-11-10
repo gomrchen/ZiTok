@@ -12,11 +12,14 @@ class VideoService {
     return dio.get('/api/video/popular');
   }
 
-  Future<Response> search({required String content, int pages = 1, int size = 20}) {
+  Future<Response> search({required String content,String? username,int?from_date,int?to_date, int pages = 1, int size = 20}) {
     return dio.post('/api/video/search', data: {
-      'content': content,
-      'pages': pages,
-      'size': size,
+      'keywords': content,
+      'page_num': pages,
+      'page_size': size,
+      'username': username,
+      'from_date': from_date,
+      'to_date': to_date,
     });
   }
 

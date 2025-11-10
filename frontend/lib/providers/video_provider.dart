@@ -58,6 +58,7 @@ class VideoProvider extends ChangeNotifier {
     notifyListeners();
     final res = await repo.fetchDiscover(VideoQuery(page: _discoverPage, pageSize: 20, keyword: _keyword, tags: _filters));
     _discover.addAll(res.items);
+    print('discoverppppppppppppp: ');print(_discover);
     _discoverHasMore = res.hasMore;
     _discoverPage += 1;
     _loadingDiscover = false;

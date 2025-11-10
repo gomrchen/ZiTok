@@ -19,10 +19,9 @@ class UserService {
     });
   }
 
-  Future<Response> info({int? uid, String? userName}) {
-    return dio.get('/api/user/auth/info', queryParameters: {
-      if (uid != null) 'uid': uid,
-      if (userName != null) 'user_name': userName,
+  Future<Response> info({required String userId}) {
+    return dio.get('/user/info', queryParameters: {
+      'user_id': userId,
     });
   }
 
