@@ -1,0 +1,34 @@
+{
+  "title": "Go Runtime 监控",
+  "panels": [
+    {
+      "title": "活跃 Goroutines",
+      "type": "timeseries",
+      "targets": [{"expr": "go_goroutines", "legendFormat": "Goroutines"}],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 0}
+    },
+    {
+      "title": "GC 频率",
+      "type": "timeseries", 
+      "targets": [{"expr": "rate(go_gc_cycles_total[5m])", "legendFormat": "GC/秒"}],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 0}
+    },
+    {
+      "title": "堆内存使用",
+      "type": "timeseries",
+      "targets": [
+        {"expr": "go_memstats_heap_alloc_bytes / 1024 / 1024", "legendFormat": "堆内存 (MB)"},
+        {"expr": "go_memstats_heap_sys_bytes / 1024 / 1024", "legendFormat": "堆系统内存 (MB)"}
+      ],
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 8}
+    },
+    {
+      "title": "GC 暂停时间",
+      "type": "timeseries",
+      "targets": [{"expr": "rate(go_gc_pause_ns[5m]) / 1000000", "legendFormat": "暂停时间 (ms)"}],
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 8}
+    }
+  ],
+  "time": {"from": "now-1h", "to": "now"},
+  "refresh": "5s"
+}

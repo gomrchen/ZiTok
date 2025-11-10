@@ -1,0 +1,26 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: mysql-init
+  namespace: videohub
+spec:
+  template:
+    spec:
+      containers:
+      - name: mysql-init
+        image: mysql:8.0
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          value: "123456"
+        volumeMounts:
+        - name: init-sql
+          mountPath: /docker-entrypoint-initdb.d
+      restartPolicy: OnFailure
+      volumes:
+      - name: init-sql
+        hostPath:
+          path: /home/yxrxy/桌面/videoHub/videoHub/config/sql
+          type: Directory
+#kubectl cp config/sql/user.sql videohub/mysql-5796fb4744-bdqrz:/tmp/user.sql -n videohub && kubectl cp config/sql/video.sql videohub/mysql-5796fb4744-bdqrz:/tmp/video.sql -n videohub && kubectl cp config/sql/social.sql videohub/mysql-5796fb4744-bdqrz:/tmp/social.sql -n videohub && kubectl cp config/sql/interaction.sql videohub/mysql-5796fb4744-bdqrz:/tmp/interaction.sql -n videohub
+#kubectl exec -n videohub mysql-5796fb4744-bdqrz -- mysql -uroot -p123456 -D videohub -e 'source /tmp/user.sql; source /tmp/video.sql; source /tmp/social.sql; source /tmp/interaction.sql;'

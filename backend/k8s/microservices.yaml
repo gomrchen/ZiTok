@@ -1,0 +1,527 @@
+# Gateway 服务部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gateway
+  namespace: videohub
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: gateway
+  template:
+    metadata:
+      labels:
+        app: gateway
+    spec:
+      initContainers:
+      - name: init-storage
+        image: busybox:1.35
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          mkdir -p /app/src/storage/avatars
+          mkdir -p /app/src/storage/videos
+          mkdir -p /app/src/storage/covers
+          mkdir -p /app/src/storage/chat
+          chmod -R 755 /app/src/storage
+        volumeMounts:
+        - name: app-storage
+          mountPath: /app/src/storage
+      containers:
+      - name: gateway
+        image: videohub-gateway:latest
+        imagePullPolicy: Never
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "ok" > /app/src/storage/health
+          exec /app/output/gateway/videohub-gateway
+        ports:
+        - containerPort: 8080
+        - containerPort: 6060  # pprof
+        env:
+        - name: ETCD_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: ETCD_ADDR
+        - name: MYSQL_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: MYSQL_ADDR
+        - name: REDIS_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: REDIS_ADDR
+        volumeMounts:
+        - name: app-storage
+          mountPath: /app/src/storage
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: app-storage
+        hostPath:
+          path: /tmp/videohub/storage
+          type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gateway
+  namespace: videohub
+spec:
+  selector:
+    app: gateway
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+  - port: 6060
+    targetPort: 6060
+    name: pprof
+---
+# User 服务部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: user
+  namespace: videohub
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: user
+  template:
+    metadata:
+      labels:
+        app: user
+    spec:
+      initContainers:
+      - name: init-storage
+        image: busybox:1.35
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          mkdir -p /app/src/storage/avatars
+          chmod -R 755 /app/src/storage
+          echo "Storage directories created successfully"
+        volumeMounts:
+        - name: app-storage
+          mountPath: /app/src/storage
+      containers:
+      - name: user
+        image: videohub-user:latest
+        imagePullPolicy: Never
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "ok" > /app/src/storage/health
+          exec /app/output/user/videohub-user
+        ports:
+        - containerPort: 8897  # RPC端口
+        - containerPort: 8080  # HTTP健康检查端口
+        - containerPort: 6060  # pprof
+        env:
+        - name: ETCD_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: ETCD_ADDR
+        - name: MYSQL_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: MYSQL_ADDR
+        - name: REDIS_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: REDIS_ADDR
+        volumeMounts:
+        - name: app-storage
+          mountPath: /app/src/storage
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        # 临时移除健康检查
+        # livenessProbe:
+        #   httpGet:
+        #     path: /health
+        #     port: 8080
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /health
+        #     port: 8080
+        #   initialDelaySeconds: 5
+        #   periodSeconds: 5
+      volumes:
+      - name: app-storage
+        hostPath:
+          path: /tmp/videohub/storage
+          type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: user
+  namespace: videohub
+spec:
+  selector:
+    app: user
+  ports:
+  - port: 8897
+    targetPort: 8897
+    name: rpc
+  - port: 8080
+    targetPort: 8080
+    name: http
+  - port: 6060
+    targetPort: 6060
+    name: pprof
+---
+# Video 服务部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: video
+  namespace: videohub
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: video
+  template:
+    metadata:
+      labels:
+        app: video
+    spec:
+      initContainers:
+      - name: init-storage
+        image: busybox:1.35
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          mkdir -p /app/src/storage/videos
+          mkdir -p /app/src/storage/covers
+          chmod -R 755 /app/src/storage
+          echo "Storage directories created successfully"
+        volumeMounts:
+        - name: app-storage
+          mountPath: /app/src/storage
+      containers:
+      - name: video
+        image: videohub-video:latest
+        imagePullPolicy: Never
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "ok" > /app/src/storage/health
+          exec /app/output/video/videohub-video
+        ports:
+        - containerPort: 8891  # RPC端口
+        - containerPort: 8080  # HTTP健康检查端口
+        - containerPort: 6060  # pprof
+        env:
+        - name: ETCD_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: ETCD_ADDR
+        - name: MYSQL_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: MYSQL_ADDR
+        - name: REDIS_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: REDIS_ADDR
+        - name: KAFKA_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: KAFKA_ADDR
+        volumeMounts:
+        - name: app-storage
+          mountPath: /app/src/storage
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        # 移除健康检查
+        # livenessProbe:
+        #   httpGet:
+        #     path: /health
+        #     port: 8080
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /health
+        #     port: 8080
+        #   initialDelaySeconds: 5
+        #   periodSeconds: 5
+      volumes:
+      - name: app-storage
+        hostPath:
+          path: /tmp/videohub/storage
+          type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: video
+  namespace: videohub
+spec:
+  selector:
+    app: video
+  ports:
+  - port: 8891
+    targetPort: 8891
+    name: rpc
+  - port: 8080
+    targetPort: 8080
+    name: http
+  - port: 6060
+    targetPort: 6060
+    name: pprof
+---
+# Interaction 服务部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: interaction
+  namespace: videohub
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: interaction
+  template:
+    metadata:
+      labels:
+        app: interaction
+    spec:
+      initContainers:
+      - name: init-storage
+        image: busybox:1.35
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          mkdir -p /app/src/storage
+          chmod -R 755 /app/src/storage
+          echo "Storage directories created successfully"
+        volumeMounts:
+        - name: app-storage
+          mountPath: /app/src/storage
+      containers:
+      - name: interaction
+        image: videohub-interaction:latest
+        imagePullPolicy: Never
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "ok" > /app/src/storage/health
+          exec /app/output/interaction/videohub-interaction
+        ports:
+        - containerPort: 8895  # RPC端口
+        - containerPort: 8080  # HTTP健康检查端口
+        - containerPort: 6060  # pprof
+        env:
+        - name: ETCD_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: ETCD_ADDR
+        - name: MYSQL_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: MYSQL_ADDR
+        - name: REDIS_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: REDIS_ADDR
+        volumeMounts:
+        - name: app-storage
+          mountPath: /app/src/storage
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        # 临时移除健康检查
+        # livenessProbe:
+        #   httpGet:
+        #     path: /health
+        #     port: 8080
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /health
+        #     port: 8080
+        #   initialDelaySeconds: 5
+        #   periodSeconds: 5
+      volumes:
+      - name: app-storage
+        hostPath:
+          path: /tmp/videohub/storage
+          type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: interaction
+  namespace: videohub
+spec:
+  selector:
+    app: interaction
+  ports:
+  - port: 8895
+    targetPort: 8895
+    name: rpc
+  - port: 8080
+    targetPort: 8080
+    name: http
+  - port: 6060
+    targetPort: 6060
+    name: pprof
+---
+# Social 服务部署
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: social
+  namespace: videohub
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: social
+  template:
+    metadata:
+      labels:
+        app: social
+    spec:
+      initContainers:
+      - name: init-storage
+        image: busybox:1.35
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          mkdir -p /app/src/storage/chat
+          chmod -R 755 /app/src/storage
+          echo "Storage directories created successfully"
+        volumeMounts:
+        - name: app-storage
+          mountPath: /app/src/storage
+      containers:
+      - name: social
+        image: videohub-social:latest
+        imagePullPolicy: Never
+        command: ["/bin/sh", "-c"]
+        args:
+        - |
+          echo "ok" > /app/src/storage/health
+          exec /app/output/social/videohub-social
+        ports:
+        - containerPort: 8893  # RPC端口
+        - containerPort: 8080  # HTTP健康检查端口
+        - containerPort: 6060  # pprof
+        env:
+        - name: ETCD_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: ETCD_ADDR
+        - name: MYSQL_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: MYSQL_ADDR
+        - name: REDIS_ADDR
+          valueFrom:
+            configMapKeyRef:
+              name: videohub-config
+              key: REDIS_ADDR
+        volumeMounts:
+        - name: app-storage
+          mountPath: /app/src/storage
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        # 临时移除健康检查
+        # livenessProbe:
+        #   httpGet:
+        #     path: /health
+        #     port: 8080
+        #   initialDelaySeconds: 30
+        #   periodSeconds: 10
+        # readinessProbe:
+        #   httpGet:
+        #     path: /health
+        #     port: 8080
+        #   initialDelaySeconds: 5
+        #   periodSeconds: 5
+      volumes:
+      - name: app-storage
+        hostPath:
+          path: /tmp/videohub/storage
+          type: DirectoryOrCreate
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: social
+  namespace: videohub
+spec:
+  selector:
+    app: social
+  ports:
+  - port: 8893
+    targetPort: 8893
+    name: rpc
+  - port: 8080
+    targetPort: 8080
+    name: http
+  - port: 6060
+    targetPort: 6060
+    name: pprof 
