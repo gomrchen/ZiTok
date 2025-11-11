@@ -25,7 +25,7 @@ class UserInfo {
 
   factory UserInfo.fromJson(Map<String, dynamic> j) => UserInfo(
         id: (j['id'] ?? '').toString(),
-        userName: (j['user_name'] ?? '').toString(),
+        userName: (j['username'] ?? '').toString(),
         email: j['email'] as String?,
         gender: j['gender'] is int ? j['gender'] as int : int.tryParse('${j['gender']}'),
         avatar: j['avatar'] as String?,

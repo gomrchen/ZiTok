@@ -1,40 +1,12 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:zitok/providers/comment_provider.dart';
+import '../models/comment.dart';
 import '../theme/theme_tokens.dart';
 
 enum CommentSort { timeDesc, timeAsc, hot }
 
-class _CommentItem {
-  final String id;
-  final String author;
-  final String content;
-  final DateTime time;
-  int likes;
-  final List<_CommentItem> replies;
-  _CommentItem({required this.id, required this.author, required this.content, required this.time, this.likes = 0, this.replies = const []});
-}
-
-List<_CommentItem> _mockComments() {
-  final now = DateTime.now();
-  return List.generate(8, (i) {
-    final replies = List.generate(i % 4, (j) => _CommentItem(
-          id: 'r${i}_$j',
-          author: '用户$j',
-          content: '子回复内容 示例 #$j，父评论 $i',
-          time: now.subtract(Duration(minutes: (i * 5 + j))),
-          likes: (i + j) * 2,
-        ));
-    return _CommentItem(
-      id: 'p$i',
-      author: '用户$i',
-      content: '这是父评论内容 示例 #$i，包含一些文字说明。',
-      time: now.subtract(Duration(minutes: i * 7)),
-      likes: i * 3 + 1,
-      replies: replies,
-    );
-  });
-}
-
-/// 评论区底部弹窗（双栏 + 标签切换 + 父子评论/折叠/排序/点赞 + 输入区）
+/// 评论区底部弹窗
 void showCommentsSheet(BuildContext context, {required String videoId}) {
   showModalBottomSheet(
     context: context,
@@ -42,18 +14,25 @@ void showCommentsSheet(BuildContext context, {required String videoId}) {
     backgroundColor: Theme.of(context).colorScheme.surface,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
     builder: (context) {
-      return _CommentSheetContent(videoId: videoId);
+      //【推荐修改】当Provider已在上层提供时，使用 .value 构造函数是最佳实践
+      return ChangeNotifierProvider.value(
+        value: context.read<CommentProvider>(),
+        child: _CommentSheetContent(videoId: videoId),
+      );
     },
   );
 }
 
-/// 控制器：用于跨组件通信（例如在弹窗底部输入区点击“发送”时，通知列表组件追加评论）。
+/// 控制器：用于跨组件通信
 class CommentsPaneController {
-  void Function(String text)? _sendHook;
-  void send(String text) => _sendHook?.call(text);
+  void Function(String text, String? parentId)? _sendHook;
+  void Function(CommentItem comment)? _startReplyHook;
+
+  void send(String text, {String? parentId}) => _sendHook?.call(text, parentId);
+  void startReply(CommentItem comment) => _startReplyHook?.call(comment);
 }
 
-/// 可复用评论列表组件：排序、父子评论折叠、点赞，支持可选底部输入区。
+/// 可复用评论列表组件
 class CommentsPane extends StatefulWidget {
   final String videoId;
   final bool showInput;
@@ -62,6 +41,7 @@ class CommentsPane extends StatefulWidget {
   final CommentSort initialSort;
   final ValueChanged<String>? onSend;
   final CommentsPaneController? controller;
+  final ValueSetter<CommentItem>? onReply;
 
   const CommentsPane({
     super.key,
@@ -72,6 +52,7 @@ class CommentsPane extends StatefulWidget {
     this.initialSort = CommentSort.timeDesc,
     this.onSend,
     this.controller,
+    this.onReply,
   });
 
   @override
@@ -80,16 +61,22 @@ class CommentsPane extends StatefulWidget {
 
 class _CommentsPaneState extends State<CommentsPane> with AutomaticKeepAliveClientMixin {
   late final ValueNotifier<CommentSort> _sort;
-  late final List<_CommentItem> _comments;
+  late List<CommentItem> _comments;
   final Set<String> _expanded = <String>{};
   final TextEditingController _text = TextEditingController();
+  late CommentProvider commentProvider; // 在initState或build中初始化
 
   @override
   void initState() {
     super.initState();
     _sort = ValueNotifier<CommentSort>(widget.initialSort);
-    _comments = _mockComments();
-    // 绑定控制器，外部可通过 controller.send(text) 追加评论
+    // 使用 WidgetsBinding 确保 Provider 在 build 之后被安全访问
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        Provider.of<CommentProvider>(context, listen: false).fetchComments(widget.videoId);
+      }
+    });
+
     widget.controller?._sendHook = _receiveExternalSend;
   }
 
@@ -101,8 +88,8 @@ class _CommentsPaneState extends State<CommentsPane> with AutomaticKeepAliveClie
     super.dispose();
   }
 
-  List<_CommentItem> _sorted(List<_CommentItem> list, CommentSort s) {
-    final out = List<_CommentItem>.from(list);
+  List<CommentItem> _sorted(List<CommentItem> list, CommentSort s) {
+    final out = List<CommentItem>.from(list);
     switch (s) {
       case CommentSort.timeDesc:
         out.sort((a, b) => b.time.compareTo(a.time));
@@ -117,26 +104,52 @@ class _CommentsPaneState extends State<CommentsPane> with AutomaticKeepAliveClie
     return out;
   }
 
-  void _receiveExternalSend(String text) {
+  void _receiveExternalSend(String text, String? parentId) {
     final t = text.trim();
     if (t.isEmpty) return;
-    setState(() {
-      _comments.insert(0, _CommentItem(
-        id: 'local_${DateTime.now().millisecondsSinceEpoch}',
-        author: '我',
+    if (mounted) {
+      context.read<CommentProvider>().addComment(
+        videoId: widget.videoId,
         content: t,
-        time: DateTime.now(),
-        likes: 0,
-      ));
-    });
+        parentId: parentId,
+      );
+    }
   }
 
   void _send() {
     final t = _text.text.trim();
     if (t.isEmpty) return;
     widget.onSend?.call(t);
-    _receiveExternalSend(t);
+    _receiveExternalSend(t, null);
     _text.clear();
+  }
+
+  /// 【新增】处理删除逻辑的方法
+  void _handleDelete(CommentItem commentToDelete) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('确认删除'),
+        content: const Text('确定要删除这条评论及其所有回复吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              // 调用 provider 中已经完成的方法
+              context.read<CommentProvider>().deleteCommentAndChildren(
+                videoId: widget.videoId,
+                commentToDelete: commentToDelete,
+              );
+              Navigator.of(ctx).pop();
+            },
+            child: Text('确认', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -144,12 +157,15 @@ class _CommentsPaneState extends State<CommentsPane> with AutomaticKeepAliveClie
 
   @override
   Widget build(BuildContext context) {
+    // 在 build 方法中，使用 watch 来确保数据更新时UI能重建
+    commentProvider = context.watch<CommentProvider>();
+    _comments = commentProvider.commentsMap[widget.videoId] ?? [];
+
     super.build(context);
     final pad = widget.padding ?? const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm);
     final controller = widget.scrollController ?? ScrollController();
     return Column(
       children: [
-        // 排序菜单与总数
         ValueListenableBuilder<CommentSort>(
           valueListenable: _sort,
           builder: (context, sort, _) {
@@ -177,7 +193,6 @@ class _CommentsPaneState extends State<CommentsPane> with AutomaticKeepAliveClie
           },
         ),
         const Divider(height: 1),
-        // 列表
         Expanded(
           child: ValueListenableBuilder<CommentSort>(
             valueListenable: _sort,
@@ -187,24 +202,29 @@ class _CommentsPaneState extends State<CommentsPane> with AutomaticKeepAliveClie
                 controller: controller,
                 key: PageStorageKey('comments_${widget.videoId}'),
                 itemCount: list.length,
-                itemBuilder: (_, i) => _CommentTile(
-                  item: list[i],
-                  expanded: _expanded.contains(list[i].id),
-                  onToggleExpand: () {
-                    setState(() {
-                      if (_expanded.contains(list[i].id)) {
-                        _expanded.remove(list[i].id);
-                      } else {
-                        _expanded.add(list[i].id);
-                      }
-                    });
-                  },
-                ),
+                itemBuilder: (_, i) {
+                  final commentItem = list[i];
+                  return _CommentTile(
+                    item: commentItem,
+                    expanded: _expanded.contains(commentItem.id),
+                    onToggleExpand: () {
+                      setState(() {
+                        if (_expanded.contains(commentItem.id)) {
+                          _expanded.remove(commentItem.id);
+                        } else {
+                          _expanded.add(commentItem.id);
+                        }
+                      });
+                    },
+                    onReply: widget.onReply,
+                    onDelete: () => _handleDelete(commentItem),
+                    onDeleteReply: (replyItem) => _handleDelete(replyItem),
+                  );
+                },
               );
             },
           ),
         ),
-        // 可选底部输入区
         if (widget.showInput)
           SafeArea(
             top: false,
@@ -258,16 +278,27 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
   final TextEditingController _text = TextEditingController();
   final CommentsPaneController _paneController = CommentsPaneController();
 
+  CommentItem? _replyingTo;
+  final FocusNode _focusNode = FocusNode();
+
   @override
   void initState() {
     super.initState();
     _tab = TabController(length: 2, vsync: this);
+    _paneController._startReplyHook = (commentToReply) {
+      setState(() {
+        _replyingTo = commentToReply;
+      });
+      _focusNode.requestFocus();
+    };
   }
 
   @override
   void dispose() {
     _tab.dispose();
     _text.dispose();
+    _focusNode.dispose();
+    _paneController._startReplyHook = null;
     super.dispose();
   }
 
@@ -282,7 +313,6 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
       builder: (context, controller) {
         return Column(
           children: [
-            // 顶部标题 + 关闭
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
               child: Row(
@@ -293,7 +323,6 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
                 ],
               ),
             ),
-            // 标签栏
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
               child: TabBar(
@@ -304,7 +333,6 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
               ),
             ),
             const Divider(height: 1),
-            // 内容：响应式布局。如果宽屏，显示双栏；否则使用 TabBarView 滑动切换。
             Expanded(
               child: LayoutBuilder(
                 builder: (ctx, box) {
@@ -329,7 +357,6 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
               ),
             ),
             const Divider(height: 1),
-            // 底部输入区（固定）
             SafeArea(
               top: false,
               child: Padding(
@@ -339,15 +366,15 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
                     Expanded(
                       child: TextField(
                         controller: _text,
-                        decoration: const InputDecoration(
-                          hintText: '写下你的评论...',
-                          border: OutlineInputBorder(),
+                        focusNode: _focusNode,
+                        decoration: InputDecoration(
+                          hintText: _replyingTo == null ? '写下你的评论...' : '回复 @${_replyingTo!.author}',
+                          border: const OutlineInputBorder(),
                           isDense: true,
                         ),
                       ),
                     ),
                     const SizedBox(width: Spacing.md),
-                    // 简易 emoji 选择
                     PopupMenuButton<String>(
                       tooltip: 'Emoji',
                       itemBuilder: (context) => const [
@@ -365,8 +392,12 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
                       onPressed: () {
                         final t = _text.text.trim();
                         if (t.isEmpty) return;
-                        _paneController.send(t); // 通过控制器通知列表组件
+                        _paneController.send(t, parentId: _replyingTo?.id);
                         _text.clear();
+                        _focusNode.unfocus();
+                        setState(() {
+                          _replyingTo = null;
+                        });
                       },
                       child: const Text('发送'),
                     ),
@@ -380,195 +411,233 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
     );
   }
 
-  // 左侧：视频简介
   Widget _videoIntro(ScrollController controller) {
-    final theme = Theme.of(context);
-    return ListView(
-      controller: controller,
-      padding: const EdgeInsets.all(Spacing.md),
-      children: [
-        Text('视频标题示例', style: theme.textTheme.titleMedium),
-        const SizedBox(height: Spacing.sm),
-        Text('这是一个视频的简要介绍。包含标签、作者、发布时间等信息。', style: theme.textTheme.bodyMedium),
-        const SizedBox(height: Spacing.md),
-        Wrap(spacing: 8, runSpacing: 8, children: const [
-          Chip(label: Text('#知识')), Chip(label: Text('#学习')), Chip(label: Text('#技能')),
-        ]),
-      ],
-    );
+    return Container(alignment: Alignment.center, child: const Text('视频简介区'));
   }
 
-  // 右侧：评论区
   Widget _commentsPane(ScrollController controller) {
     return CommentsPane(
+      key: const ValueKey('comments'),
       videoId: widget.videoId,
-      scrollController: controller,
       showInput: false,
+      scrollController: controller,
       controller: _paneController,
+      onReply: (commentToReply) {
+        setState(() {
+          _replyingTo = commentToReply;
+        });
+        _focusNode.requestFocus();
+      },
     );
   }
 }
 
 class _CommentTile extends StatelessWidget {
-  final _CommentItem item;
+  final CommentItem item;
   final bool expanded;
   final VoidCallback onToggleExpand;
-  const _CommentTile({required this.item, required this.expanded, required this.onToggleExpand});
+  final ValueSetter<CommentItem>? onReply;
+  final VoidCallback? onDelete;
+  final ValueSetter<CommentItem>? onDeleteReply;
+
+  const _CommentTile({
+    required this.item,
+    required this.expanded,
+    required this.onToggleExpand,
+    this.onReply,
+    this.onDelete,
+    this.onDeleteReply,
+  });
+
+  String _fmt(DateTime t) {
+    final m = t.minute.toString().padLeft(2, '0');
+    return '${t.month}/${t.day} ${t.hour}:$m';
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final children = item.replies;
-    final showButton = children.length > 2;
-    final visibleChildren = expanded ? children : children.take(2).toList();
+    final visibleChildren = expanded ? children : (children.length > 2 ? children.sublist(0, 2) : children);
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(radius: 16, child: Text(item.author.substring(0, 1))),
-              const SizedBox(width: Spacing.sm),
+              CircleAvatar(radius: 16, child: Text(item.author.isNotEmpty ? item.author.substring(0, 1) : '?')),
+              const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Text(item.author.isNotEmpty ? item.author : '匿名用户', style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+                    const SizedBox(height: 4),
+                    Text(item.content),
+                    const SizedBox(height: 8),
                     Row(
                       children: [
-                        Text(item.author, style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600)),
-                        const SizedBox(width: 8),
                         Text(_fmt(item.time), style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+                        const SizedBox(width: 16),
+                        InkWell(
+                          onTap: () => onReply?.call(item),
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 4.0),
+                            child: Text(
+                              '回复',
+                              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: Colors.grey.shade600),
+                            ),
+                          ),
+                        ),
                       ],
                     ),
-                    const SizedBox(height: 6),
-                    Text(item.content),
                   ],
                 ),
               ),
-              // 点赞按钮（带计数）
-              _LikeButton(initial: item.likes),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 24,
+                width: 24,
+                child: IconButton(
+                  padding: EdgeInsets.zero,
+                  visualDensity: VisualDensity.compact,
+                  tooltip: '删除评论',
+                  iconSize: 16,
+                  icon: const Icon(Icons.delete_outline, color: Colors.grey),
+                  onPressed: onDelete,
+                ),
+              ),
             ],
           ),
-          const SizedBox(height: 8),
-          // 子评论区块，视觉缩进与分割线
-          if (children.isNotEmpty)
+          if (children.isNotEmpty) ...[
+            const SizedBox(height: 8),
             Container(
-              margin: const EdgeInsets.only(left: 40),
-              decoration: BoxDecoration(
-                border: Border(left: BorderSide(color: Colors.grey.withOpacity(0.2))),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.only(left: Spacing.sm),
-                child: Column(
-                  children: [
-                    AnimatedSize(
-                      duration: const Duration(milliseconds: 200),
-                      curve: Curves.easeInOut,
-                      child: Column(
-                        children: [
-                          for (final r in visibleChildren) _ReplyTile(item: r),
-                        ],
+              padding: const EdgeInsets.only(left: 16, top: 8, bottom: 8, right: 8),
+              margin: const EdgeInsets.only(left: 24),
+              decoration: BoxDecoration(color: Colors.grey.withOpacity(0.05), borderRadius: BorderRadius.circular(8)),
+              child: Column(
+                children: [
+                  ...visibleChildren.map((reply) => _ReplyTile(
+                    item: reply,
+                    onReply: onReply, // 把 onReply 传下去
+                    onDelete: () => onDeleteReply?.call(reply),
+                  )),
+                  if (children.length > 2)
+                    InkWell(
+                      onTap: onToggleExpand,
+                      child: Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: Text(
+                          expanded ? '收起' : '展开 ${children.length - visibleChildren.length} 条回复',
+                          style: theme.textTheme.bodySmall?.copyWith(color: Colors.blue),
+                        ),
                       ),
-                    ),
-                    if (showButton)
-                      TextButton(
-                        onPressed: onToggleExpand,
-                        child: Text(expanded ? '收起回复' : '展开更多回复(${children.length - 2})'),
-                      ),
-                  ],
-                ),
+                    )
+                ],
               ),
             ),
-          const Divider(height: 16),
+          ]
         ],
       ),
     );
   }
+}
 
+// 【关键修改】_ReplyTile 现在有了自己的“回复”按钮
+class _ReplyTile extends StatelessWidget {
+  final CommentItem item;
+  final ValueSetter<CommentItem>? onReply;
+  final VoidCallback? onDelete;
+
+  const _ReplyTile({
+    required this.item,
+    this.onReply,
+    this.onDelete
+  });
+
+  // 新增一个和父评论一样的 _fmt 方法
   String _fmt(DateTime t) {
     final m = t.minute.toString().padLeft(2, '0');
     return '${t.month}/${t.day} ${t.hour}:$m';
   }
-}
 
-class _ReplyTile extends StatelessWidget {
-  final _CommentItem item;
-  const _ReplyTile({required this.item});
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final parentAuthor = item.parent?.author;
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
+      padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const SizedBox(width: 6),
-          CircleAvatar(radius: 12, child: Text(item.author.substring(0, 1))),
-          const SizedBox(width: 8),
           Expanded(
+            // 使用Column来组织内容和操作行
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // 评论内容部分
+                RichText(
+                  text: TextSpan(
+                    style: theme.textTheme.bodyMedium, // 默认文字样式
+                    children: [
+                      TextSpan(
+                        text: item.author.isNotEmpty ? item.author : '匿名用户',
+                        style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                      ),
+                      if (parentAuthor != null && parentAuthor.isNotEmpty) ...[
+                        TextSpan(
+                          text: ' 回复 ',
+                          style: theme.textTheme.bodyMedium?.copyWith(color: Colors.grey.shade600),
+                        ),
+                        TextSpan(
+                          text: '@$parentAuthor',
+                          style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                      TextSpan(text: ': ${item.content}'),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // 新增的操作行，和父评论的样式一致
                 Row(
                   children: [
-                    Text(item.author, style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600)),
-                    const SizedBox(width: 6),
-                    Text(item.content),
+                    Text(_fmt(item.time), style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+                    const SizedBox(width: 16),
+                    InkWell(
+                      onTap: () => onReply?.call(item), // 点击时，调用onReply回调
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 4.0),
+                        child: Text(
+                          '回复',
+                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: Colors.grey.shade600),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
-                const SizedBox(height: 4),
-                Text(_fmt(item.time), style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
               ],
             ),
           ),
+          const SizedBox(width: 8),
+          // 删除按钮保持不变
+          SizedBox(
+            height: 20,
+            width: 20,
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              visualDensity: VisualDensity.compact,
+              tooltip: '删除回复',
+              iconSize: 14,
+              icon: const Icon(Icons.delete_outline, color: Colors.grey),
+              onPressed: onDelete,
+            ),
+          ),
         ],
-      ),
-    );
-  }
-
-  String _fmt(DateTime t) {
-    final m = t.minute.toString().padLeft(2, '0');
-    return '${t.month}/${t.day} ${t.hour}:$m';
-  }
-}
-
-class _LikeButton extends StatefulWidget {
-  final int initial;
-  const _LikeButton({required this.initial});
-  @override
-  State<_LikeButton> createState() => _LikeButtonState();
-}
-
-class _LikeButtonState extends State<_LikeButton> {
-  late int count;
-  bool liked = false;
-  @override
-  void initState() {
-    super.initState();
-    count = widget.initial;
-  }
-  void _toggle() {
-    setState(() {
-      liked = !liked;
-      count += liked ? 1 : -1;
-    });
-  }
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: _toggle,
-      borderRadius: BorderRadius.circular(20),
-      hoverColor: Colors.red.withOpacity(0.08),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        child: Column(
-          children: [
-            Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? Colors.red : Colors.grey),
-            Text('$count', style: Theme.of(context).textTheme.bodySmall),
-          ],
-        ),
       ),
     );
   }

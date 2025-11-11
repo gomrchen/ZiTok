@@ -307,7 +307,7 @@ class _UserNotesBlockState extends State<_UserNotesBlock> with AutomaticKeepAliv
             decoration: BoxDecoration(color: Colors.orange.withOpacity(0.08), borderRadius: Radii.md),
             child: Column(
               children: [
-                TextField(controller: _title, decoration: const InputDecoration(labelText: '标题')), 
+                TextField(controller: _title, decoration: const InputDecoration(labelText: '标题')),
                 const SizedBox(height: 8),
                 TextField(controller: _content, decoration: const InputDecoration(labelText: '内容'), maxLines: 3),
                 const SizedBox(height: 8),

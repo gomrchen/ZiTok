@@ -10,6 +10,8 @@ class VideoRepository {
   Future<PagedResult<Video>> fetchDiscover(VideoQuery query) async {
     final resp = await api.search(content: query.keyword ?? '', pages: query.page, size: query.pageSize);
     final data = resp.data as Map<String, dynamic>? ?? {};
+    print("data::");
+    print(data);
     final items = (data['items'] as List<dynamic>? ?? []).map((e) => Video.fromJson(e as Map<String, dynamic>)).toList();
     final count = data['count'] is int ? data['count'] as int : items.length;
     return PagedResult(items: items, page: query.page, pageSize: query.pageSize, hasMore: (items.length + query.page * query.pageSize) < count);

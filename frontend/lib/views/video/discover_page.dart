@@ -56,6 +56,8 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     final vp = context.watch<VideoProvider>();
+    print("vpPPPPP:");
+    print(vp.discover);
     return Scaffold(
       appBar: AppBar(
         // 不显示“发现”标题，仅保留底部 TabBar
@@ -95,6 +97,11 @@ class _RecommendFullScreenState extends State<_RecommendFullScreen> {
   @override
   void initState() {
     super.initState();
+    print("vdieosssssss:");
+
+    for (final v in widget.videos) {
+      print(v.videoUrl);
+    }
     _pageController = PageController();
   }
 
@@ -250,7 +257,7 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
               const SizedBox(height: Spacing.md),
               _ActionIcon(icon: Icons.chat_bubble_outline, label: '1.2k', onTap: () {
                 // 打开评论弹窗
-                showCommentsSheet(context, videoId: widget.video.id);
+                showCommentsSheet(context, videoId: 'v_2');//widget.video.id);
               }),
               const SizedBox(height: Spacing.md),
               _ActionIcon(icon: Icons.share_outlined, label: '4.6k', onTap: _onShare),
