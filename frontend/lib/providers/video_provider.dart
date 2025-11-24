@@ -25,6 +25,13 @@ class VideoProvider extends ChangeNotifier {
   String? _followError;
   double _followScrollOffset = 0.0;
   int? _recommendStartIndexInFollow;
+  
+  // 搜索状态
+  List<Video> _searchResults = [];
+  bool _loadingSearch = false;
+  bool _searchHasMore = true;
+  int _searchPage = 1;
+  String? _searchKeyword;
 
   VideoProvider({required this.repo});
 
@@ -42,6 +49,12 @@ class VideoProvider extends ChangeNotifier {
   String? get followError => _followError;
   double get followScrollOffset => _followScrollOffset;
   int? get recommendStartIndexInFollow => _recommendStartIndexInFollow;
+  
+  // 搜索相关getter
+  List<Video> get searchResults => _searchResults;
+  bool get loadingSearch => _loadingSearch;
+  bool get searchHasMore => _searchHasMore;
+  String? get searchKeyword => _searchKeyword;
 
   Future<void> refreshDiscover({String? keyword, List<String>? tags}) async {
     debugPrint('VideoProvider.refreshDiscover: start keyword=$keyword');
@@ -196,5 +209,37 @@ class VideoProvider extends ChangeNotifier {
     _loadingFeatured = false;
     notifyListeners();
     debugPrint('VideoProvider.loadMoreFeatured: page=$_featuredPage items_now=${_featured.length} hasMore=$_featuredHasMore');
+  }
+  
+  /// 刷新搜索结果
+  Future<void> refreshSearch(String keyword) async {
+    debugPrint('VideoProvider.refreshSearch: start keyword=$keyword');
+    _searchPage = 1;
+    _searchKeyword = keyword;
+    _searchResults = [];
+    _searchHasMore = true;
+    await loadMoreSearch();
+    debugPrint('VideoProvider.refreshSearch: done items=${_searchResults.length}');
+  }
+  
+  /// 加载更多搜索结果
+  Future<void> loadMoreSearch() async {
+    if (_loadingSearch || !_searchHasMore || _searchKeyword == null) return;
+    debugPrint('VideoProvider.loadMoreSearch: page=$_searchPage keyword=$_searchKeyword');
+    _loadingSearch = true;
+    notifyListeners();
+    
+    try {
+      final res = await repo.fetchSearch(_searchKeyword!, _searchPage, 20);
+      _searchResults.addAll(res.items);
+      _searchHasMore = res.hasMore;
+      _searchPage += 1;
+    } catch (e) {
+      debugPrint('VideoProvider.loadMoreSearch: error=$e');
+    } finally {
+      _loadingSearch = false;
+      notifyListeners();
+      debugPrint('VideoProvider.loadMoreSearch: page=$_searchPage items_now=${_searchResults.length} hasMore=$_searchHasMore');
+    }
   }
 }

@@ -6,39 +6,84 @@ import 'package:zitok/services/api_client.dart';
 import 'package:dio/dio.dart';
 
 class FakeAuthService extends AuthService {
-  FakeAuthService(ApiClient client) : super(client);
+  FakeAuthService(super.client);
 
   @override
   Future<Response> login({required String username, required String password}) {
-    return Future.value(Response(requestOptions: RequestOptions(path: '/user/login'), data: {
-      'base': {'code': 10000, 'msg': 'success'},
-      'data': {
-        'id': '1', 'username': username, 'avatar_url': '', 'name': 'n', 'bio': '', 'gender': 'unknown', 'birthday': '1990-01-01',
-        'created_at': '1970-01-01 08:00:00','updated_at': '1970-01-01 08:00:00','deleted_at': '1970-01-01 08:00:00'
-      }
-    }));
+    return Future.value(
+      Response(
+        requestOptions: RequestOptions(path: '/user/login'),
+        data: {
+          'base': {'code': 10000, 'msg': 'success'},
+          'data': {
+            'id': '1',
+            'username': username,
+            'avatar_url': '',
+            'name': 'n',
+            'bio': '',
+            'gender': 'unknown',
+            'birthday': '1990-01-01',
+            'created_at': '1970-01-01 08:00:00',
+            'updated_at': '1970-01-01 08:00:00',
+            'deleted_at': '1970-01-01 08:00:00',
+          },
+        },
+      ),
+    );
   }
 
   @override
-  Future<Response> register({required String username, required String email, required String password}) {
-    return Future.value(Response(requestOptions: RequestOptions(path: '/user/register'), data: {
-      'base': {'code': 10000, 'msg': 'success'},
-      'data': {
-        'id': '2', 'username': username, 'email': email, 'avatar_url': '', 'name': 'n', 'bio': '', 'gender': 'unknown', 'birthday': '1990-01-01',
-        'created_at': '1970-01-01 08:00:00','updated_at': '1970-01-01 08:00:00','deleted_at': '1970-01-01 08:00:00'
-      }
-    }));
+  Future<Response> register({
+    required String username,
+    required String email,
+    required String password,
+    required String verificationCode,
+  }) {
+    return Future.value(
+      Response(
+        requestOptions: RequestOptions(path: '/user/register'),
+        data: {
+          'base': {'code': 10000, 'msg': 'success'},
+          'data': {
+            'id': '2',
+            'username': username,
+            'email': email,
+            'avatar_url': '',
+            'name': 'n',
+            'bio': '',
+            'gender': 'unknown',
+            'birthday': '1990-01-01',
+            'created_at': '1970-01-01 08:00:00',
+            'updated_at': '1970-01-01 08:00:00',
+            'deleted_at': '1970-01-01 08:00:00',
+          },
+        },
+      ),
+    );
   }
 
   @override
   Future<Response> profile() {
-    return Future.value(Response(requestOptions: RequestOptions(path: '/user/info'), data: {
-      'base': {'code': 10000, 'msg': 'success'},
-      'data': {
-        'id': '1', 'username': 'u', 'avatar_url': '', 'name': 'n', 'bio': '', 'gender': 'unknown', 'birthday': '1990-01-01',
-        'created_at': '1970-01-01 08:00:00','updated_at': '1970-01-01 08:00:00','deleted_at': '1970-01-01 08:00:00'
-      }
-    }));
+    return Future.value(
+      Response(
+        requestOptions: RequestOptions(path: '/user/info'),
+        data: {
+          'base': {'code': 10000, 'msg': 'success'},
+          'data': {
+            'id': '1',
+            'username': 'u',
+            'avatar_url': '',
+            'name': 'n',
+            'bio': '',
+            'gender': 'unknown',
+            'birthday': '1990-01-01',
+            'created_at': '1970-01-01 08:00:00',
+            'updated_at': '1970-01-01 08:00:00',
+            'deleted_at': '1970-01-01 08:00:00',
+          },
+        },
+      ),
+    );
   }
 }
 
@@ -62,7 +107,12 @@ void main() {
     });
 
     test('register returns User and persists id', () async {
-      final user = await repo.register(username: 'u2', email: 'e@example.com', password: 'p');
+      final user = await repo.register(
+        username: 'u2',
+        email: 'e@example.com',
+        password: 'p',
+        verificationCode: '123456',
+      );
       expect(user.username, 'u2');
       expect(prefs.getString('auth_user_id'), '2');
     });

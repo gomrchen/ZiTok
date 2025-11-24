@@ -14,7 +14,8 @@ class DiscoverPage extends StatefulWidget {
   State<DiscoverPage> createState() => _DiscoverPageState();
 }
 
-class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMixin {
+class _DiscoverPageState extends State<DiscoverPage>
+    with TickerProviderStateMixin {
   late TabController _tab;
   int _currentRecommendIndex = 0;
   final Map<String, VideoPlayerController> _controllers = {};
@@ -62,21 +63,59 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
     await ctrl.play();
   }
 
+  // 处理搜索点击，跳转到搜索页面
+  void _onSearchTap() {
+    context.push('/search');
+  }
+
   @override
   Widget build(BuildContext context) {
     final vp = context.watch<VideoProvider>();
     print("vpPPPPP:");
     print(vp.discover);
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
-        // 不显示“发现”标题，仅保留底部 TabBar
-        toolbarHeight: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 0,
         elevation: 0,
+        backgroundColor: Colors.white,
+        // 添加搜索输入框
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+          child: GestureDetector(
+            onTap: _onSearchTap,
+            child: Container(
+              decoration: BoxDecoration(
+                color: const Color(0xFFF2F2F2), // 灰色背景
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.search,
+                    color: Color(0xFF999999),
+                    size: 18,
+                  ), // 搜索图标
+                  const SizedBox(width: 8),
+                  const Text(
+                    '搜索视频、用户或话题', // placeholder
+                    style: TextStyle(color: Color(0xFF999999), fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
         bottom: TabBar(
           controller: _tab,
-          tabs: const [Tab(text: '精选'), Tab(text: '推荐')],
+          tabs: const [
+            Tab(text: '精选'),
+            Tab(text: '推荐'),
+          ],
+          labelColor: const Color(0xFF000000),
+          unselectedLabelColor: const Color(0xFF999999),
         ),
       ),
       body: TabBarView(
@@ -103,7 +142,12 @@ class _RecommendFullScreen extends StatefulWidget {
   final ValueChanged<int> onIndexChanged;
   final bool isLoading;
   final VoidCallback onRetry;
-  const _RecommendFullScreen({required this.videos, required this.onIndexChanged, required this.isLoading, required this.onRetry});
+  const _RecommendFullScreen({
+    required this.videos,
+    required this.onIndexChanged,
+    required this.isLoading,
+    required this.onRetry,
+  });
   @override
   State<_RecommendFullScreen> createState() => _RecommendFullScreenState();
 }
@@ -132,8 +176,25 @@ class _RecommendFullScreenState extends State<_RecommendFullScreen> {
     if (widget.videos.isEmpty) {
       return Center(
         child: widget.isLoading
-            ? Column(mainAxisSize: MainAxisSize.min, children: const [CircularProgressIndicator(), SizedBox(height: 12), Text('正在加载推荐流...')])
-            : Column(mainAxisSize: MainAxisSize.min, children: [const Text('暂无推荐内容'), const SizedBox(height: 8), ElevatedButton(onPressed: widget.onRetry, child: const Text('重新加载'))]),
+            ? Column(
+                mainAxisSize: MainAxisSize.min,
+                children: const [
+                  CircularProgressIndicator(),
+                  SizedBox(height: 12),
+                  Text('正在加载推荐流...'),
+                ],
+              )
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text('暂无推荐内容'),
+                  const SizedBox(height: 8),
+                  ElevatedButton(
+                    onPressed: widget.onRetry,
+                    child: const Text('重新加载'),
+                  ),
+                ],
+              ),
       );
     }
     return PageView.builder(
@@ -162,12 +223,22 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
   String? _error;
   // 顶部栏：菜单展开占位
   void _onMenu() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('菜单功能待接入'), duration: Duration(milliseconds: 1200)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('菜单功能待接入'),
+        duration: Duration(milliseconds: 1200),
+      ),
+    );
   }
 
   // 顶部栏：搜索占位
   void _onSearch() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('搜索功能待接入'), duration: Duration(milliseconds: 1200)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('搜索功能待接入'),
+        duration: Duration(milliseconds: 1200),
+      ),
+    );
   }
 
   // 附件：打开笔记弹窗
@@ -181,6 +252,7 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
       },
     );
   }
+
   // 分享占位：显示气泡提示（2秒消失）
   void _onShare() {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -194,10 +266,12 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
       ),
     );
   }
+
   // 跳转视频详情
   void _openDetails() {
     context.go('/video/${widget.video.id}');
   }
+
   @override
   void initState() {
     super.initState();
@@ -207,15 +281,18 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
       return;
     }
     _controller = VideoPlayerController.networkUrl(Uri.parse(url));
-    _controller.initialize().then((_) {
-      if (mounted) setState(() => _initialized = true);
-      _controller.setLooping(true);
-      _controller.play();
-      context.read<VideoProvider>().visit(widget.video.id);
-    }).catchError((e) {
-      debugPrint('FullScreenVideoItem: initialize error $e');
-      if (mounted) setState(() => _error = '视频加载失败');
-    });
+    _controller
+        .initialize()
+        .then((_) {
+          if (mounted) setState(() => _initialized = true);
+          _controller.setLooping(true);
+          _controller.play();
+          context.read<VideoProvider>().visit(widget.video.id);
+        })
+        .catchError((e) {
+          debugPrint('FullScreenVideoItem: initialize error $e');
+          if (mounted) setState(() => _error = '视频加载失败');
+        });
   }
 
   @override
@@ -231,10 +308,22 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
       fit: StackFit.expand,
       children: [
         _error != null
-            ? Center(child: Text(_error!, style: const TextStyle(color: Colors.black54)))
+            ? Center(
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: Colors.black54),
+                ),
+              )
             : _initialized
-                ? FittedBox(fit: BoxFit.cover, child: SizedBox(width: _controller.value.size.width, height: _controller.value.size.height, child: VideoPlayer(_controller)))
-                : const Center(child: CircularProgressIndicator()),
+            ? FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: _controller.value.size.width,
+                  height: _controller.value.size.height,
+                  child: VideoPlayer(_controller),
+                ),
+              )
+            : const Center(child: CircularProgressIndicator()),
         // 顶部功能栏（左：附件；右：搜索、菜单）
         Positioned(
           left: Spacing.md,
@@ -246,7 +335,10 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
               Container(
                 width: 40,
                 height: 40,
-                decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x33000000)),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0x33000000),
+                ),
                 child: IconButton(
                   icon: const Icon(Icons.attach_file, color: Colors.white),
                   tooltip: '查看笔记',
@@ -259,7 +351,10 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
                 width: 40,
                 height: 40,
                 margin: const EdgeInsets.only(right: 8),
-                decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x33000000)),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0x33000000),
+                ),
                 child: IconButton(
                   icon: const Icon(Icons.search, color: Colors.white),
                   tooltip: '搜索',
@@ -270,7 +365,10 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
               Container(
                 width: 40,
                 height: 40,
-                decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x33000000)),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0x33000000),
+                ),
                 child: IconButton(
                   icon: const Icon(Icons.more_vert, color: Colors.white),
                   tooltip: '菜单',
@@ -288,17 +386,33 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
             children: [
               _LikeActionIcon(
                 initialCount: widget.video.likes ?? 0,
-                onTap: () => context.read<VideoProvider>().like(widget.video.id),
+                onTap: () =>
+                    context.read<VideoProvider>().like(widget.video.id),
               ),
               const SizedBox(height: Spacing.md),
-              _ActionIcon(icon: Icons.chat_bubble_outline, label: '1.2k', onTap: () {
-                // 打开评论弹窗
-                showCommentsSheet(context, videoId: 'v_2');//widget.video.id);
-              }),
+              _ActionIcon(
+                icon: Icons.chat_bubble_outline,
+                label: '1.2k',
+                onTap: () {
+                  // 打开评论弹窗
+                  showCommentsSheet(
+                    context,
+                    videoId: 'v_2',
+                  ); //widget.video.id);
+                },
+              ),
               const SizedBox(height: Spacing.md),
-              _ActionIcon(icon: Icons.share_outlined, label: '4.6k', onTap: _onShare),
+              _ActionIcon(
+                icon: Icons.share_outlined,
+                label: '4.6k',
+                onTap: _onShare,
+              ),
               const SizedBox(height: Spacing.md),
-              _ActionIcon(icon: Icons.open_in_full, label: '', onTap: _openDetails),
+              _ActionIcon(
+                icon: Icons.open_in_full,
+                label: '',
+                onTap: _openDetails,
+              ),
             ],
           ),
         ),
@@ -310,11 +424,26 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('@${widget.video.uid ?? '未知作者'}', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white)),
+              Text(
+                '@${widget.video.uid ?? '未知作者'}',
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: Colors.white,
+                ),
+              ),
               const SizedBox(height: 8),
-              Text('Video description here. #hashtag #anothertag', style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70)),
+              Text(
+                'Video description here. #hashtag #anothertag',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.white70,
+                ),
+              ),
               const SizedBox(height: 8),
-              Text('Original Audio · song name', style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70)),
+              Text(
+                'Original Audio · song name',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: Colors.white70,
+                ),
+              ),
             ],
           ),
         ),
@@ -322,7 +451,6 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
     );
   }
 }
-
 
 class _ActionIcon extends StatelessWidget {
   final IconData icon;
@@ -339,13 +467,21 @@ class _ActionIcon extends StatelessWidget {
           child: Container(
             width: 40,
             height: 40,
-            decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x33000000)),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0x33000000),
+            ),
             child: Icon(icon, color: Colors.white),
           ),
         ),
         if (label.isNotEmpty) ...[
           const SizedBox(height: 6),
-          Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white)),
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: Colors.white),
+          ),
         ],
       ],
     );
@@ -361,7 +497,8 @@ class _LikeActionIcon extends StatefulWidget {
   State<_LikeActionIcon> createState() => _LikeActionIconState();
 }
 
-class _LikeActionIconState extends State<_LikeActionIcon> with TickerProviderStateMixin {
+class _LikeActionIconState extends State<_LikeActionIcon>
+    with TickerProviderStateMixin {
   late int count;
   bool liked = false;
   late AnimationController pulse; // 心形缩放
@@ -371,8 +508,14 @@ class _LikeActionIconState extends State<_LikeActionIcon> with TickerProviderSta
   void initState() {
     super.initState();
     count = widget.initialCount;
-    pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 220));
-    burst = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
+    pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+    burst = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
   }
 
   @override
@@ -414,31 +557,46 @@ class _LikeActionIconState extends State<_LikeActionIcon> with TickerProviderSta
                     final radius = 18 * t;
                     final opacity = (1 - t).clamp(0.0, 1.0);
                     Color c = Colors.red.withOpacity(opacity);
-                    return Stack(children: [
-                      _particle(Offset(0, -radius), c),
-                      _particle(Offset(0, radius), c),
-                      _particle(Offset(radius, 0), c),
-                      _particle(Offset(-radius, 0), c),
-                      _particle(Offset(radius * 0.7, -radius * 0.7), c),
-                      _particle(Offset(-radius * 0.7, -radius * 0.7), c),
-                    ]);
+                    return Stack(
+                      children: [
+                        _particle(Offset(0, -radius), c),
+                        _particle(Offset(0, radius), c),
+                        _particle(Offset(radius, 0), c),
+                        _particle(Offset(-radius, 0), c),
+                        _particle(Offset(radius * 0.7, -radius * 0.7), c),
+                        _particle(Offset(-radius * 0.7, -radius * 0.7), c),
+                      ],
+                    );
                   },
                 ),
                 // 圆形半透明底
                 Container(
-                  decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x33000000)),
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0x33000000),
+                  ),
                 ),
                 // 心形图标（缩放/颜色过渡）
                 ScaleTransition(
-                  scale: Tween<double>(begin: 1.0, end: 1.25).animate(CurvedAnimation(parent: pulse, curve: Curves.easeOut)),
-                  child: Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? Colors.red : Colors.white),
+                  scale: Tween<double>(begin: 1.0, end: 1.25).animate(
+                    CurvedAnimation(parent: pulse, curve: Curves.easeOut),
+                  ),
+                  child: Icon(
+                    liked ? Icons.favorite : Icons.favorite_border,
+                    color: liked ? Colors.red : Colors.white,
+                  ),
                 ),
               ],
             ),
           ),
         ),
         const SizedBox(height: 6),
-        Text('${_formatCount(count)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white)),
+        Text(
+          '${_formatCount(count)}',
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: Colors.white),
+        ),
       ],
     );
   }

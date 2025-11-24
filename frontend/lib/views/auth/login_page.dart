@@ -63,7 +63,10 @@ class _LoginPageState extends State<LoginPage> {
                     ),
                     const SizedBox(height: Spacing.lg),
                     if (auth.error != null)
-                      Text(auth.error!, style: const TextStyle(color: Color(0xFFEF4444))),
+                      Text(
+                        auth.error!,
+                        style: const TextStyle(color: Color(0xFFEF4444)),
+                      ),
                     const SizedBox(height: Spacing.md),
                     // 主按钮
                     SizedBox(
@@ -72,18 +75,30 @@ class _LoginPageState extends State<LoginPage> {
                         onPressed: auth.loading
                             ? null
                             : () async {
-                                await context.read<AuthProvider>().login(_usernameCtrl.text.trim(), _pwdCtrl.text);
-                                if (mounted && context.read<AuthProvider>().isAuthenticated) {
-                context.go('/home');
+                                await context.read<AuthProvider>().login(
+                                  _usernameCtrl.text.trim(),
+                                  _pwdCtrl.text,
+                                );
+                                if (mounted &&
+                                    context
+                                        .read<AuthProvider>()
+                                        .isAuthenticated) {
+                                  context.go('/home');
                                 }
                               },
                         child: auth.loading
-                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                            ? const SizedBox(
+                                height: 20,
+                                width: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              )
                             : const Text('登录'),
                       ),
                     ),
                     const SizedBox(height: Spacing.md),
-                    // 次级按钮：描边，文案高亮“注册一个”
+                    // 次级按钮：描边，文案高亮"注册一个"
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
@@ -95,9 +110,25 @@ class _LoginPageState extends State<LoginPage> {
                             children: [
                               TextSpan(
                                 text: ' 注册一个',
-                                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.primary),
-                              )
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: theme.colorScheme.primary,
+                                ),
+                              ),
                             ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: Spacing.md),
+                    // 忘记密码按钮
+                    SizedBox(
+                      width: double.infinity,
+                      child: OutlinedButton(
+                        onPressed: () => context.go('/auth/forgot-password'),
+                        child: Text(
+                          '忘记密码',
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: theme.colorScheme.primary,
                           ),
                         ),
                       ),

@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../theme/theme_tokens.dart';
+import '../../providers/auth_provider.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -19,9 +21,18 @@ class SettingsPage extends StatelessWidget {
           _Section(
             title: '账户与安全',
             children: [
-              ListTile(leading: const Icon(Icons.person), title: const Text('账户'), trailing: const Icon(Icons.chevron_right), onTap: () {}),
-              ListTile(leading: const Icon(Icons.lock), title: const Text('隐私'), trailing: const Icon(Icons.chevron_right), onTap: () {}),
-              ListTile(leading: const Icon(Icons.security), title: const Text('安全'), trailing: const Icon(Icons.chevron_right), onTap: () {}),
+              ListTile(
+                leading: const Icon(Icons.person),
+                title: const Text('账户'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/account-settings'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.security),
+                title: const Text('安全'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => context.push('/settings/change-password'),
+              ),
             ],
           ),
           const SizedBox(height: Spacing.md),
@@ -81,7 +92,10 @@ class SettingsPage extends StatelessWidget {
     );
   }
 
-  Future<String?> _showLanguageSheet(BuildContext context, String current) async {
+  Future<String?> _showLanguageSheet(
+    BuildContext context,
+    String current,
+  ) async {
     return showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -89,16 +103,65 @@ class SettingsPage extends StatelessWidget {
         const langs = ['简体中文', 'English'];
         return ListView(
           children: langs
-              .map((e) => RadioListTile<String>(
-                    value: e,
-                    groupValue: current,
-                    title: Text(e),
-                    onChanged: (v) => Navigator.pop(context, v),
-                  ))
+              .map(
+                (e) => RadioListTile<String>(
+                  value: e,
+                  groupValue: current,
+                  title: Text(e),
+                  onChanged: (v) => Navigator.pop(context, v),
+                ),
+              )
               .toList(),
         );
       },
     );
+  }
+
+  void _confirmLogout(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('退出登录'),
+        content: const Text('确定要退出当前账号吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(context);
+              _logout(context);
+            },
+            child: const Text('确定'),
+            style: TextButton.styleFrom(foregroundColor: Colors.red),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _logout(BuildContext context) {
+    final authProvider = context.read<AuthProvider>();
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => const Center(child: CircularProgressIndicator()),
+    );
+
+    // 执行登出操作
+    authProvider
+        .logout()
+        .then((_) {
+          // 清除所有路由栈并跳转到欢迎界面
+          context.go('/welcome');
+        })
+        .catchError((error) {
+          Navigator.pop(context); // 关闭加载对话框
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(SnackBar(content: Text('登出失败: $error')));
+        });
   }
 }
 
@@ -117,8 +180,14 @@ class _Section extends StatelessWidget {
           children: [
             Container(
               alignment: Alignment.centerLeft,
-              padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
-              child: Text(title, style: Theme.of(context).textTheme.titleMedium),
+              padding: const EdgeInsets.symmetric(
+                horizontal: Spacing.md,
+                vertical: Spacing.sm,
+              ),
+              child: Text(
+                title,
+                style: Theme.of(context).textTheme.titleMedium,
+              ),
             ),
             const Divider(height: 1),
             ...children,

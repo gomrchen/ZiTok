@@ -12,7 +12,10 @@ class AuthRepository {
   String? get accessToken => prefs.getString('access_token');
 
   /// 登录并返回用户
-  Future<User> login({required String username, required String password}) async {
+  Future<User> login({
+    required String username,
+    required String password,
+  }) async {
     final res = await authService.login(username: username, password: password);
     final body = res.data as Map<String, dynamic>? ?? {};
     final base = body['base'] as Map<String, dynamic>? ?? {};
@@ -20,8 +23,8 @@ class AuthRepository {
     final code = (base['code'] is int
         ? base['code'] as int
         : topCode is int
-            ? topCode
-            : int.tryParse('${topCode}') ?? 0);
+        ? topCode
+        : int.tryParse('${topCode}') ?? 0);
     if (code != 10000 && code != 200 && !(code == 0 && res.statusCode == 200)) {
       final msg = (base['msg'] ?? body['message'] ?? '登录失败').toString();
       throw AuthException(message: msg, code: code);
@@ -33,29 +36,42 @@ class AuthRepository {
     // 兼容后端将 token 放在响应头的情况
     if (token == null || token.isEmpty) {
       final headerAuth = res.headers['authorization']?.first;
-      if (headerAuth != null && headerAuth.toLowerCase().startsWith('bearer ')) {
+      if (headerAuth != null &&
+          headerAuth.toLowerCase().startsWith('bearer ')) {
         token = headerAuth.substring(7);
       }
     }
     final refresh = (raw['refresh_token'] ?? raw['refreshToken'])?.toString();
     final uid = (raw['user_id'] ?? raw['uid'] ?? user.id).toString();
-    if (token != null && token.isNotEmpty) await prefs.setString('access_token', token);
-    if (refresh != null && refresh.isNotEmpty) await prefs.setString('refresh_token', refresh);
+    if (token != null && token.isNotEmpty)
+      await prefs.setString('access_token', token);
+    if (refresh != null && refresh.isNotEmpty)
+      await prefs.setString('refresh_token', refresh);
     await prefs.setString('auth_user_id', uid);
     return user;
   }
 
   /// 注册并返回用户
-  Future<User> register({required String username, required String email, required String password}) async {
-    final res = await authService.register(username: username, email: email, password: password);
+  Future<User> register({
+    required String username,
+    required String email,
+    required String password,
+    required String verificationCode,
+  }) async {
+    final res = await authService.register(
+      username: username,
+      email: email,
+      password: password,
+      verificationCode: verificationCode,
+    );
     final body = res.data as Map<String, dynamic>? ?? {};
     final base = body['base'] as Map<String, dynamic>? ?? {};
     final topCode = body['code'];
     final code = (base['code'] is int
         ? base['code'] as int
         : topCode is int
-            ? topCode
-            : int.tryParse('${topCode}') ?? 0);
+        ? topCode
+        : int.tryParse('${topCode}') ?? 0);
     if (code == 0 && (res.statusCode == 200)) {
       final raw = (body['data'] as Map<String, dynamic>?) ?? body;
       final user = User.fromJson(raw);
@@ -81,8 +97,8 @@ class AuthRepository {
     final code = (base['code'] is int
         ? base['code'] as int
         : topCode is int
-            ? topCode
-            : int.tryParse('${topCode}') ?? 0);
+        ? topCode
+        : int.tryParse('${topCode}') ?? 0);
     if (code == 0 && (res.statusCode == 200)) {
       final raw = (body['data'] as Map<String, dynamic>?) ?? body;
       final user = User.fromJson(raw);
@@ -97,6 +113,49 @@ class AuthRepository {
     final user = User.fromJson(raw);
     await prefs.setString('auth_user_id', user.id);
     return user;
+  }
+
+  /// 修改密码
+  Future<void> changePassword({
+    required String email,
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    final res = await authService.changePassword(
+      email: email,
+      oldPassword: oldPassword,
+      newPassword: newPassword,
+    );
+    final body = res.data as Map<String, dynamic>? ?? {};
+    final base = body['base'] as Map<String, dynamic>? ?? {};
+    final topCode = body['code'];
+    final code = (base['code'] is int
+        ? base['code'] as int
+        : topCode is int
+        ? topCode
+        : int.tryParse('${topCode}') ?? 0);
+    if (code == 0 && (res.statusCode == 200)) {
+      return;
+    }
+    if (code != 10000 && code != 200) {
+      final msg = (base['msg'] ?? body['message'] ?? '修改密码失败').toString();
+      throw AuthException(message: msg, code: code);
+    }
+  }
+
+  /// 登出，清除本地认证信息
+  Future<void> logout() async {
+    try {
+      // 尝试调用后端登出接口（可选）
+      await authService.logout();
+    } catch (e) {
+      // 即使后端接口调用失败，也继续清除本地数据
+    } finally {
+      // 清除本地存储的认证信息
+      await prefs.remove('access_token');
+      await prefs.remove('refresh_token');
+      await prefs.remove('auth_user_id');
+    }
   }
 }
 
