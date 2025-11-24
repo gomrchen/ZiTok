@@ -80,8 +80,8 @@ class CommentRepository {
           for (var comment in allComments) {
             final userInfo = userInfoMap[comment.authorId];
             if (userInfo != null) {
-              comment.author = userInfo.userName;
-              comment.avatar = userInfo.avatar!;
+              comment.author = userInfo.username;
+              comment.avatar = userInfo.avatarUrl ?? '';
             }
           }
 

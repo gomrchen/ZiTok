@@ -16,10 +16,10 @@ class UserProvider with ChangeNotifier {
   // ========== 状态属性 ==========
 
   /// 当前登录的用户信息
-  UserInfo? _currentUser;
+  User? _currentUser;
 
   /// 其他用户的缓存，以用户ID (String) 为key
-  final Map<String, UserInfo> _userCache = {};
+  final Map<String, User> _userCache = {};
 
 
   /// 全局错误信息
@@ -29,7 +29,7 @@ class UserProvider with ChangeNotifier {
   // ========== Getters ==========
 
   /// 获取当前登录的用户信息
-  UserInfo? get currentUser => _currentUser;
+  User? get currentUser => _currentUser;
 
   /// 获取错误信息
   String? get error => _error;
@@ -54,7 +54,7 @@ class UserProvider with ChangeNotifier {
   ///
   /// 优先从缓存中读取，如果缓存中没有，则通过网络请求获取，并存入缓存。
   /// [uid] 需要获取信息的用户ID (String)。
-  Future<UserInfo?> getUserInfo(String uid) async {
+  Future<User?> getUserInfo(String uid) async {
     print('开始获取用户(ID: $uid)信息...');
     // 1. 优先从缓存中查找
     if (_userCache.containsKey(uid)) {
@@ -63,7 +63,7 @@ class UserProvider with ChangeNotifier {
 
     try {
       // 调用 repository 中的 info 方法
-      final userInfo = await _userRepository.info(uid: uid);
+      final userInfo = await _userRepository.info(userId: uid);
 
       // 3. 将获取到的用户信息存入缓存
       _userCache[uid] = userInfo;
