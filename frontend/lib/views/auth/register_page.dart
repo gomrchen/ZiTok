@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
-import '../../config/env.dart';
 import '../../theme/theme_tokens.dart';
 
 class RegisterPage extends StatefulWidget {
@@ -13,14 +12,14 @@ class RegisterPage extends StatefulWidget {
 }
 
 class _RegisterPageState extends State<RegisterPage> {
-  final _phoneCtrl = TextEditingController();
-  final _otpCtrl = TextEditingController();
+  final _usernameCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
   final _pwdCtrl = TextEditingController();
 
   @override
   void dispose() {
-    _phoneCtrl.dispose();
-    _otpCtrl.dispose();
+    _usernameCtrl.dispose();
+    _emailCtrl.dispose();
     _pwdCtrl.dispose();
     super.dispose();
   }
@@ -45,32 +44,21 @@ class _RegisterPageState extends State<RegisterPage> {
                     const SizedBox(height: Spacing.sm),
                     Text('支持笔记功能的视频社区', style: theme.textTheme.bodySmall),
                     const SizedBox(height: Spacing.lg),
-                    if (Env.isDev)
-                      Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.only(bottom: Spacing.md),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.yellow.shade100,
-                          borderRadius: Radii.sm,
-                        ),
-                        child: const Text('开发环境：仅格式校验，不调用后端', style: TextStyle(color: Colors.black87)),
-                      ),
                     TextField(
-                      controller: _phoneCtrl,
-                      keyboardType: TextInputType.phone,
+                      controller: _usernameCtrl,
+                      keyboardType: TextInputType.text,
                       decoration: const InputDecoration(
-                        labelText: '手机号',
-                        hintText: 'Enter your telephone number',
+                        labelText: '用户名',
+                        hintText: 'Enter your username',
                       ),
                     ),
                     const SizedBox(height: Spacing.md),
                     TextField(
-                      controller: _otpCtrl,
-                      keyboardType: TextInputType.number,
+                      controller: _emailCtrl,
+                      keyboardType: TextInputType.emailAddress,
                       decoration: const InputDecoration(
-                        labelText: '验证码',
-                        hintText: 'Enter 6-digit OTP',
+                        labelText: '邮箱',
+                        hintText: 'Enter your email',
                       ),
                     ),
                     const SizedBox(height: Spacing.md),
@@ -93,10 +81,10 @@ class _RegisterPageState extends State<RegisterPage> {
                             ? null
                             : () async {
                                 await context.read<AuthProvider>().register(
-                                      _phoneCtrl.text.trim(),
-                                      _otpCtrl.text.trim(),
-                                      password: _pwdCtrl.text.trim().isEmpty ? null : _pwdCtrl.text.trim(),
-                                    );
+                                  _usernameCtrl.text.trim(),
+                                  _emailCtrl.text.trim(),
+                                  _pwdCtrl.text.trim(),
+                                );
                                 if (mounted && context.read<AuthProvider>().isAuthenticated) {
               context.go('/home');
                                 }

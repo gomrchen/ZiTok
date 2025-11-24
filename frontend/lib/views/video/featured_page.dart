@@ -24,6 +24,13 @@ class FeaturedBody extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final vp = context.watch<VideoProvider>();
+    if (vp.featured.isEmpty) {
+      return Center(
+        child: vp.loadingFeatured
+            ? const CircularProgressIndicator()
+            : ElevatedButton(onPressed: () => context.read<VideoProvider>().refreshFeatured(), child: const Text('加载精选')),
+      );
+    }
     return CustomScrollView(
       slivers: [
         SliverToBoxAdapter(

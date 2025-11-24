@@ -9,10 +9,13 @@ import '../views/auth/register_page.dart';
 import '../views/home/home_shell.dart';
 import '../views/video/video_detail_page.dart';
 import '../views/notes/video_notes_page.dart';
+import '../views/notes/note_detail_page.dart';
 import '../views/messages/messages_page.dart';
 import '../views/chat/chat_page.dart';
 import '../views/profile/edit_profile_page.dart';
 import '../views/settings/settings_page.dart';
+import '../views/profile/video_manage_page.dart';
+import '../views/profile/note_manage_page.dart';
 
 class AppRouter {
   static GoRouter buildRouter(AuthProvider auth) {
@@ -32,6 +35,22 @@ class AppRouter {
         // 非主界面详情页与设置
         GoRoute(path: '/video/:id', builder: _builder((state) => VideoDetailPage(id: state.pathParameters['id']!))),
         GoRoute(path: '/video/:id/notes', builder: _builder((state) => VideoNotesPage(videoId: state.pathParameters['id']!))),
+        GoRoute(path: '/note/:id', builder: _builder((state) => NoteDetailPage(id: state.pathParameters['id']!))),
+        // 注意：这里导入的NoteDetailPage来自notes包，不是profile包
+        GoRoute(
+          path: '/profile/video/:id/manage',
+          pageBuilder: (context, state) => CustomTransitionPage(
+            child: VideoManagePage.fromState(state),
+            transitionsBuilder: (ctx, a, __, child) => FadeTransition(opacity: a, child: child),
+          ),
+        ),
+        GoRoute(
+          path: '/profile/note/:id/manage',
+          pageBuilder: (context, state) => CustomTransitionPage(
+            child: NoteManagePage.fromState(state),
+            transitionsBuilder: (ctx, a, __, child) => FadeTransition(opacity: a, child: child),
+          ),
+        ),
         GoRoute(path: '/profile/edit', builder: _builder((_) => const EditProfilePage())),
         GoRoute(path: '/settings', builder: _builder((_) => const SettingsPage())),
       ],

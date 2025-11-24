@@ -2,12 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:zitok/providers/comment_provider.dart';
-import 'package:zitok/providers/user_provider.dart';
-import 'package:zitok/repositories/comment_repository.dart';
-import 'package:zitok/repositories/user_repository.dart';
-import 'package:zitok/services/comment_service.dart';
-import 'package:zitok/services/user_service.dart';
 
 import 'config/env.dart';
 import 'routes/app_router.dart';
@@ -22,6 +16,9 @@ import 'services/cache.dart';
 import 'providers/video_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/messaging_provider.dart';
+import 'repositories/user_repository.dart';
+import 'services/user_service.dart';
+import 'providers/profile_provider.dart';
 
 class AppBootstrap {
   static late SharedPreferences prefs;
@@ -35,7 +32,6 @@ class AppBootstrap {
     await Hive.openBox('messages_box');
 
     prefs = await SharedPreferences.getInstance();
-    prefs.setString('access_token', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NjI3ODY3NzYsInVzZXJfaWQiOjF9.YP1QCgnSLmQ34ZMpx9BNIdzSrW0dLYy4U0tNrpJpIvc');
     apiClient = ApiClient(baseUrl: Env.baseUrl, prefs: prefs);
   }
 }
@@ -53,13 +49,8 @@ class ZitokApp extends StatelessWidget {
       api: VideoService(AppBootstrap.apiClient.dio),
       cache: CacheManager(AppBootstrap.prefs),
     );
-    final commentRepository = CommentRepository(
-      api: CommentService(AppBootstrap.apiClient.dio),
-      userProvider: UserProvider(repo: UserRepository(api: UserService(AppBootstrap.apiClient.dio))),
-    );
-    final userRepository = UserRepository(
-      api: UserService(AppBootstrap.apiClient.dio),
-    );
+    final userRepository = UserRepository(api: UserService(AppBootstrap.apiClient.dio));
+
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthProvider>(
@@ -72,18 +63,13 @@ class ZitokApp extends StatelessWidget {
           create: (_) => SettingsProvider(prefs: AppBootstrap.prefs),
         ),
         ChangeNotifierProvider<VideoProvider>(
-          create: (_) => VideoProvider(repo: videoRepository)
-            ..refreshDiscover()
-            ..refreshFeatured(),
+          create: (_) => VideoProvider(repo: videoRepository),
         ),
         ChangeNotifierProvider<MessagingProvider>(
           create: (_) => MessagingProvider(),
         ),
-        ChangeNotifierProvider<CommentProvider>(
-          create: (_) => CommentProvider(repo: commentRepository),
-        ),
-        ChangeNotifierProvider(
-          create: (context) => UserProvider( repo: userRepository),
+        ChangeNotifierProvider<ProfileProvider>(
+          create: (_) => ProfileProvider(repo: userRepository)..load(),
         ),
       ],
       child: Builder(

@@ -1,30 +1,41 @@
 import '../services/user_service.dart';
 import '../models/user_models.dart';
 
+/// 用户仓库：封装服务层并进行类型转换与错误处理
 class UserRepository {
   final UserService api;
   const UserRepository({required this.api});
 
-  /// 获取用户信息
-  Future<UserInfo> info({required String uid}) async {
-    // 1. 直接调用 UserService 中的 info 方法
-    final resp = await api.info(userId: uid);
-
-    // 2. 解析响应数据
-    // 首先，将整个响应体解析为一个Map
-    final responseBody = resp.data as Map<String, dynamic>? ?? {};
-
-    // 3. 【修改】从响应体中获取 `data` 字段，这才是包含用户信息的Map
-    final userInfoData = responseBody['data'] as Map<String, dynamic>?;
-
-    // 4. 如果 `data` 字段不存在或为null，则抛出错误
-    if (userInfoData == null) {
-      // 从响应中获取错误消息，如果不存在则提供一个默认消息
-      final message = responseBody['message']?.toString() ?? 'User data is missing in the response.';
-      throw Exception('Failed to get user info: $message');
+  Future<User> info({String? userId}) async {
+    final resp = await api.info(userId: userId);
+    final body = resp.data as Map<String, dynamic>? ?? {};
+    final base = body['base'] as Map<String, dynamic>? ?? {};
+    final topCode = body['code'];
+    final code = (base['code'] is int
+        ? base['code'] as int
+        : topCode is int
+            ? topCode
+            : int.tryParse('${topCode}') ?? 0);
+    if (code != 10000 && code != 200) {
+      throw Exception((base['msg'] ?? body['message'] ?? '获取用户信息失败').toString());
     }
-    print('userInfoData: $userInfoData');
-    // 5. 使用包含用户信息的 `data` Map来创建UserInfo对象
-    return UserInfo.fromJson(userInfoData);
+    final rawData = body['data'];
+    final raw = (rawData is Map<String, dynamic>) ? rawData : body;
+    return User.fromJson(raw);
+  }
+
+  Future<void> updateInfo(UserUpdateRequest req) async {
+    final resp = await api.updateInfo(req);
+    final body = resp.data as Map<String, dynamic>? ?? {};
+    final base = body['base'] as Map<String, dynamic>? ?? {};
+    final topCode = body['code'];
+    final code = (base['code'] is int
+        ? base['code'] as int
+        : topCode is int
+            ? topCode
+            : int.tryParse('${topCode}') ?? 0);
+    if (code != 10000 && code != 200) {
+      throw Exception((base['msg'] ?? body['message'] ?? '更新用户信息失败').toString());
+    }
   }
 }

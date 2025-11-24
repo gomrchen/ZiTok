@@ -20,13 +20,14 @@ class ChatMessage {
 class MessagingProvider extends ChangeNotifier {
   final Map<String, List<ChatMessage>> _messages = {};
   final List<Friend> _friends = const [
-    Friend(id: 'u1', name: '无烟校园', avatarUrl: 'https://i.pravatar.cc/100?img=1', online: true),
-    Friend(id: 'u2', name: '金jin', avatarUrl: 'https://i.pravatar.cc/100?img=2', online: true),
-    Friend(id: 'u3', name: '小小耶耶', avatarUrl: 'https://i.pravatar.cc/100?img=3'),
-    Friend(id: 'u4', name: '上十', avatarUrl: 'https://i.pravatar.cc/100?img=4'),
-    Friend(id: 'u5', name: 'serena', avatarUrl: 'https://i.pravatar.cc/100?img=5'),
-    Friend(id: 'u6', name: 'copy', avatarUrl: 'https://i.pravatar.cc/100?img=6'),
-    Friend(id: 'u7', name: 'j1at', avatarUrl: 'https://i.pravatar.cc/100?img=7'),
+    // 使用 picsum.photos 稳定头像源（通过 seed 保持可重复）
+    Friend(id: 'u1', name: '无烟校园', avatarUrl: 'https://picsum.photos/seed/u1/100/100', online: true),
+    Friend(id: 'u2', name: '金jin', avatarUrl: 'https://picsum.photos/seed/u2/100/100', online: true),
+    Friend(id: 'u3', name: '小小耶耶', avatarUrl: 'https://picsum.photos/seed/u3/100/100'),
+    Friend(id: 'u4', name: '上十', avatarUrl: 'https://picsum.photos/seed/u4/100/100'),
+    Friend(id: 'u5', name: 'serena', avatarUrl: 'https://picsum.photos/seed/u5/100/100'),
+    Friend(id: 'u6', name: 'copy', avatarUrl: 'https://picsum.photos/seed/u6/100/100'),
+    Friend(id: 'u7', name: 'j1at', avatarUrl: 'https://picsum.photos/seed/u7/100/100'),
   ];
 
   List<Friend> get friends => List.unmodifiable(_friends);

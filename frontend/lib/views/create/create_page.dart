@@ -245,7 +245,7 @@ class _CreatePageState extends State<CreatePage> {
       return;
     }
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('发布成功（本地模拟）')));
-    _goTo(CreateStep.publish);
+    _animateToStep(CreateStep.publish);
   }
 
   @override
@@ -347,7 +347,7 @@ class _CreatePageState extends State<CreatePage> {
         Align(
           alignment: Alignment.centerRight,
           child: FilledButton(
-            onPressed: () => _goTo(CreateStep.edit),
+            onPressed: () => _animateToStep(CreateStep.edit),
             child: const Text('下一步 · 内容编辑'),
           ),
         ),
@@ -588,7 +588,7 @@ class _CreatePageState extends State<CreatePage> {
         const SizedBox(height: Spacing.lg),
         Align(
           alignment: Alignment.centerRight,
-          child: FilledButton(onPressed: () => _goTo(CreateStep.prepare), child: const Text('返回 · 继续编辑')),
+          child: FilledButton(onPressed: () => _animateToStep(CreateStep.prepare), child: const Text('返回 · 继续编辑')),
         ),
       ],
     );

@@ -11,6 +11,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../../theme/theme_tokens.dart';
 import '../../app.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/profile_provider.dart';
 import '../../services/user_service.dart';
 import '../../utils/image_utils.dart';
 import 'widgets/edit_field_dialog.dart';
@@ -51,11 +52,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
 
   // 便捷：当前用户 ID
-  int get _uid {
-    final user = context.read<AuthProvider>().user;
-    final id = user != null ? (user['user_id'] as int? ?? 1) : 1;
-    return id;
-  }
+  String get _userId => context.read<AuthProvider>().user?.id ?? '0';
 
   UserService get _userApi => widget.userService ?? UserService(AppBootstrap.apiClient.dio);
 
@@ -279,6 +276,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (v != null && v.isNotEmpty && v.length >= 2) {
       setState(() => _nickname = v);
       Hive.box('user_box').put('nickname', v);
+      context.read<ProfileProvider>().debounceUpdateInfo(username: v);
       _recalcCompletion();
     } else if (v != null) {
       _showError('名字长度需≥2');
@@ -290,6 +288,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (v != null) {
       setState(() => _bio = v);
       Hive.box('user_box').put('bio', v);
+      context.read<ProfileProvider>().debounceUpdateInfo(signature: v);
       _recalcCompletion();
     }
   }
@@ -309,6 +308,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final v = await GenderSelectDialog.show(context, value: _gender);
     setState(() => _gender = v);
     Hive.box('user_box').put('gender', v);
+    context.read<ProfileProvider>().debounceUpdateInfo(gender: v);
     _recalcCompletion();
   }
 
@@ -328,6 +328,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (picked != null) {
       setState(() => _birthday = picked);
       Hive.box('user_box').put('birthday', picked.toIso8601String());
+      final ymd = '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
+      context.read<ProfileProvider>().debounceUpdateInfo(birthday: ymd);
       _recalcCompletion();
     }
   }
@@ -483,7 +485,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     try {
       final fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final mf = MultipartFile.fromBytes(bytes, filename: fileName);
-      await _userApi.uploadAvatar(uid: _uid, avatar: mf, fileName: fileName);
+      await _userApi.uploadAvatar(userId: _userId, avatarData: mf);
       // 更新本地缓存，立即显示
       Hive.box('user_box').put('avatar', bytes);
       _showToast('头像已更新');
@@ -499,7 +501,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     try {
       final fileName = 'cover_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final mf = MultipartFile.fromBytes(bytes, filename: fileName);
-      await _userApi.uploadBackdrop(uid: _uid, cover: mf, fileName: fileName);
+      await _userApi.uploadProfileBackground(userId: _userId, backgroundData: mf);
       Hive.box('user_box').put('backdrop', bytes);
       _showToast('封面已更新');
     } catch (e) {

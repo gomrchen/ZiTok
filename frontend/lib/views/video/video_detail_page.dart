@@ -12,7 +12,7 @@ class VideoDetailPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final vp = context.read<VideoProvider>();
+    final vp = context.watch<VideoProvider>();
     final Video video = vp.discover.firstWhere(
       (e) => e.id == id,
       orElse: () => vp.featured.firstWhere(
@@ -45,6 +45,7 @@ class VideoDetailPage extends StatelessWidget {
                   context.go('/home');
                 }
               },
+              onInitialized: () => context.read<VideoProvider>().visit(video.id),
             ),
           ),
           // 下半：内容展示区（评论 / 简介 / 笔记）

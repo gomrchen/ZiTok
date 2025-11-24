@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:chewie/chewie.dart';
 import 'package:video_player/video_player.dart';
+import 'dart:io';
 
 /// 轻量封装：高级视频播放器组件
 /// - 支持全屏（Chewie 内置）
@@ -14,6 +15,7 @@ class AdvancedVideoPlayer extends StatefulWidget {
   final bool autoPlay;
   final bool looping;
   final VoidCallback? onBack; // 可选返回回调
+  final VoidCallback? onInitialized;
 
   const AdvancedVideoPlayer({
     super.key,
@@ -22,6 +24,7 @@ class AdvancedVideoPlayer extends StatefulWidget {
     this.autoPlay = true,
     this.looping = false,
     this.onBack,
+    this.onInitialized,
   });
 
   @override
@@ -33,6 +36,8 @@ class _AdvancedVideoPlayerState extends State<AdvancedVideoPlayer> {
   ChewieController? _chewie;
   late String _currentLabel;
   double _volume = 1.0;
+  String? _error;
+  bool _probing = false;
 
   @override
   void initState() {
@@ -55,8 +60,35 @@ class _AdvancedVideoPlayerState extends State<AdvancedVideoPlayer> {
   Future<void> _setupController(VideoSource src) async {
     final oldVp = _vp;
     final oldChewie = _chewie;
+    _error = null;
+    setState(() {});
+    // 探测资源可达性（Range: bytes=0-1）
+    _probing = true;
+    try {
+      final ok = await _probeUrl(src.url);
+      debugPrint('AdvancedVideoPlayer: probe ${src.url} ok=$ok');
+      if (!ok) {
+        _error = '视频资源不可访问';
+        _probing = false;
+        setState(() {});
+        return;
+      }
+    } catch (e) {
+      debugPrint('AdvancedVideoPlayer: probe error $e');
+    } finally {
+      _probing = false;
+    }
     _vp = VideoPlayerController.networkUrl(Uri.parse(src.url));
-    await _vp!.initialize();
+    try {
+      await _vp!.initialize();
+    } catch (e) {
+      debugPrint('AdvancedVideoPlayer: initialize error $e');
+      _error = '播放器初始化失败';
+      setState(() {});
+      oldChewie?.dispose();
+      oldVp?.dispose();
+      return;
+    }
     _vp!.setLooping(widget.looping);
     _vp!.setVolume(_volume);
     _chewie = ChewieController(
@@ -68,9 +100,23 @@ class _AdvancedVideoPlayerState extends State<AdvancedVideoPlayer> {
       allowedScreenSleep: false,
     );
     setState(() {});
+    if (widget.onInitialized != null) widget.onInitialized!();
     // 清理旧实例，避免内存泄漏
     oldChewie?.dispose();
     oldVp?.dispose();
+  }
+
+  Future<bool> _probeUrl(String url) async {
+    try {
+      final client = HttpClient();
+      final uri = Uri.parse(url);
+      final req = await client.getUrl(uri);
+      req.headers.add('Range', 'bytes=0-1');
+      final resp = await req.close();
+      return resp.statusCode == 200 || resp.statusCode == 206;
+    } catch (_) {
+      return false;
+    }
   }
 
   void _switchQuality(String label) async {
@@ -104,9 +150,15 @@ class _AdvancedVideoPlayerState extends State<AdvancedVideoPlayer> {
             SizedBox(
               width: w,
               height: h,
-              child: ctrl == null
-                  ? const Center(child: CircularProgressIndicator())
-                  : Chewie(controller: ctrl),
+              child: () {
+                if (_error != null) {
+                  return Center(child: Text(_error!, style: const TextStyle(color: Colors.white)));
+                }
+                if (ctrl == null) {
+                  return const Center(child: CircularProgressIndicator());
+                }
+                return Chewie(controller: ctrl);
+              }(),
             ),
             // 左上角：返回按钮（圆形、半透明、48x48 点击区域）
             Positioned(

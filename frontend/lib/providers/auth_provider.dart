@@ -1,27 +1,28 @@
 import 'package:flutter/foundation.dart';
 import '../repositories/auth_repository.dart';
+import '../models/user_models.dart';
 
+/// 认证 Provider：维护登录态与用户数据
 class AuthProvider extends ChangeNotifier {
   final AuthRepository authRepository;
 
   bool _loading = false;
   String? _error;
-  Map<String, dynamic>? _user;
+  User? _user;
 
   AuthProvider({required this.authRepository});
 
-  bool get isAuthenticated => authRepository.accessToken != null && authRepository.accessToken!.isNotEmpty;
+  bool get isAuthenticated => _user != null;
   bool get loading => _loading;
   String? get error => _error;
-  Map<String, dynamic>? get user => _user;
+  User? get user => _user;
 
-  Future<void> login(String phone, String password) async {
+  Future<void> login(String username, String password) async {
     _loading = true;
     _error = null;
     notifyListeners();
     try {
-      await authRepository.login(phone: phone, password: password);
-      _user = await authRepository.profile();
+      _user = await authRepository.login(username: username, password: password);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -30,13 +31,12 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> register(String phone, String otp, {String? password}) async {
+  Future<void> register(String username, String email, String password) async {
     _loading = true;
     _error = null;
     notifyListeners();
     try {
-      await authRepository.register(phone: phone, otp: otp, password: password);
-      _user = await authRepository.profile();
+      _user = await authRepository.register(username: username, email: email, password: password);
     } catch (e) {
       _error = e.toString();
     } finally {

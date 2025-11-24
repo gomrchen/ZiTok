@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
-import '../../config/env.dart';
 import '../../theme/theme_tokens.dart';
 
 class LoginPage extends StatefulWidget {
@@ -13,12 +12,12 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _phoneCtrl = TextEditingController();
+  final _usernameCtrl = TextEditingController();
   final _pwdCtrl = TextEditingController();
 
   @override
   void dispose() {
-    _phoneCtrl.dispose();
+    _usernameCtrl.dispose();
     _pwdCtrl.dispose();
     super.dispose();
   }
@@ -44,24 +43,13 @@ class _LoginPageState extends State<LoginPage> {
                     const SizedBox(height: Spacing.sm),
                     Text('支持笔记功能的视频社区', style: theme.textTheme.bodySmall),
                     const SizedBox(height: Spacing.lg),
-                    if (Env.isDev)
-                      Container(
-                        width: double.infinity,
-                        margin: const EdgeInsets.only(bottom: Spacing.md),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.yellow.shade100,
-                          borderRadius: Radii.sm,
-                        ),
-                        child: const Text('开发环境：仅格式校验，不调用后端', style: TextStyle(color: Colors.black87)),
-                      ),
                     // 表单
                     TextField(
-                      controller: _phoneCtrl,
-                      keyboardType: TextInputType.phone,
+                      controller: _usernameCtrl,
+                      keyboardType: TextInputType.text,
                       decoration: const InputDecoration(
-                        labelText: '手机号',
-                        hintText: 'Enter your telephone number',
+                        labelText: '用户名',
+                        hintText: 'Enter your username',
                       ),
                     ),
                     const SizedBox(height: Spacing.md),
@@ -84,7 +72,7 @@ class _LoginPageState extends State<LoginPage> {
                         onPressed: auth.loading
                             ? null
                             : () async {
-                                await context.read<AuthProvider>().login(_phoneCtrl.text.trim(), _pwdCtrl.text);
+                                await context.read<AuthProvider>().login(_usernameCtrl.text.trim(), _pwdCtrl.text);
                                 if (mounted && context.read<AuthProvider>().isAuthenticated) {
                 context.go('/home');
                                 }
