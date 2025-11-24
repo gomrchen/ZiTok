@@ -19,6 +19,10 @@ import 'providers/messaging_provider.dart';
 import 'repositories/user_repository.dart';
 import 'services/user_service.dart';
 import 'providers/profile_provider.dart';
+import 'providers/user_provider.dart';
+import 'repositories/comment_repository.dart';
+import 'services/comment_service.dart';
+import 'providers/comment_provider.dart';
 
 class AppBootstrap {
   static late SharedPreferences prefs;
@@ -70,6 +74,17 @@ class ZitokApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<ProfileProvider>(
           create: (_) => ProfileProvider(repo: userRepository)..load(),
+        ),
+        ChangeNotifierProvider<UserProvider>(
+          create: (_) => UserProvider(repo: userRepository),
+        ),
+        ChangeNotifierProvider<CommentProvider>(
+          create: (context) => CommentProvider(
+            repo: CommentRepository(
+              api: CommentService(AppBootstrap.apiClient.dio),
+              userProvider: context.read<UserProvider>(),
+            ),
+          ),
         ),
       ],
       child: Builder(
