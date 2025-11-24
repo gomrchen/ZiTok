@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:zitok/widgets/comment_sheet.dart';
+<<<<<<< HEAD
+
+=======
 //ztc作业1
+>>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
 void main() {
   testWidgets('Comment sheet shows tabs and collapsible replies', (tester) async {
     final app = MaterialApp(
@@ -44,4 +48,8 @@ void main() {
     await tester.pump();
     expect(find.byIcon(Icons.favorite), findsWidgets);
   });
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d

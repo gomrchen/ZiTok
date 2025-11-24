@@ -44,4 +44,8 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d

@@ -27,7 +27,11 @@ class AuthRepository {
       throw AuthException(message: msg, code: code);
     }
     final raw = (body['data'] as Map<String, dynamic>?) ?? body;
+<<<<<<< HEAD
+    User  user = User.fromJson(raw);
+=======
     final user = User.fromJson(raw);
+>>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
     // 持久化 token 与用户ID
     String? token = (raw['token'] ?? raw['access_token'])?.toString();
     // 兼容后端将 token 放在响应头的情况
@@ -39,6 +43,13 @@ class AuthRepository {
     }
     final refresh = (raw['refresh_token'] ?? raw['refreshToken'])?.toString();
     final uid = (raw['user_id'] ?? raw['uid'] ?? user.id).toString();
+<<<<<<< HEAD
+    print("在这里！！！！！！！"+uid);
+    print(raw.toString());
+    print("!!!!!!!!!!!!!!!!!!!!!!!!");
+    print(body.toString());
+=======
+>>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
     if (token != null && token.isNotEmpty) await prefs.setString('access_token', token);
     if (refresh != null && refresh.isNotEmpty) await prefs.setString('refresh_token', refresh);
     await prefs.setString('auth_user_id', uid);

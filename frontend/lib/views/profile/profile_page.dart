@@ -17,8 +17,16 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
+<<<<<<< HEAD
+    print('🚀 ProfilePage: initState 调用');
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      print('📱 ProfilePage: 开始加载用户数据');
+      // 使用新的方法，从AuthProvider加载用户数据
+      context.read<ProfileProvider>().loadFromAuthProvider(context);
+=======
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<ProfileProvider>().load();
+>>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
     });
   }
 
@@ -26,6 +34,42 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     final profile = context.watch<ProfileProvider>();
     final user = profile.user;
+<<<<<<< HEAD
+
+    // 显示加载状态
+    if (profile.loading) {
+      print('⏳ ProfilePage: 显示加载状态');
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    // 显示错误信息
+    if (profile.error != null) {
+      print('❌ ProfilePage: 显示错误: ${profile.error}');
+      return Scaffold(
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Text('加载失败: ${profile.error}'),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () => context.read<ProfileProvider>().loadFromCache(),
+                child: const Text('重试'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    print('✅ ProfilePage: 显示用户数据 - username: ${user?.username ?? "null"}');
+
+=======
+>>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
     return Scaffold(
       body: SafeArea(
         top: true,
@@ -41,7 +85,11 @@ class _ProfilePageState extends State<ProfilePage> {
                   child: CustomScrollView(
                     slivers: [
                       SliverToBoxAdapter(child: _ProfileHeader(
+<<<<<<< HEAD
+                          userName: user?.username ?? '用户',
+=======
                           userName: user?.username ?? '',
+>>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
                           bio: user?.bio ?? '',
                           avatarUrl: user?.avatarUrl,
                           backgroundUrl: user?.profileBackgroundImageUrl,
@@ -370,4 +418,8 @@ class _VideosTab extends StatelessWidget {
       itemCount: 8,
     );
   }
+<<<<<<< HEAD
 }
+=======
+}
+>>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
