@@ -25,16 +25,48 @@ class Video {
 
   factory Video.fromJson(Map<String, dynamic> j) => Video(
         id: (j['id'] ?? '').toString(),
-        uid: j['uid']?.toString(),
-        videoUrl: j['video_url'] as String?,
-        coverUrl: j['cover_url'] as String?,
-        intro: j['intro'] as String?,
+        uid: (j['uid'] ?? j['user_id'] ?? j['authorId'])?.toString(),
+        videoUrl: (j['video_url'] as String?) ?? (j['playUrl'] as String?),
+        coverUrl: (j['cover_url'] as String?) ?? (j['coverUrl'] as String?),
+        intro: (j['intro'] ?? j['description']) as String?,
         title: j['title'] as String?,
         stars: j['starts'] is int ? j['starts'] as int : int.tryParse('${j['starts']}'),
-        likes: j['likes'] is int ? j['likes'] as int : int.tryParse('${j['likes']}'),
-        views: j['views'] is int ? j['views'] as int : int.tryParse('${j['views']}'),
+        likes: j['likes'] is int
+            ? j['likes'] as int
+            : (j['like_count'] is int
+                ? j['like_count'] as int
+                : (j['favoriteCount'] is int ? j['favoriteCount'] as int : int.tryParse('${j['like_count'] ?? j['likes'] ?? j['favoriteCount']}'))),
+        views: j['views'] is int
+            ? j['views'] as int
+            : (j['visit_count'] is int ? j['visit_count'] as int : int.tryParse('${j['visit_count'] ?? j['views']}')),
         tags: (j['tags'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
       );
+
+  Video copyWith({
+    String? id,
+    String? uid,
+    String? title,
+    String? intro,
+    String? coverUrl,
+    String? videoUrl,
+    int? stars,
+    int? likes,
+    int? views,
+    List<String>? tags,
+  }) {
+    return Video(
+      id: id ?? this.id,
+      uid: uid ?? this.uid,
+      title: title ?? this.title,
+      intro: intro ?? this.intro,
+      coverUrl: coverUrl ?? this.coverUrl,
+      videoUrl: videoUrl ?? this.videoUrl,
+      stars: stars ?? this.stars,
+      likes: likes ?? this.likes,
+      views: views ?? this.views,
+      tags: tags ?? this.tags,
+    );
+  }
 }
 
 class VideoQuery {

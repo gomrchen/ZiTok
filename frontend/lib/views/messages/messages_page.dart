@@ -156,7 +156,18 @@ class MessagesBody extends StatelessWidget {
             (context, i) {
               final f = mp.friends[i % mp.friends.length];
               return ListTile(
-                leading: CircleAvatar(backgroundImage: NetworkImage(f.avatarUrl)),
+                leading: CircleAvatar(
+                  radius: 20,
+                  child: ClipOval(
+                    child: CachedNetworkImage(
+                      imageUrl: f.avatarUrl,
+                      width: 40,
+                      height: 40,
+                      fit: BoxFit.cover,
+                      errorWidget: (ctx, _, __) => const Icon(Icons.person),
+                    ),
+                  ),
+                ),
                 title: Text(f.name),
                 subtitle: const Text('最后一条消息预览'),
                 onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ChatPage(conversationId: f.id))),

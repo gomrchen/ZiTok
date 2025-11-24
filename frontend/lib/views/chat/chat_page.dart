@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import '../../providers/messaging_provider.dart';
 
@@ -192,7 +193,18 @@ class _FriendSearchPageState extends State<FriendSearchPage> {
         itemBuilder: (_, i) {
           final f = results[i];
           return ListTile(
-            leading: CircleAvatar(backgroundImage: NetworkImage(f.avatarUrl)),
+            leading: CircleAvatar(
+              radius: 20,
+              child: ClipOval(
+                child: CachedNetworkImage(
+                  imageUrl: f.avatarUrl,
+                  width: 40,
+                  height: 40,
+                  fit: BoxFit.cover,
+                  errorWidget: (ctx, _, __) => const Icon(Icons.person),
+                ),
+              ),
+            ),
             title: Text(f.name),
             trailing: TextButton(
               onPressed: () {

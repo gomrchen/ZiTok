@@ -1,0 +1,1225 @@
+{
+  "openapi": "3.0.1",
+  "info": {
+    "title": "默认模块",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [
+    {
+      "name": "视频"
+    }
+  ],
+  "paths": {
+    "/video/list": {
+      "get": {
+        "summary": "发布列表",
+        "deprecated": false,
+        "description": "获取首页视频流",
+        "tags": [
+          "视频"
+        ],
+        "parameters": [
+          {
+            "name": "user_id",
+            "in": "query",
+            "description": "可空，13 位 timestamp，若存在则返回此时间之后的视频流",
+            "required": false,
+            "example": "1",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "example": [
+              "1"
+            ],
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "example": "5",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "{{token}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "base": {
+                      "$ref": "#/components/schemas/%E5%93%8D%E5%BA%94%E7%8A%B6%E6%80%81"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/%E8%A7%86%E9%A2%91"
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "base",
+                    "data"
+                  ]
+                },
+                "example": {
+                  "base": {
+                    "code": 10000,
+                    "msg": "success"
+                  },
+                  "data": {
+                    "items": [
+                      {
+                        "id": "483675103821824000",
+                        "user_id": "483675103821824000",
+                        "video_url": "https://west2.online/video-example.mp4",
+                        "cover_url": "https://west2.online/video-example.jpeg",
+                        "title": "west2-online",
+                        "description": "west2-online",
+                        "visit_count": 0,
+                        "like_count": 0,
+                        "comment_count": 0,
+                        "created_at": "1970-01-01 08:00:00",
+                        "updated_at": "1970-01-01 08:00:00",
+                        "deleted_at": "1970-01-01 08:00:00"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "x-200:成功": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "",
+                  "type": "object",
+                  "properties": {
+                    "base": {
+                      "$ref": "#/components/schemas/%E5%93%8D%E5%BA%94%E7%8A%B6%E6%80%81"
+                    }
+                  },
+                  "required": [
+                    "base"
+                  ]
+                },
+                "example": {
+                  "base": {
+                    "code": -1,
+                    "msg": "密码错误"
+                  }
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/video/publish": {
+      "post": {
+        "summary": "投稿",
+        "deprecated": false,
+        "description": "使用 HTTP 单文件上传视频",
+        "tags": [
+          "视频"
+        ],
+        "parameters": [
+          {
+            "name": "Access-Token",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Refresh-Token",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "{{token}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "video_data": {
+                    "description": "视频原始数据",
+                    "type": "string",
+                    "format": "binary",
+                    "example": "file:///home/yxrxy/视频/50e749daa3b2b4fca9d8141338865e79.mp4"
+                  },
+                  "title": {
+                    "description": "视频标题",
+                    "type": "string",
+                    "example": "香蕉"
+                  },
+                  "description": {
+                    "description": "描述",
+                    "type": "string",
+                    "example": "这个不是水果视频"
+                  },
+                  "user_id": {
+                    "type": "string",
+                    "example": "1"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "base": {
+                      "$ref": "#/components/schemas/%E5%93%8D%E5%BA%94%E7%8A%B6%E6%80%81"
+                    }
+                  },
+                  "required": [
+                    "base"
+                  ]
+                },
+                "example": {
+                  "base": {
+                    "code": 10000,
+                    "msg": "success"
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "x-200:成功": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "",
+                  "type": "object",
+                  "properties": {
+                    "base": {
+                      "$ref": "#/components/schemas/%E5%93%8D%E5%BA%94%E7%8A%B6%E6%80%81"
+                    }
+                  },
+                  "required": [
+                    "base"
+                  ]
+                },
+                "example": {
+                  "base": {
+                    "code": -1,
+                    "msg": "密码错误"
+                  }
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/video/1": {
+      "get": {
+        "summary": "视频详细",
+        "deprecated": false,
+        "description": "根据 user_id 查看指定人的发布列表",
+        "tags": [
+          "视频"
+        ],
+        "parameters": [
+          {
+            "name": "video_id",
+            "in": "query",
+            "description": "",
+            "required": true,
+            "example": "1",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page",
+            "in": "query",
+            "description": "页码，从 0 开始",
+            "required": true,
+            "example": 1,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "单页尺寸",
+            "required": true,
+            "example": 10,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "Access-Token",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Refresh-Token",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "{{token}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/x-www-form-urlencoded": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "video_id": {
+                    "type": "string",
+                    "example": ""
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "base": {
+                      "$ref": "#/components/schemas/%E5%93%8D%E5%BA%94%E7%8A%B6%E6%80%81"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/%E8%A7%86%E9%A2%91"
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "title": "全部数量",
+                          "description": "当前用户的全部发布数量（非 items 数量）"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "base",
+                    "data"
+                  ]
+                },
+                "example": {
+                  "base": {
+                    "code": 10000,
+                    "msg": "success"
+                  },
+                  "data": {
+                    "items": [
+                      {
+                        "id": "483675103821824000",
+                        "user_id": "483675103821824000",
+                        "video_url": "https://west2.online/video-example.mp4",
+                        "cover_url": "https://west2.online/video-example.jpeg",
+                        "title": "west2-online",
+                        "description": "west2-online",
+                        "visit_count": 0,
+                        "like_count": 0,
+                        "comment_count": 0,
+                        "created_at": "1970-01-01 08:00:00",
+                        "updated_at": "1970-01-01 08:00:00",
+                        "deleted_at": "1970-01-01 08:00:00"
+                      }
+                    ],
+                    "total": 100
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "x-200:成功": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "",
+                  "type": "object",
+                  "properties": {
+                    "base": {
+                      "$ref": "#/components/schemas/%E5%93%8D%E5%BA%94%E7%8A%B6%E6%80%81"
+                    }
+                  },
+                  "required": [
+                    "base"
+                  ]
+                },
+                "example": {
+                  "base": {
+                    "code": -1,
+                    "msg": "密码错误"
+                  }
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      },
+      "delete": {
+        "summary": "删除视频",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "视频"
+        ],
+        "parameters": [
+          {
+            "name": "video_id",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "example": "10",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "user_id",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "example": "3",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "{{token}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          },
+          "x-200:成功": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "",
+                  "type": "object",
+                  "properties": {
+                    "base": {
+                      "$ref": "#/components/schemas/%E5%93%8D%E5%BA%94%E7%8A%B6%E6%80%81"
+                    }
+                  },
+                  "required": [
+                    "base"
+                  ]
+                },
+                "example": {
+                  "base": {
+                    "code": -1,
+                    "msg": "密码错误"
+                  }
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/video/hot": {
+      "get": {
+        "summary": "热门排行榜",
+        "deprecated": false,
+        "description": "根据点击量（visit_count）获取排行榜数据，要求使用 redis 缓存",
+        "tags": [
+          "视频"
+        ],
+        "parameters": [
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "单页尺寸",
+            "required": false,
+            "example": 0,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "page_num",
+            "in": "query",
+            "description": "页码",
+            "required": false,
+            "example": 10,
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "name": "Access-Token",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Refresh-Token",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "{{token}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "base": {
+                      "$ref": "#/components/schemas/%E5%93%8D%E5%BA%94%E7%8A%B6%E6%80%81"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/%E8%A7%86%E9%A2%91"
+                          }
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "base",
+                    "data"
+                  ]
+                },
+                "example": {
+                  "base": {
+                    "code": 10000,
+                    "msg": "success"
+                  },
+                  "data": {
+                    "items": [
+                      {
+                        "id": "483675103821824000",
+                        "user_id": "483675103821824000",
+                        "video_url": "https://west2.online/video-example.mp4",
+                        "cover_url": "https://west2.online/video-example.jpeg",
+                        "title": "west2-online",
+                        "description": "west2-online",
+                        "visit_count": 0,
+                        "like_count": 0,
+                        "comment_count": 0,
+                        "created_at": "1970-01-01 08:00:00",
+                        "updated_at": "1970-01-01 08:00:00",
+                        "deleted_at": "1970-01-01 08:00:00"
+                      }
+                    ]
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "x-200:成功": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "",
+                  "type": "object",
+                  "properties": {
+                    "base": {
+                      "$ref": "#/components/schemas/%E5%93%8D%E5%BA%94%E7%8A%B6%E6%80%81"
+                    }
+                  },
+                  "required": [
+                    "base"
+                  ]
+                },
+                "example": {
+                  "base": {
+                    "code": -1,
+                    "msg": "密码错误"
+                  }
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/video/search": {
+      "post": {
+        "summary": "条件搜索视频",
+        "deprecated": false,
+        "description": "搜索指定关键字的视频，将会从以下字段进行搜索\n- 标题（title）\n- 描述（description）",
+        "tags": [
+          "视频"
+        ],
+        "parameters": [
+          {
+            "name": "Access-Token",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Refresh-Token",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "{{token}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "keywords": {
+                    "description": "可空，关键字，留空默认不做关键字要求",
+                    "type": "string",
+                    "example": "west-online"
+                  },
+                  "page_size": {
+                    "description": "页面尺寸",
+                    "type": "integer",
+                    "example": 10
+                  },
+                  "page_num": {
+                    "description": "页码",
+                    "type": "integer",
+                    "example": 1
+                  },
+                  "from_date": {
+                    "description": "可空，起始时间，13 位 timestamp",
+                    "type": "integer",
+                    "example": 0
+                  },
+                  "to_date": {
+                    "description": "可空，结束时间，13 位 timestamp",
+                    "type": "integer",
+                    "example": 0
+                  },
+                  "username": {
+                    "description": "可空，查询包含指定字符的用户发布的视频",
+                    "type": "string",
+                    "example": "tytt"
+                  }
+                },
+                "required": [
+                  "keywords",
+                  "page_size",
+                  "page_num"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "base": {
+                      "$ref": "#/components/schemas/%E5%93%8D%E5%BA%94%E7%8A%B6%E6%80%81"
+                    },
+                    "data": {
+                      "type": "object",
+                      "properties": {
+                        "items": {
+                          "type": "array",
+                          "items": {
+                            "$ref": "#/components/schemas/%E8%A7%86%E9%A2%91"
+                          }
+                        },
+                        "total": {
+                          "type": "integer",
+                          "description": "查询的全部结果数量"
+                        }
+                      },
+                      "required": [
+                        "items",
+                        "total"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "base",
+                    "data"
+                  ]
+                },
+                "example": {
+                  "base": {
+                    "code": 10000,
+                    "msg": "success"
+                  },
+                  "data": {
+                    "items": [
+                      {
+                        "id": "483675103821824000",
+                        "user_id": "483675103821824000",
+                        "video_url": "https://west2.online/video-example.mp4",
+                        "cover_url": "https://west2.online/video-example.jpeg",
+                        "title": "west2-online",
+                        "description": "west2-online",
+                        "visit_count": 0,
+                        "like_count": 0,
+                        "comment_count": 0,
+                        "created_at": "1970-01-01 08:00:00",
+                        "updated_at": "1970-01-01 08:00:00",
+                        "deleted_at": "1970-01-01 08:00:00"
+                      }
+                    ],
+                    "total": 100
+                  }
+                }
+              }
+            },
+            "headers": {}
+          },
+          "x-200:成功": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "",
+                  "type": "object",
+                  "properties": {
+                    "base": {
+                      "$ref": "#/components/schemas/%E5%93%8D%E5%BA%94%E7%8A%B6%E6%80%81"
+                    }
+                  },
+                  "required": [
+                    "base"
+                  ]
+                },
+                "example": {
+                  "base": {
+                    "code": -1,
+                    "msg": "密码错误"
+                  }
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/video/semantic": {
+      "post": {
+        "summary": "语义相似度搜索视频",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "视频"
+        ],
+        "parameters": [
+          {
+            "name": "query",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "example": "吃了对眼睛好的",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page_size",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "example": "10",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "page_num",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "example": "1",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "threshold",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "example": "0.3",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "{{token}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          },
+          "x-200:成功": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "",
+                  "type": "object",
+                  "properties": {
+                    "base": {
+                      "$ref": "#/components/schemas/%E5%93%8D%E5%BA%94%E7%8A%B6%E6%80%81"
+                    }
+                  },
+                  "required": [
+                    "base"
+                  ]
+                },
+                "example": {
+                  "base": {
+                    "code": -1,
+                    "msg": "密码错误"
+                  }
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/video/{video_id}/like": {
+      "post": {
+        "summary": "增加视频点赞数",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "视频"
+        ],
+        "parameters": [
+          {
+            "name": "video_id",
+            "in": "path",
+            "description": "",
+            "required": true,
+            "example": "1",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "{{token}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          },
+          "x-200:成功": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "",
+                  "type": "object",
+                  "properties": {
+                    "base": {
+                      "$ref": "#/components/schemas/%E5%93%8D%E5%BA%94%E7%8A%B6%E6%80%81"
+                    }
+                  },
+                  "required": [
+                    "base"
+                  ]
+                },
+                "example": {
+                  "base": {
+                    "code": -1,
+                    "msg": "密码错误"
+                  }
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/video/{video_id}/visit": {
+      "post": {
+        "summary": "增加视频观看数",
+        "deprecated": false,
+        "description": "",
+        "tags": [
+          "视频"
+        ],
+        "parameters": [
+          {
+            "name": "video_id",
+            "in": "path",
+            "description": "",
+            "required": true,
+            "example": "1",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "{{token}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          },
+          "x-200:成功": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "title": "",
+                  "type": "object",
+                  "properties": {
+                    "base": {
+                      "$ref": "#/components/schemas/%E5%93%8D%E5%BA%94%E7%8A%B6%E6%80%81"
+                    }
+                  },
+                  "required": [
+                    "base"
+                  ]
+                },
+                "example": {
+                  "base": {
+                    "code": -1,
+                    "msg": "密码错误"
+                  }
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "视频": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "视频id",
+            "description": "唯一标识符，可选自增/雪花/UUID/其他"
+          },
+          "user_id": {
+            "type": "string",
+            "title": "视频作者",
+            "description": "发表视频的用户唯一标识符"
+          },
+          "video_url": {
+            "type": "string",
+            "title": "视频",
+            "description": "视频文件链接"
+          },
+          "cover_url": {
+            "type": "string",
+            "title": "封面",
+            "description": "封面链接"
+          },
+          "title": {
+            "type": "string",
+            "title": "视频标题",
+            "description": "视频标题"
+          },
+          "description": {
+            "type": "string",
+            "title": "视频描述",
+            "description": "视频描述"
+          },
+          "visit_count": {
+            "type": "integer",
+            "title": "访问量",
+            "description": "视频访问量"
+          },
+          "like_count": {
+            "type": "integer",
+            "title": "点赞数",
+            "description": "点赞数量"
+          },
+          "comment_count": {
+            "type": "integer",
+            "title": "评论数",
+            "description": "评论数量"
+          },
+          "created_at": {
+            "type": "string",
+            "title": "创建时间"
+          },
+          "updated_at": {
+            "type": "string",
+            "title": "更新时间"
+          },
+          "deleted_at": {
+            "type": "string",
+            "title": "删除时间"
+          }
+        },
+        "required": [
+          "user_id",
+          "video_url",
+          "cover_url",
+          "like_count",
+          "comment_count",
+          "title",
+          "id",
+          "visit_count",
+          "description",
+          "created_at",
+          "updated_at",
+          "deleted_at"
+        ]
+      },
+      "响应状态": {
+        "type": "object",
+        "properties": {
+          "code": {
+            "type": "integer"
+          },
+          "msg": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "msg"
+        ]
+      }
+    },
+    "securitySchemes": {}
+  },
+  "servers": [],
+  "security": []
+}

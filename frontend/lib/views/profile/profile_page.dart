@@ -1,14 +1,31 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hive_flutter/hive_flutter.dart';
+import 'package:provider/provider.dart';
 import '../../theme/theme_tokens.dart';
+import '../../providers/profile_provider.dart';
+import '../../models/user_models.dart';
 
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
   @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<ProfileProvider>().load();
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final profile = context.watch<ProfileProvider>();
+    final user = profile.user;
     return Scaffold(
       body: SafeArea(
         top: true,
@@ -23,7 +40,14 @@ class ProfilePage extends StatelessWidget {
                   length: 3,
                   child: CustomScrollView(
                     slivers: [
-                      SliverToBoxAdapter(child: _ProfileHeader()),
+                      SliverToBoxAdapter(child: _ProfileHeader(
+                          userName: user?.username ?? '',
+                          bio: user?.bio ?? '',
+                          avatarUrl: user?.avatarUrl,
+                          backgroundUrl: user?.profileBackgroundImageUrl,
+                          gender: user?.gender,
+                          birthday: user?.birthday,
+                          onEdit: () => context.push('/profile/edit'))),
                       const SliverToBoxAdapter(
                         child: Padding(
                           padding: EdgeInsets.symmetric(horizontal: Spacing.md),
@@ -44,22 +68,22 @@ class ProfilePage extends StatelessWidget {
                                   borderSide: BorderSide(color: cs.primary, width: 2),
                                 ),
                                 tabs: const [
-                                  Tab(text: '收藏'),
-                                  Tab(text: '笔记'),
-                                  Tab(text: '动态'),
+                                  Tab(text: '我的收藏'),
+                                  Tab(text: '我的笔记'),
+                                  Tab(text: '我的视频'),
                                 ],
                               );
                             },
                           ),
                         ),
                       ),
-                      const SliverFillRemaining(
+                      SliverFillRemaining(
                         hasScrollBody: true,
                         child: TabBarView(
                           children: [
                             _FavoritesList(),
-                            _NotesList(),
-                            _ActivitiesList(),
+                            _NotesTab(),
+                            _VideosTab(),
                           ],
                         ),
                       ),
@@ -102,7 +126,7 @@ class _MenuActionButton extends StatelessWidget {
                 width: 40,
                 height: 40,
                 decoration: BoxDecoration(
-                  color: cs.surfaceVariant.withOpacity(0.7),
+                  color: cs.surfaceContainerHighest.withValues(alpha: 0.7),
                   shape: BoxShape.circle,
                 ),
                 alignment: Alignment.center,
@@ -117,11 +141,16 @@ class _MenuActionButton extends StatelessWidget {
 }
 
 class _ProfileHeader extends StatelessWidget {
+  final String userName;
+  final String bio;
+  final String? avatarUrl;
+  final String? backgroundUrl;
+  final Gender? gender;
+  final String? birthday;
+  final VoidCallback onEdit;
+  const _ProfileHeader({required this.userName, required this.bio, required this.avatarUrl, this.backgroundUrl, this.gender, this.birthday, required this.onEdit});
   @override
   Widget build(BuildContext context) {
-    final box = Hive.box('user_box');
-    final nickname = box.get('nickname', defaultValue: '安东尼没有绿山墙');
-    final bio = box.get('bio', defaultValue: '室内设计师，商务合作请联系 emile@234.com');
     final cs = Theme.of(context).colorScheme;
     const double headerHeight = 176; // 贴近图二头部高度
     const double avatarRadius = 36;
@@ -137,15 +166,18 @@ class _ProfileHeader extends StatelessWidget {
               Container(
                 height: headerHeight,
                 width: double.infinity,
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
                     colors: [
-                      Color(0xFF2BD2C4), // 图二主色近似：明亮青绿
-                      Color(0xFFEFF9F7), // 渐隐到浅色
+                      Color(0xFF2BD2C4),
+                      Color(0xFFEFF9F7),
                     ],
                   ),
+                  image: backgroundUrl == null
+                      ? null
+                      : DecorationImage(image: NetworkImage(backgroundUrl!), fit: BoxFit.cover),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
@@ -157,7 +189,8 @@ class _ProfileHeader extends StatelessWidget {
                         CircleAvatar(
                           radius: avatarRadius,
                           backgroundColor: const Color(0xFF2BD2C4),
-                          child: Icon(Icons.pets, color: cs.onPrimary, size: 24),
+                          backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl!) : null,
+                          child: avatarUrl == null ? Icon(Icons.person, color: cs.onPrimary, size: 24) : null,
                         ),
                         const SizedBox(width: Spacing.md),
                         Expanded(
@@ -166,14 +199,14 @@ class _ProfileHeader extends StatelessWidget {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                nickname,
+                                userName.isEmpty ? '用户' : userName,
                                 style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 20),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '抖音号：46082144372',
+                                '@${userName.isEmpty ? 'unknown' : userName}',
                                 style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70, fontSize: 12),
                               ),
                             ],
@@ -186,10 +219,9 @@ class _ProfileHeader extends StatelessWidget {
                             foregroundColor: const Color(0xFF2BD2C4),
                             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            // Flutter 当前版本的 styleFrom.overlayColor 接受 Color? 类型
                             overlayColor: const Color(0x1F2BD2C4),
                           ),
-                          onPressed: () => context.push('/profile/edit'),
+                          onPressed: onEdit,
                           child: const Text('编辑主页'),
                         ),
                       ],
@@ -209,9 +241,28 @@ class _ProfileHeader extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
             child: Align(
               alignment: Alignment.centerLeft,
-              child: Text(
-                bio,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    bio.isEmpty ? '完善个人介绍' : bio,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 6),
+                  Row(
+                    children: [
+                      if (gender != null && gender != Gender.unknown)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(color: cs.surfaceContainerHighest.withValues(alpha: 0.6), borderRadius: Radii.sm),
+                          child: Text(gender == Gender.male ? '男' : '女', style: Theme.of(context).textTheme.bodySmall),
+                        ),
+                      if ((gender != null && gender != Gender.unknown) && (birthday != null && birthday!.isNotEmpty)) const SizedBox(width: Spacing.sm),
+                      if (birthday != null && birthday!.isNotEmpty)
+                        Text('生日 $birthday', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                    ],
+                  ),
+                ],
               ),
             ),
           ),
@@ -239,10 +290,10 @@ class _StatsRow extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          cell('1', '获赞'),
-          cell('7', '互关'),
-          cell('24', '关注'),
-          cell('7', '粉丝'),
+          cell('-', '视频'),
+          cell('-', '笔记'),
+          cell('-', '获赞'),
+          cell('-', '好友'),
         ],
       ),
     );
@@ -268,18 +319,24 @@ class _FavoritesList extends StatelessWidget {
   }
 }
 
-class _NotesList extends StatelessWidget {
-  const _NotesList();
+class _NotesTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return ListView.separated(
       padding: const EdgeInsets.all(Spacing.md),
-      itemBuilder: (context, i) => Card(
-        elevation: 0,
-        child: ListTile(
-          title: Text(i == 0 ? 'Constructive and destructive waves' : '这是一个笔记标题'),
-          subtitle: const Text('笔记摘要…'),
-          trailing: IconButton(icon: const Icon(Icons.edit), onPressed: () => context.go('/profile/edit')),
+      itemBuilder: (context, i) => ListTile(
+        leading: const Icon(Icons.note),
+        title: Text('笔记 #$i'),
+        subtitle: const Text('笔记摘要…'),
+        trailing: IconButton(
+          icon: const Icon(Icons.chevron_right),
+          onPressed: () => context.push('/profile/note/$i/manage', extra: {
+            'title': '笔记 #$i',
+            'tags': const ['学习', '记录'],
+            'likes': 0,
+            'favorites': 0,
+            'reads': 0,
+          }),
         ),
       ),
       separatorBuilder: (_, __) => const SizedBox(height: Spacing.sm),
@@ -288,18 +345,29 @@ class _NotesList extends StatelessWidget {
   }
 }
 
-class _ActivitiesList extends StatelessWidget {
-  const _ActivitiesList();
+class _VideosTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return ListView.builder(
+    return ListView.separated(
       padding: const EdgeInsets.all(Spacing.md),
       itemBuilder: (context, i) => ListTile(
-        leading: const Icon(Icons.history),
-        title: Text('动态事件 #$i'),
-        subtitle: const Text('时间与详情'),
+        leading: const Icon(Icons.video_library),
+        title: Text('视频 #$i'),
+        subtitle: const Text('视频简介…'),
+        trailing: IconButton(
+          icon: const Icon(Icons.chevron_right),
+          onPressed: () => context.push('/profile/video/$i/manage', extra: {
+            'title': '视频 #$i',
+            'tags': const ['教程'],
+            'likes': 0,
+            'favorites': 0,
+            'views': 0,
+            'coverUrl': null,
+          }),
+        ),
       ),
-      itemCount: 12,
+      separatorBuilder: (_, __) => const SizedBox(height: Spacing.sm),
+      itemCount: 8,
     );
   }
 }

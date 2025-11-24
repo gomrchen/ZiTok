@@ -20,10 +20,11 @@ class _FollowPageState extends State<FollowPage> with AutomaticKeepAliveClientMi
   void initState() {
     super.initState();
     final vp = context.read<VideoProvider>();
-    // 初次进入或数据为空时刷新
-    if (vp.follow.isEmpty) {
-      vp.refreshFollow();
-    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (vp.follow.isEmpty) {
+        vp.refreshFollow();
+      }
+    });
     // 恢复滚动位置
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (vp.followScrollOffset > 0) {
@@ -77,7 +78,7 @@ class _FollowPageState extends State<FollowPage> with AutomaticKeepAliveClientMi
             video: video,
             isRecommended: isRecommended,
             onTap: () => context.go('/video/${video.id}'),
-            onLike: () => vp.toggleLike(video.id),
+            onLike: () => vp.like(video.id),
             onComment: () => showCommentsSheet(context, videoId: video.id),
           );
         },

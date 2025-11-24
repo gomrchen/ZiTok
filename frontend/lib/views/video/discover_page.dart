@@ -23,6 +23,15 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
   void initState() {
     super.initState();
     _tab = TabController(length: 2, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final vp = context.read<VideoProvider>();
+      if (vp.discover.isEmpty) {
+        vp.refreshDiscover();
+      }
+      if (vp.featured.isEmpty) {
+        vp.refreshFeatured();
+      }
+    });
   }
 
   @override
@@ -74,7 +83,12 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
           // 精选模式：复用 FeaturedBody（无嵌套 Scaffold）
           const FeaturedBody(),
           // 推荐模式：竖直PageView全屏播放
-          _RecommendFullScreen(videos: vp.discover, onIndexChanged: (i) => _playIndex(vp.discover, i)),
+          _RecommendFullScreen(
+            videos: vp.discover,
+            isLoading: vp.loadingDiscover,
+            onRetry: () => vp.refreshDiscover(),
+            onIndexChanged: (i) => _playIndex(vp.discover, i),
+          ),
         ],
       ),
       // 底部导航由 Router 壳提供，页面内不再渲染
@@ -85,7 +99,9 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
 class _RecommendFullScreen extends StatefulWidget {
   final List videos;
   final ValueChanged<int> onIndexChanged;
-  const _RecommendFullScreen({required this.videos, required this.onIndexChanged});
+  final bool isLoading;
+  final VoidCallback onRetry;
+  const _RecommendFullScreen({required this.videos, required this.onIndexChanged, required this.isLoading, required this.onRetry});
   @override
   State<_RecommendFullScreen> createState() => _RecommendFullScreenState();
 }
@@ -106,6 +122,13 @@ class _RecommendFullScreenState extends State<_RecommendFullScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (widget.videos.isEmpty) {
+      return Center(
+        child: widget.isLoading
+            ? Column(mainAxisSize: MainAxisSize.min, children: const [CircularProgressIndicator(), SizedBox(height: 12), Text('正在加载推荐流...')])
+            : Column(mainAxisSize: MainAxisSize.min, children: [const Text('暂无推荐内容'), const SizedBox(height: 8), ElevatedButton(onPressed: widget.onRetry, child: const Text('重新加载'))]),
+      );
+    }
     return PageView.builder(
       scrollDirection: Axis.vertical,
       controller: _pageController,
@@ -129,6 +152,7 @@ class _FullScreenVideoItem extends StatefulWidget {
 class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
   late VideoPlayerController _controller;
   bool _initialized = false;
+  String? _error;
   // 顶部栏：菜单展开占位
   void _onMenu() {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('菜单功能待接入'), duration: Duration(milliseconds: 1200)));
@@ -170,11 +194,20 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
   @override
   void initState() {
     super.initState();
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.video.videoUrl));
+    final url = widget.video.videoUrl ?? '';
+    if (url.isEmpty) {
+      _error = '视频地址为空';
+      return;
+    }
+    _controller = VideoPlayerController.networkUrl(Uri.parse(url));
     _controller.initialize().then((_) {
       if (mounted) setState(() => _initialized = true);
       _controller.setLooping(true);
       _controller.play();
+      context.read<VideoProvider>().visit(widget.video.id);
+    }).catchError((e) {
+      debugPrint('FullScreenVideoItem: initialize error $e');
+      if (mounted) setState(() => _error = '视频加载失败');
     });
   }
 
@@ -190,9 +223,11 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        _initialized
-            ? FittedBox(fit: BoxFit.cover, child: SizedBox(width: _controller.value.size.width, height: _controller.value.size.height, child: VideoPlayer(_controller)))
-            : const Center(child: CircularProgressIndicator()),
+        _error != null
+            ? Center(child: Text(_error!, style: const TextStyle(color: Colors.black54)))
+            : _initialized
+                ? FittedBox(fit: BoxFit.cover, child: SizedBox(width: _controller.value.size.width, height: _controller.value.size.height, child: VideoPlayer(_controller)))
+                : const Center(child: CircularProgressIndicator()),
         // 顶部功能栏（左：附件；右：搜索、菜单）
         Positioned(
           left: Spacing.md,
@@ -246,6 +281,7 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
             children: [
               _LikeActionIcon(
                 initialCount: widget.video.likes ?? 0,
+                onTap: () => context.read<VideoProvider>().like(widget.video.id),
               ),
               const SizedBox(height: Spacing.md),
               _ActionIcon(icon: Icons.chat_bubble_outline, label: '1.2k', onTap: () {
@@ -312,7 +348,8 @@ class _ActionIcon extends StatelessWidget {
 /// 点赞图标（红心）带动画与计数（300~450ms）
 class _LikeActionIcon extends StatefulWidget {
   final int initialCount;
-  const _LikeActionIcon({required this.initialCount});
+  final VoidCallback? onTap;
+  const _LikeActionIcon({required this.initialCount, this.onTap});
   @override
   State<_LikeActionIcon> createState() => _LikeActionIconState();
 }
@@ -347,6 +384,7 @@ class _LikeActionIconState extends State<_LikeActionIcon> with TickerProviderSta
     if (liked) {
       burst.forward(from: 0);
     }
+    if (widget.onTap != null) widget.onTap!();
   }
 
   @override

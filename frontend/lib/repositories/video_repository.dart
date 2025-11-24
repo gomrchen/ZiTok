@@ -1,6 +1,8 @@
+import 'package:flutter/foundation.dart';
 import '../models/video.dart';
 import '../services/video_service.dart';
 import '../services/cache.dart';
+import '../utils/url_utils.dart';
 
 class VideoRepository {
   final VideoService api;
@@ -8,40 +10,102 @@ class VideoRepository {
   const VideoRepository({required this.api, required this.cache});
 
   Future<PagedResult<Video>> fetchDiscover(VideoQuery query) async {
-    final resp = await api.search(content: query.keyword ?? '', pages: query.page, size: query.pageSize);
-    final data = resp.data as Map<String, dynamic>? ?? {};
-    final items = (data['items'] as List<dynamic>? ?? []).map((e) => Video.fromJson(e as Map<String, dynamic>)).toList();
-    final count = data['count'] is int ? data['count'] as int : items.length;
-    return PagedResult(items: items, page: query.page, pageSize: query.pageSize, hasMore: (items.length + query.page * query.pageSize) < count);
+    final resp = await api.list(page: query.page, size: query.pageSize);
+    final root = resp.data as Map<String, dynamic>? ?? {};
+    List<dynamic> raw = [];
+    if (root['data'] is List) {
+      raw = root['data'] as List;
+    } else if (root['data'] is Map && (root['data'] as Map)['items'] is List) {
+      raw = (root['data'] as Map)['items'] as List;
+    } else if (root['items'] is List) {
+      raw = root['items'] as List;
+    }
+    var items = raw.map((e) => Video.fromJson(e as Map<String, dynamic>)).toList();
+    items = items
+        .map((v) => v.copyWith(
+              videoUrl: UrlUtils.resolveStorageUrl(v.videoUrl, defaultDir: 'videos'),
+              coverUrl: UrlUtils.resolveStorageUrl(v.coverUrl, defaultDir: 'covers'),
+            ))
+        .toList();
+    final hasMore = items.length == query.pageSize;
+    debugPrint('VideoRepository.fetchDiscover: page=${query.page} size=${query.pageSize} items=${items.length}');
+    if (items.isNotEmpty) {
+      final sample = items.take(3).map((e) => e.videoUrl).toList();
+      debugPrint('VideoRepository.fetchDiscover: sampleUrls=$sample');
+    }
+    return PagedResult(items: items, page: query.page, pageSize: query.pageSize, hasMore: hasMore);
   }
 
   Future<PagedResult<Video>> fetchFeatured(VideoQuery query) async {
-    // 先尝试缓存
-    final cached = cache.getJson('video_popular');
+    final cached = cache.getJson('video_hot');
     List<Video> items;
     if (cached != null) {
       items = (cached['items'] as List<dynamic>? ?? []).map((e) => Video.fromJson(e as Map<String, dynamic>)).toList();
     } else {
-      final resp = await api.popular();
-      final data = resp.data as Map<String, dynamic>? ?? {};
-      items = (data['items'] as List<dynamic>? ?? []).map((e) => Video.fromJson(e as Map<String, dynamic>)).toList();
-      await cache.setJson('video_popular', {'items': (data['items'] ?? [])});
+      final resp = await api.hot(pageSize: query.pageSize, pageNum: query.page);
+      final root = resp.data as Map<String, dynamic>? ?? {};
+      List<dynamic> raw = [];
+      if (root['data'] is List) {
+        raw = root['data'] as List;
+      } else if (root['data'] is Map && (root['data'] as Map)['items'] is List) {
+        raw = (root['data'] as Map)['items'] as List;
+      } else if (root['items'] is List) {
+        raw = root['items'] as List;
+      }
+      items = raw.map((e) => Video.fromJson(e as Map<String, dynamic>)).toList();
+      await cache.setJson('video_hot', {'items': (raw)});
     }
-    // 分页切片
+    items = items
+        .map((v) => v.copyWith(
+              videoUrl: UrlUtils.resolveStorageUrl(v.videoUrl, defaultDir: 'videos'),
+              coverUrl: UrlUtils.resolveStorageUrl(v.coverUrl, defaultDir: 'covers'),
+            ))
+        .toList();
     final start = (query.page - 1) * query.pageSize;
     final end = (start + query.pageSize).clamp(0, items.length);
     final sliced = start < items.length ? items.sublist(start, end) : <Video>[];
+    debugPrint('VideoRepository.fetchFeatured: page=${query.page} size=${query.pageSize} total=${items.length} sliced=${sliced.length}');
+    if (sliced.isNotEmpty) {
+      final sample = sliced.take(3).map((e) => e.videoUrl).toList();
+      debugPrint('VideoRepository.fetchFeatured: sampleUrls=$sample');
+    }
     return PagedResult(items: sliced, page: query.page, pageSize: query.pageSize, hasMore: end < items.length);
   }
 
   Future<PagedResult<Video>> fetchFollow(VideoQuery query) async {
-    final resp = await api.list(uid: 0); // 后端可根据 header 中的 UID 解析当前用户，此处传0占位
-    final data = resp.data as Map<String, dynamic>? ?? {};
-    final items = (data['items'] as List<dynamic>? ?? []).map((e) => Video.fromJson(e as Map<String, dynamic>)).toList();
-    // 分页切片
+    final resp = await api.list(page: query.page, size: query.pageSize);
+    final root = resp.data as Map<String, dynamic>? ?? {};
+    List<dynamic> raw = [];
+    if (root['data'] is List) {
+      raw = root['data'] as List;
+    } else if (root['data'] is Map && (root['data'] as Map)['items'] is List) {
+      raw = (root['data'] as Map)['items'] as List;
+    } else if (root['items'] is List) {
+      raw = root['items'] as List;
+    }
+    var items = raw.map((e) => Video.fromJson(e as Map<String, dynamic>)).toList();
+    items = items
+        .map((v) => v.copyWith(
+              videoUrl: UrlUtils.resolveStorageUrl(v.videoUrl, defaultDir: 'videos'),
+              coverUrl: UrlUtils.resolveStorageUrl(v.coverUrl, defaultDir: 'covers'),
+            ))
+        .toList();
     final start = (query.page - 1) * query.pageSize;
     final end = (start + query.pageSize).clamp(0, items.length);
     final sliced = start < items.length ? items.sublist(start, end) : <Video>[];
+    debugPrint('VideoRepository.fetchFollow: page=${query.page} size=${query.pageSize} total=${items.length} sliced=${sliced.length}');
+    if (sliced.isNotEmpty) {
+      final sample = sliced.take(3).map((e) => e.videoUrl).toList();
+      debugPrint('VideoRepository.fetchFollow: sampleUrls=$sample');
+    }
     return PagedResult(items: sliced, page: query.page, pageSize: query.pageSize, hasMore: end < items.length);
+  }
+
+  Future<void> like(String videoId) async {
+    await api.like(videoId: videoId);
+  }
+
+  Future<void> visit(String videoId) async {
+    await api.visit(videoId: videoId);
   }
 }

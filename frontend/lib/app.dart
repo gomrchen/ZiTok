@@ -16,6 +16,9 @@ import 'services/cache.dart';
 import 'providers/video_provider.dart';
 import 'providers/settings_provider.dart';
 import 'providers/messaging_provider.dart';
+import 'repositories/user_repository.dart';
+import 'services/user_service.dart';
+import 'providers/profile_provider.dart';
 
 class AppBootstrap {
   static late SharedPreferences prefs;
@@ -46,6 +49,7 @@ class ZitokApp extends StatelessWidget {
       api: VideoService(AppBootstrap.apiClient.dio),
       cache: CacheManager(AppBootstrap.prefs),
     );
+    final userRepository = UserRepository(api: UserService(AppBootstrap.apiClient.dio));
 
     return MultiProvider(
       providers: [
@@ -59,12 +63,13 @@ class ZitokApp extends StatelessWidget {
           create: (_) => SettingsProvider(prefs: AppBootstrap.prefs),
         ),
         ChangeNotifierProvider<VideoProvider>(
-          create: (_) => VideoProvider(repo: videoRepository)
-            ..refreshDiscover()
-            ..refreshFeatured(),
+          create: (_) => VideoProvider(repo: videoRepository),
         ),
         ChangeNotifierProvider<MessagingProvider>(
           create: (_) => MessagingProvider(),
+        ),
+        ChangeNotifierProvider<ProfileProvider>(
+          create: (_) => ProfileProvider(repo: userRepository)..load(),
         ),
       ],
       child: Builder(

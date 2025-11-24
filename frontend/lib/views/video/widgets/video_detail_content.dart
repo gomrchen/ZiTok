@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../models/video.dart';
+import '../../../providers/video_provider.dart';
+import 'package:provider/provider.dart';
 import '../../../theme/theme_tokens.dart';
 import '../../../widgets/comment_sheet.dart' show CommentsPane; // 复用评论组件
 import '../../../repositories/notes_repository.dart';
@@ -132,7 +134,11 @@ class _IntroSection extends StatelessWidget {
       children: [
         Text(video.title ?? '未知视频', style: theme.textTheme.titleMedium),
         const SizedBox(height: 6),
-        Text('👍 ${video.likes ?? 0} · 👁️ ${video.views ?? 0}', style: theme.textTheme.bodySmall),
+        Row(children: [
+          Text('👍 ${video.likes ?? 0} · 👁️ ${video.views ?? 0}', style: theme.textTheme.bodySmall),
+          const SizedBox(width: 12),
+          IconButton(onPressed: () => context.read<VideoProvider>().like(video.id), icon: const Icon(Icons.favorite_border)),
+        ]),
         const SizedBox(height: Spacing.sm),
         if ((video.intro ?? '').isNotEmpty)
           Text(video.intro!, style: theme.textTheme.bodyMedium),

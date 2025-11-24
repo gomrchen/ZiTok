@@ -1,71 +1,30 @@
 import 'package:dio/dio.dart';
 import '../services/api_client.dart';
-import '../config/env.dart';
 
+/// 认证服务（登录、注册、资料）
 class AuthService {
   final ApiClient client;
   AuthService(this.client);
 
-  Future<Response<dynamic>> login({required String phone, required String password}) {
-    if (Env.isDev) {
-      return Future.value(Response(
-        requestOptions: RequestOptions(path: '/api/user/login'),
-        data: {
-          'code': 200,
-          'message': 'success',
-          'data': {
-            'access_token': 'dev_access_token',
-            'refresh_token': 'dev_refresh_token',
-          },
-        },
-        statusCode: 200,
-      ));
-    }
-    return client.dio.post('/api/user/login', data: {
-      'phone': phone,
+  /// 登录：用户名 + 密码
+  Future<Response<dynamic>> login({required String username, required String password}) {
+    return client.dio.post('/user/login', data: {
+      'username': username,
       'password': password,
     });
   }
 
-  Future<Response<dynamic>> register({required String phone, required String otp, String? password}) {
-    if (Env.isDev) {
-      return Future.value(Response(
-        requestOptions: RequestOptions(path: '/api/user/register'),
-        data: {
-          'code': 200,
-          'message': 'success',
-          'data': {
-            'access_token': 'dev_access_token',
-            'refresh_token': 'dev_refresh_token',
-          },
-        },
-        statusCode: 200,
-      ));
-    }
-    return client.dio.post('/api/user/register', data: {
-      'phone': phone,
-      'otp': otp,
-      if (password != null) 'password': password,
+  /// 注册：用户名 + 邮箱 + 密码
+  Future<Response<dynamic>> register({required String username, required String email, required String password}) {
+    return client.dio.post('/user/register', data: {
+      'username': username,
+      'email': email,
+      'password': password,
     });
   }
 
+  /// 当前用户信息
   Future<Response<dynamic>> profile() {
-    if (Env.isDev) {
-      return Future.value(Response(
-        requestOptions: RequestOptions(path: '/api/user/auth/info'),
-        data: {
-          'code': 200,
-          'message': 'success',
-          'data': {
-            'user_id': 1,
-            'nickname': 'DevUser',
-            'avatar': null,
-            'bio': '开发环境本地用户',
-          },
-        },
-        statusCode: 200,
-      ));
-    }
-    return client.dio.get('/api/user/auth/info');
+    return client.dio.get('/user/info');
   }
 }

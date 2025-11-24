@@ -44,16 +44,19 @@ class VideoProvider extends ChangeNotifier {
   int? get recommendStartIndexInFollow => _recommendStartIndexInFollow;
 
   Future<void> refreshDiscover({String? keyword, List<String>? tags}) async {
+    debugPrint('VideoProvider.refreshDiscover: start keyword=$keyword');
     _discoverPage = 1;
     _keyword = keyword;
     _filters = tags;
     _discover = [];
     _discoverHasMore = true;
     await loadMoreDiscover();
+    debugPrint('VideoProvider.refreshDiscover: done items=${_discover.length}');
   }
 
   Future<void> loadMoreDiscover() async {
     if (_loadingDiscover || !_discoverHasMore) return;
+    debugPrint('VideoProvider.loadMoreDiscover: page=$_discoverPage');
     _loadingDiscover = true;
     notifyListeners();
     final res = await repo.fetchDiscover(VideoQuery(page: _discoverPage, pageSize: 20, keyword: _keyword, tags: _filters));
@@ -62,20 +65,24 @@ class VideoProvider extends ChangeNotifier {
     _discoverPage += 1;
     _loadingDiscover = false;
     notifyListeners();
+    debugPrint('VideoProvider.loadMoreDiscover: page=$_discoverPage items_now=${_discover.length} hasMore=$_discoverHasMore');
   }
 
   /// 刷新关注流：当关注内容不足时，自动拼接精选推荐
   Future<void> refreshFollow() async {
+    debugPrint('VideoProvider.refreshFollow: start');
     _followPage = 1;
     _follow = [];
     _followHasMore = true;
     _followError = null;
     _recommendStartIndexInFollow = null;
     await loadMoreFollow();
+    debugPrint('VideoProvider.refreshFollow: done items=${_follow.length}');
   }
 
   Future<void> loadMoreFollow() async {
     if (_loadingFollow || !_followHasMore) return;
+    debugPrint('VideoProvider.loadMoreFollow: page=$_followPage');
     _loadingFollow = true;
     notifyListeners();
     try {
@@ -99,9 +106,11 @@ class VideoProvider extends ChangeNotifier {
       }
     } catch (e) {
       _followError = e.toString();
+      debugPrint('VideoProvider.loadMoreFollow: error=$_followError');
     } finally {
       _loadingFollow = false;
       notifyListeners();
+      debugPrint('VideoProvider.loadMoreFollow: page=$_followPage items_now=${_follow.length} hasMore=$_followHasMore');
     }
   }
 
@@ -111,45 +120,72 @@ class VideoProvider extends ChangeNotifier {
   }
 
   /// 点赞（本地更新），真实项目中应调用后端接口并做失败回滚
-  void toggleLike(String videoId) {
-    final idx = _follow.indexWhere((v) => v.id == videoId);
-    if (idx >= 0) {
-      final v = _follow[idx];
-      final liked = _likedVideoIds.contains(videoId);
-      final currentLikes = v.likes ?? 0;
-      final int newLikes = liked ? (currentLikes > 0 ? currentLikes - 1 : 0) : currentLikes + 1;
-      _follow[idx] = Video(
-        id: v.id,
-        uid: v.uid,
-        title: v.title,
-        intro: v.intro,
-        coverUrl: v.coverUrl,
-        videoUrl: v.videoUrl,
-        stars: v.stars,
-        likes: newLikes,
-        views: v.views,
-        tags: v.tags,
-      );
-      if (liked) {
-        _likedVideoIds.remove(videoId);
-      } else {
-        _likedVideoIds.add(videoId);
+  Future<void> like(String videoId) async {
+    await repo.like(videoId);
+    void updateList(List<Video> list) {
+      final i = list.indexWhere((v) => v.id == videoId);
+      if (i >= 0) {
+        final v = list[i];
+        list[i] = Video(
+          id: v.id,
+          uid: v.uid,
+          title: v.title,
+          intro: v.intro,
+          coverUrl: v.coverUrl,
+          videoUrl: v.videoUrl,
+          stars: v.stars,
+          likes: (v.likes ?? 0) + 1,
+          views: v.views,
+          tags: v.tags,
+        );
       }
-      notifyListeners();
     }
+    updateList(_follow);
+    updateList(_discover);
+    updateList(_featured);
+    notifyListeners();
+  }
+
+  Future<void> visit(String videoId) async {
+    await repo.visit(videoId);
+    void updateList(List<Video> list) {
+      final i = list.indexWhere((v) => v.id == videoId);
+      if (i >= 0) {
+        final v = list[i];
+        list[i] = Video(
+          id: v.id,
+          uid: v.uid,
+          title: v.title,
+          intro: v.intro,
+          coverUrl: v.coverUrl,
+          videoUrl: v.videoUrl,
+          stars: v.stars,
+          likes: v.likes,
+          views: (v.views ?? 0) + 1,
+          tags: v.tags,
+        );
+      }
+    }
+    updateList(_follow);
+    updateList(_discover);
+    updateList(_featured);
+    notifyListeners();
   }
 
   Future<void> refreshFeatured({String? keyword, List<String>? tags}) async {
+    debugPrint('VideoProvider.refreshFeatured: start');
     _featuredPage = 1;
     _keyword = keyword;
     _filters = tags;
     _featured = [];
     _featuredHasMore = true;
     await loadMoreFeatured();
+    debugPrint('VideoProvider.refreshFeatured: done items=${_featured.length}');
   }
 
   Future<void> loadMoreFeatured() async {
     if (_loadingFeatured || !_featuredHasMore) return;
+    debugPrint('VideoProvider.loadMoreFeatured: page=$_featuredPage');
     _loadingFeatured = true;
     notifyListeners();
     final res = await repo.fetchFeatured(VideoQuery(page: _featuredPage, pageSize: 20, keyword: _keyword, tags: _filters));
@@ -158,5 +194,6 @@ class VideoProvider extends ChangeNotifier {
     _featuredPage += 1;
     _loadingFeatured = false;
     notifyListeners();
+    debugPrint('VideoProvider.loadMoreFeatured: page=$_featuredPage items_now=${_featured.length} hasMore=$_featuredHasMore');
   }
 }
