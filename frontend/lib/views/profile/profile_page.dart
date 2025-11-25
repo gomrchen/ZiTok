@@ -1,7 +1,11 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:hive/hive.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../../providers/auth_provider.dart';
+import '../../providers/messaging_provider.dart';
 import '../../theme/theme_tokens.dart';
 import '../../providers/profile_provider.dart';
 import '../../models/user_models.dart';
@@ -14,19 +18,23 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
+  bool _initialLoadComplete = false;
+
   @override
   void initState() {
     super.initState();
-<<<<<<< HEAD
     print('🚀 ProfilePage: initState 调用');
-    WidgetsBinding.instance.addPostFrameCallback((_) {
+
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
       print('📱 ProfilePage: 开始加载用户数据');
-      // 使用新的方法，从AuthProvider加载用户数据
-      context.read<ProfileProvider>().loadFromAuthProvider(context);
-=======
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<ProfileProvider>().load();
->>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
+      try {
+        await context.read<ProfileProvider>().loadFromAuthProvider(context);
+        setState(() {
+          _initialLoadComplete = true;
+        });
+      } catch (e) {
+        print('❌ ProfilePage: 加载用户数据失败: $e');
+      }
     });
   }
 
@@ -34,7 +42,27 @@ class _ProfilePageState extends State<ProfilePage> {
   Widget build(BuildContext context) {
     final profile = context.watch<ProfileProvider>();
     final user = profile.user;
-<<<<<<< HEAD
+
+    // 添加详细的用户数据调试信息
+    print('🔍 ProfilePage 用户数据检查:');
+    print('   - user对象: ${user != null ? "非空" : "空"}');
+    print('   - username: ${user?.username ?? "null"}');
+    print('   - id: ${user?.id ?? "null"}');
+    print('   - avatarUrl: ${user?.avatarUrl ?? "null"}');
+    print('   - bio: ${user?.bio ?? "null"}');
+    print('   - profileBackgroundImageUrl: ${user?.profileBackgroundImageUrl ?? "null"}');
+    print('   - _initialLoadComplete: $_initialLoadComplete');
+    print('   - profile.loading: ${profile.loading}');
+
+    // 如果初始加载未完成且不在加载状态，显示加载指示器
+    if (!_initialLoadComplete && !profile.loading) {
+      print('⏳ ProfilePage: 显示初始加载状态');
+      return const Scaffold(
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
 
     // 显示加载状态
     if (profile.loading) {
@@ -57,7 +85,12 @@ class _ProfilePageState extends State<ProfilePage> {
               Text('加载失败: ${profile.error}'),
               const SizedBox(height: 16),
               ElevatedButton(
-                onPressed: () => context.read<ProfileProvider>().loadFromCache(),
+                onPressed: () {
+                  context.read<ProfileProvider>().loadFromCache();
+                  setState(() {
+                    _initialLoadComplete = false;
+                  });
+                },
                 child: const Text('重试'),
               ),
             ],
@@ -68,8 +101,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
     print('✅ ProfilePage: 显示用户数据 - username: ${user?.username ?? "null"}');
 
-=======
->>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
     return Scaffold(
       body: SafeArea(
         top: true,
@@ -85,11 +116,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   child: CustomScrollView(
                     slivers: [
                       SliverToBoxAdapter(child: _ProfileHeader(
-<<<<<<< HEAD
                           userName: user?.username ?? '用户',
-=======
-                          userName: user?.username ?? '',
->>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
                           bio: user?.bio ?? '',
                           avatarUrl: user?.avatarUrl,
                           backgroundUrl: user?.profileBackgroundImageUrl,
@@ -196,11 +223,21 @@ class _ProfileHeader extends StatelessWidget {
   final Gender? gender;
   final String? birthday;
   final VoidCallback onEdit;
-  const _ProfileHeader({required this.userName, required this.bio, required this.avatarUrl, this.backgroundUrl, this.gender, this.birthday, required this.onEdit});
+
+  const _ProfileHeader({
+    required this.userName,
+    required this.bio,
+    required this.avatarUrl,
+    this.backgroundUrl,
+    this.gender,
+    this.birthday,
+    required this.onEdit
+  });
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    const double headerHeight = 176; // 贴近图二头部高度
+    const double headerHeight = 176;
     const double avatarRadius = 36;
 
     return Semantics(
@@ -208,7 +245,6 @@ class _ProfileHeader extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 顶部平直背景：使用渐变兜底，并在右上角叠加菜单图标
           Stack(
             children: [
               Container(
@@ -225,7 +261,10 @@ class _ProfileHeader extends StatelessWidget {
                   ),
                   image: backgroundUrl == null
                       ? null
-                      : DecorationImage(image: NetworkImage(backgroundUrl!), fit: BoxFit.cover),
+                      : DecorationImage(
+                      image: NetworkImage(backgroundUrl!),
+                      fit: BoxFit.cover
+                  ),
                 ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
@@ -234,12 +273,8 @@ class _ProfileHeader extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        CircleAvatar(
-                          radius: avatarRadius,
-                          backgroundColor: const Color(0xFF2BD2C4),
-                          backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl!) : null,
-                          child: avatarUrl == null ? Icon(Icons.person, color: cs.onPrimary, size: 24) : null,
-                        ),
+                        // 头像部分 - 添加调试信息和错误处理
+                        _buildAvatar(cs, avatarRadius),
                         const SizedBox(width: Spacing.md),
                         Expanded(
                           child: Column(
@@ -248,14 +283,21 @@ class _ProfileHeader extends StatelessWidget {
                             children: [
                               Text(
                                 userName.isEmpty ? '用户' : userName,
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 20),
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w700,
+                                    fontSize: 20
+                                ),
                                 maxLines: 1,
                                 overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 '@${userName.isEmpty ? 'unknown' : userName}',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70, fontSize: 12),
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Colors.white70,
+                                    fontSize: 12
+                                ),
                               ),
                             ],
                           ),
@@ -284,7 +326,7 @@ class _ProfileHeader extends StatelessWidget {
               ),
             ],
           ),
-          // 简介
+          // 简介部分保持不变
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
             child: Align(
@@ -302,12 +344,25 @@ class _ProfileHeader extends StatelessWidget {
                       if (gender != null && gender != Gender.unknown)
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(color: cs.surfaceContainerHighest.withValues(alpha: 0.6), borderRadius: Radii.sm),
-                          child: Text(gender == Gender.male ? '男' : '女', style: Theme.of(context).textTheme.bodySmall),
+                          decoration: BoxDecoration(
+                              color: cs.surfaceContainerHighest.withValues(alpha: 0.6),
+                              borderRadius: Radii.sm
+                          ),
+                          child: Text(
+                              gender == Gender.male ? '男' : '女',
+                              style: Theme.of(context).textTheme.bodySmall
+                          ),
                         ),
-                      if ((gender != null && gender != Gender.unknown) && (birthday != null && birthday!.isNotEmpty)) const SizedBox(width: Spacing.sm),
+                      if ((gender != null && gender != Gender.unknown) &&
+                          (birthday != null && birthday!.isNotEmpty))
+                        const SizedBox(width: Spacing.sm),
                       if (birthday != null && birthday!.isNotEmpty)
-                        Text('生日 $birthday', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                        Text(
+                            '生日 $birthday',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: cs.onSurfaceVariant
+                            )
+                        ),
                     ],
                   ),
                 ],
@@ -318,21 +373,220 @@ class _ProfileHeader extends StatelessWidget {
       ),
     );
   }
+
+  // 提取头像构建方法，添加调试和错误处理
+  Widget _buildAvatar(ColorScheme cs, double avatarRadius) {
+    print('🖼️ 头像URL: $avatarUrl'); // 调试信息
+
+    // 如果头像URL为空，显示默认图标
+    if (avatarUrl == null || avatarUrl!.isEmpty) {
+      print('⚠️ 头像URL为空，显示默认图标');
+      return CircleAvatar(
+        radius: avatarRadius,
+        backgroundColor: const Color(0xFF2BD2C4),
+        child: Icon(
+            Icons.person,
+            color: cs.onPrimary,
+            size: 24
+        ),
+      );
+    }
+
+    // 如果有头像URL，显示网络图片
+    return CircleAvatar(
+      radius: avatarRadius,
+      backgroundColor: const Color(0xFF2BD2C4),
+      backgroundImage: NetworkImage(avatarUrl!),
+      // 添加错误处理，如果图片加载失败显示默认图标
+      child: avatarUrl == null ? Icon(
+          Icons.person,
+          color: cs.onPrimary,
+          size: 24
+      ) : null,
+    );
+  }
 }
 
-class _StatsRow extends StatelessWidget {
+class _StatsRow extends StatefulWidget {
   const _StatsRow();
+
+  @override
+  State<_StatsRow> createState() => _StatsRowState();
+}
+
+class _StatsRowState extends State<_StatsRow> {
+  String? _userId;
+
+  @override
+  void initState() {
+    super.initState();
+    // 组件初始化时获取用户ID并加载统计数据
+    _getUserIdAndLoadStats();
+  }
+
+  void _getUserIdAndLoadStats() {
+    print('🔍 _StatsRow: 开始获取用户ID');
+
+    // 方法1: 从 ProfileProvider 获取（主要方法）
+    final profileProvider = context.read<ProfileProvider>();
+    final profileUser = profileProvider.user;
+
+    if (profileUser != null && profileUser.id.isNotEmpty) {
+      print('✅ _StatsRow: 从ProfileProvider获取到用户ID: ${profileUser.id}');
+      _userId = profileUser.id;
+      _loadStats();
+      return;
+    }
+
+    // 方法2: 从 AuthProvider 获取（备用方法）
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final authUser = authProvider.user;
+      if (authUser != null && authUser.id.isNotEmpty) {
+        print('✅ _StatsRow: 从AuthProvider获取到用户ID: ${authUser.id}');
+        _userId = authUser.id;
+        _loadStats();
+        return;
+      }
+    } catch (e) {
+      print('⚠️ _StatsRow: 从AuthProvider获取用户ID失败: $e');
+    }
+
+    // 方法3: 从本地存储获取（最后备选）
+    _getUserIdFromStorage();
+  }
+
+  void _getUserIdFromStorage() async {
+    try {
+      print('🔍 _StatsRow: 尝试从本地存储获取用户ID');
+
+      // 首先尝试从 Hive 获取
+      final box = await Hive.openBox('user_box');
+      final String? hiveUserId = box.get('id') as String?;
+
+      if (hiveUserId != null && hiveUserId.isNotEmpty) {
+        print('✅ _StatsRow: 从Hive获取到用户ID: $hiveUserId');
+        setState(() {
+          _userId = hiveUserId;
+        });
+        _loadStats();
+        return;
+      }
+
+      // 然后尝试从 SharedPreferences 获取
+      final prefs = await SharedPreferences.getInstance();
+      final String? prefsUserId = prefs.getString('auth_user_id');
+
+      if (prefsUserId != null && prefsUserId.isNotEmpty) {
+        print('✅ _StatsRow: 从SharedPreferences获取到用户ID: $prefsUserId');
+        setState(() {
+          _userId = prefsUserId;
+        });
+        _loadStats();
+        return;
+      }
+
+      print('❌ _StatsRow: 无法从任何地方获取用户ID');
+    } catch (e) {
+      print('❌ _StatsRow: 从本地存储获取用户ID失败: $e');
+    }
+  }
+
+  void _loadStats() {
+    if (_userId == null || _userId!.isEmpty) {
+      print('⚠️ _StatsRow: 用户ID为空，无法加载统计数据');
+      return;
+    }
+
+    final profileProvider = context.read<ProfileProvider>();
+    print('🔍 _StatsRow: 开始加载用户统计数据，userId: $_userId');
+    profileProvider.loadUserStats(userId: _userId!);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final profile = context.watch<ProfileProvider>();
     final cs = Theme.of(context).colorScheme;
+
     Widget cell(String num, String label) => Column(
-          mainAxisSize: MainAxisSize.min,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(num, style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          fontWeight: FontWeight.w700,
+          fontSize: 18,
+          color: profile.loadingStats ? cs.onSurfaceVariant : cs.onSurface,
+        )),
+        const SizedBox(height: 4),
+        Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(
+          color: cs.onSurfaceVariant,
+        )),
+      ],
+    );
+
+    // 如果没有获取到用户ID，显示加载状态
+    if (_userId == null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            Text(num, style: Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700, fontSize: 18)),
-            const SizedBox(height: 4),
-            Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+            cell('-', '视频'),
+            cell('-', '笔记'),
+            cell('...', '粉丝'),
+            cell('...', '关注'),
           ],
-        );
+        ),
+      );
+    }
+
+
+
+    // 显示加载状态
+    if (profile.loadingStats) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            cell('-', '视频'),
+            cell('-', '笔记'),
+            cell('...', '粉丝'),
+            cell('...', '关注'),
+          ],
+        ),
+      );
+    }
+
+    // 显示错误状态
+    if (profile.statsError != null) {
+      print('❌ _StatsRow: 统计数据加载错误: ${profile.statsError}');
+      return Padding(
+        padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                cell('-', '视频'),
+                cell('-', '笔记'),
+                cell('0', '粉丝'),
+                cell('0', '关注'),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '统计数据加载失败',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.red,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
+    print('✅ _StatsRow: 显示统计数据 - 粉丝: ${profile.followersCount}, 关注: ${profile.followingsCount}');
+
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
       child: Row(
@@ -340,8 +594,8 @@ class _StatsRow extends StatelessWidget {
         children: [
           cell('-', '视频'),
           cell('-', '笔记'),
-          cell('-', '获赞'),
-          cell('-', '好友'),
+          cell(profile.followersCount.toString(), '粉丝'),
+          cell(profile.followingsCount.toString(), '关注'),
         ],
       ),
     );
@@ -418,8 +672,5 @@ class _VideosTab extends StatelessWidget {
       itemCount: 8,
     );
   }
-<<<<<<< HEAD
 }
-=======
-}
->>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
+

@@ -7,6 +7,7 @@ import 'package:crop_your_image/crop_your_image.dart';
 import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:http/http.dart' as http;
 
 import '../../theme/theme_tokens.dart';
 import '../../app.dart';
@@ -15,12 +16,9 @@ import '../../providers/profile_provider.dart';
 import '../../services/user_service.dart';
 import '../../utils/image_utils.dart';
 import 'widgets/edit_field_dialog.dart';
+import '../../models/user_models.dart'; // 导入用户模型以使用 Gender 枚举
 
 /// 编辑资料页
-/// - 贴合设计图效果：顶部可更换封面、头像圆形按钮、资料完成度
-/// - 支持头像相册/拍照选择、裁剪为 1:1、压缩到 200x200 并上传
-/// - 支持背景图相册选择、裁剪为头部区域比例、完整显示与上传
-/// - 上传使用 multipart/form-data，处理加载状态与错误提示
 class EditProfilePage extends StatefulWidget {
   final UserService? userService;
   const EditProfilePage({super.key, this.userService});
@@ -34,22 +32,23 @@ class _EditProfilePageState extends State<EditProfilePage> {
   final CropController _cropController = CropController();
 
   // 预览字节
-  Uint8List? _avatarPreview; // 压缩后的 200x200 头像
-  Uint8List? _backdropPreview; // 头部背景展示图（保持比例）
+  Uint8List? _avatarPreview;
+  Uint8List? _backdropPreview;
 
   // Loading 状态
   bool _uploadingAvatar = false;
   bool _uploadingBackdrop = false;
 
-  // 资料完成度（简单根据字段是否存在演示）
-  int _completion = 40; // 默认与设计图一致
+  // 资料完成度
+  int _completion = 40;
 
-  // 可编辑字段（使用 Hive 持久化）
+  // 可编辑字段
   String _nickname = '哒哒哒哒对对对';
   String _bio = '介绍喜好、个性或@你的亲友';
-  int? _gender; // 0 男 1 女 null 未设置
+  Gender _gender = Gender.unknown; // 修改：使用 Gender 枚举
   DateTime? _birthday;
-
+  String _email = '';
+  String? _avatarUrl;
 
   // 便捷：当前用户 ID
   String get _userId => context.read<AuthProvider>().user?.id ?? '0';
@@ -57,8 +56,43 @@ class _EditProfilePageState extends State<EditProfilePage> {
   UserService get _userApi => widget.userService ?? UserService(AppBootstrap.apiClient.dio);
 
   @override
+  void initState() {
+    super.initState();
+    // 初始化时从 ProfileProvider 获取用户数据
+    _loadUserData();
+  }
+
+  void _loadUserData() {
+    final profileProvider = context.read<ProfileProvider>();
+    final user = profileProvider.user;
+
+    if (user != null) {
+      setState(() {
+        _nickname = user.username;
+        _email = user.email ?? '未设置邮箱';
+        _bio = user.bio ?? '介绍喜好、个性或@你的亲友';
+        _avatarUrl = user.avatarUrl;
+        _gender = user.gender; // 直接使用 Gender 枚举
+
+        // 从 Hive 加载其他字段（如果存在）
+        final box = Hive.box('user_box');
+        final birthdayStr = box.get('birthday') as String?;
+        if (birthdayStr != null) {
+          _birthday = DateTime.tryParse(birthdayStr);
+        }
+
+        // 如果 Hive 中有缓存的头像数据，使用缓存的
+        final cachedAvatar = box.get('avatar') as Uint8List?;
+        if (cachedAvatar != null) {
+          _avatarPreview = cachedAvatar;
+        }
+      });
+      _recalcCompletion();
+    }
+  }
+
+  @override
   void dispose() {
-    // CropController 无需显式释放
     super.dispose();
   }
 
@@ -71,7 +105,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         bottom: false,
         child: LayoutBuilder(
           builder: (context, constraints) {
-            final headerHeight = constraints.maxWidth * 0.36; // 响应式头部高度，贴近图示比例
+            final headerHeight = constraints.maxWidth * 0.36;
             return CustomScrollView(
               slivers: [
                 SliverAppBar(
@@ -98,7 +132,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // 背景：若有预览图则显示，否则展示设计接近的青绿渐变
         Container(
           height: headerHeight,
           decoration: BoxDecoration(
@@ -110,12 +143,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
             image: _backdropPreview == null
                 ? null
                 : DecorationImage(
-                    image: MemoryImage(_backdropPreview!),
-                    fit: BoxFit.cover,
-                  ),
+              image: MemoryImage(_backdropPreview!),
+              fit: BoxFit.cover,
+            ),
           ),
         ),
-        // 左上角返回 icon（半透明背景）
         Positioned(
           top: Spacing.sm,
           left: Spacing.sm,
@@ -124,7 +156,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
             onPressed: () => context.pop(),
           ),
         ),
-        // 右上角替换封面 icon（半透明背景）
         Positioned(
           top: Spacing.sm,
           right: Spacing.sm,
@@ -133,7 +164,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
             onPressed: _uploadingBackdrop ? null : _onChangeBackdrop,
           ),
         ),
-        // 底部居中：头像与完成度条
         Positioned.fill(
           child: Align(
             alignment: Alignment.bottomCenter,
@@ -158,29 +188,93 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Widget _buildAvatarButton(ColorScheme cs) {
-    final double radius = 42; // 贴近图四比例
+    final double radius = 42;
     return Semantics(
       label: '更换头像',
-      child: InkWell(
-        onTap: _uploadingAvatar ? null : _showAvatarPickerSheet,
-        borderRadius: BorderRadius.circular(radius),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            CircleAvatar(
-              radius: radius,
-              backgroundColor: const Color(0xFF2BD2C4),
-              backgroundImage: _avatarPreview != null ? MemoryImage(_avatarPreview!) : null,
-            ),
-            Column(
-              mainAxisSize: MainAxisSize.min,
+      child: SizedBox( // 使用 SizedBox 提供明确的约束
+        width: radius * 2,
+        height: radius * 2,
+        child: InkWell(
+          onTap: _uploadingAvatar ? null : _showAvatarPickerSheet,
+          borderRadius: BorderRadius.circular(radius),
+          child: Container( // 添加 Container 提供明确的边界
+            width: radius * 2,
+            height: radius * 2,
+            child: Stack(
+              alignment: Alignment.center,
               children: [
-                Icon(_uploadingAvatar ? Icons.hourglass_bottom : Icons.camera_alt, color: Colors.white, size: 22),
-                const SizedBox(height: 4),
-                Text(_uploadingAvatar ? '上传中' : '更换头像', style: Theme.of(context).textTheme.labelSmall?.copyWith(color: Colors.white)),
+                // 头像显示：优先显示预览图，其次显示网络头像，最后显示默认图标
+                if (_avatarPreview != null)
+                  Container(
+                    width: radius * 2,
+                    height: radius * 2,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF2BD2C4),
+                      image: DecorationImage(
+                        image: MemoryImage(_avatarPreview!),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  )
+                else if (_avatarUrl != null && _avatarUrl!.isNotEmpty)
+                  Container(
+                    width: radius * 2,
+                    height: radius * 2,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: const Color(0xFF2BD2C4),
+                      image: DecorationImage(
+                        image: NetworkImage(_avatarUrl!),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                  )
+                else
+                  Container(
+                    width: radius * 2,
+                    height: radius * 2,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFF2BD2C4),
+                    ),
+                    child: Icon(
+                      Icons.person,
+                      color: Colors.white,
+                      size: 32,
+                    ),
+                  ),
+                // 覆盖层：相机图标和文字
+                Container(
+                  width: radius * 2,
+                  height: radius * 2,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.4),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        _uploadingAvatar ? Icons.hourglass_bottom : Icons.camera_alt,
+                        color: Colors.white,
+                        size: 22,
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        _uploadingAvatar ? '上传中' : '更换头像',
+                        style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                          color: Colors.white,
+                          fontSize: 10,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
             ),
-          ],
+          ),
         ),
       ),
     );
@@ -211,6 +305,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final titleStyle = Theme.of(context).textTheme.bodyMedium;
     final valueStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant);
     final highlightValueStyle = Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700);
+    final disabledValueStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface.withOpacity(0.5));
 
     return Container(
       decoration: const BoxDecoration(
@@ -219,7 +314,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
       ),
       child: Column(
         children: [
-          // 顶部提示行
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
             child: Row(
@@ -230,7 +324,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
               ],
             ),
           ),
-          _item(title: '名字', value: _nickname, titleStyle: titleStyle, valueStyle: highlightValueStyle, onTap: _onEditName),
+          // 名称 - 不可编辑
+          _item(
+            title: '名字',
+            value: _nickname,
+            titleStyle: titleStyle,
+            valueStyle: highlightValueStyle,
+            showArrow: false,
+            enabled: false,
+          ),
+          // 邮箱 - 不可编辑
+          _item(
+            title: '邮箱',
+            value: _email,
+            titleStyle: titleStyle,
+            valueStyle: disabledValueStyle,
+            showArrow: false,
+            enabled: false,
+          ),
+          // 可编辑字段
           _item(title: '简介', value: _bio, titleStyle: titleStyle, valueStyle: valueStyle, onTap: _onEditBio),
           _item(title: '性别', value: _genderText(), titleStyle: titleStyle, valueStyle: valueStyle, onTap: _onEditGender),
           _item(title: '生日', value: _birthdayText(), titleStyle: titleStyle, valueStyle: valueStyle, onTap: _onEditBirthday),
@@ -240,76 +352,96 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  Widget _item({required String title, required String value, TextStyle? titleStyle, TextStyle? valueStyle, VoidCallback? onTap}) {
+  Widget _item({
+    required String title,
+    required String value,
+    TextStyle? titleStyle,
+    TextStyle? valueStyle,
+    VoidCallback? onTap,
+    bool showArrow = true,
+    bool enabled = true,
+  }) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.md),
       child: InkWell(
-        onTap: onTap,
-        child: Row(
-          children: [
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(title, style: titleStyle),
-                  const SizedBox(height: 6),
-                  Text(value, style: valueStyle, textAlign: TextAlign.left),
-                ],
+        onTap: enabled ? onTap : null,
+        child: Opacity(
+          opacity: enabled ? 1.0 : 0.6,
+          child: Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(title, style: titleStyle),
+                    const SizedBox(height: 6),
+                    Text(value, style: valueStyle, textAlign: TextAlign.left),
+                  ],
+                ),
               ),
-            ),
-            const Icon(Icons.chevron_right),
-          ],
+              if (showArrow && enabled) const Icon(Icons.chevron_right),
+            ],
+          ),
         ),
       ),
     );
   }
 
-  String _nickNameFromBox() => Hive.box('user_box').get('nickname', defaultValue: '哒哒哒哒对对对');
-  String _bioFromBox() => Hive.box('user_box').get('bio', defaultValue: '介绍喜好、个性或@你的亲友');
-
-  // 文本编辑通用弹窗
-  // 废弃 BottomSheet 改为 Dialog 方案，避免布局异常
-
-  // 各字段编辑入口
-  Future<void> _onEditName() async {
-    final v = await EditTextDialog.show(context, title: '编辑名字', initial: _nickname, hint: '请输入2-20个字符', maxLength: 20);
-    if (v != null && v.isNotEmpty && v.length >= 2) {
-      setState(() => _nickname = v);
-      Hive.box('user_box').put('nickname', v);
-      context.read<ProfileProvider>().debounceUpdateInfo(username: v);
-      _recalcCompletion();
-    } else if (v != null) {
-      _showError('名字长度需≥2');
-    }
-  }
-
-  Future<void> _onEditBio() async {
-    final v = await EditTextDialog.show(context, title: '编辑简介', initial: _bio, hint: '一句话介绍自己', maxLines: 3, maxLength: 80);
-    if (v != null) {
-      setState(() => _bio = v);
-      Hive.box('user_box').put('bio', v);
-      context.read<ProfileProvider>().debounceUpdateInfo(signature: v);
-      _recalcCompletion();
-    }
-  }
-
   String _genderText() {
     switch (_gender) {
-      case 0:
+      case Gender.male:
         return '男';
-      case 1:
+      case Gender.female:
         return '女';
+      case Gender.unknown:
       default:
         return '选择性别，表达自我';
     }
   }
 
   Future<void> _onEditGender() async {
-    final v = await GenderSelectDialog.show(context, value: _gender);
-    setState(() => _gender = v);
-    Hive.box('user_box').put('gender', v);
+    // 将当前 Gender 枚举转换为编辑对话框需要的 int? 格式
+    int? currentValue = switch (_gender) {
+      Gender.male => 1,
+      Gender.female => 2,
+      Gender.unknown => 3,
+    };
+
+    print('🔍 编辑性别 - 当前值: $_gender, 转换为: $currentValue');
+
+    final v = await GenderSelectDialog.show(context, value: currentValue);
+    print('🔍 编辑性别 - 对话框返回值: $v');
+
+    // 如果用户取消选择，直接返回
+    if (v == null) {
+      print('⚠️ 编辑性别 - 用户取消了选择');
+      return;
+    }
+
+    // 将返回的 int 转换回 Gender 枚举
+    Gender newGender = switch (v) {
+      1 => Gender.male,
+      2 => Gender.female,
+      _ => Gender.unknown,
+    };
+
+    print('🔍 编辑性别 - 转换后的新值: $newGender');
+
+    setState(() {
+      _gender = newGender;
+    });
+
+    // 保存到 Hive
+    final box = Hive.box('user_box');
+    await box.put('gender', v); // 直接使用对话框返回的值
+
+    print('💾 编辑性别 - 保存到Hive: $v');
+
+    // 更新到服务器
     context.read<ProfileProvider>().debounceUpdateInfo(gender: v);
+
     _recalcCompletion();
+    print('✅ 编辑性别 - 更新完成');
   }
 
   String _birthdayText() {
@@ -334,15 +466,30 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
-
+  Future<void> _onEditBio() async {
+    final v = await EditTextDialog.show(context, title: '编辑简介', initial: _bio, hint: '一句话介绍自己', maxLines: 3, maxLength: 80);
+    if (v != null) {
+      setState(() => _bio = v);
+      Hive.box('user_box').put('bio', v);
+      context.read<ProfileProvider>().debounceUpdateInfo(signature: v);
+      _recalcCompletion();
+    }
+  }
 
   void _recalcCompletion() {
-    int score = 40;
-    if (_nickname.isNotEmpty) score += 10;
-    if (_bio.isNotEmpty) score += 10;
-    if (_gender != null) score += 10;
-    if (_birthday != null) score += 10;
-    // 已移除：所在地对完成度的加分
+    int score = 40; // 初始完成度
+    // 简介非默认值：增加20分
+    if (_bio.isNotEmpty && _bio != '介绍喜好、个性或@你的亲友') {
+      score += 20;
+    }
+    // 性别非默认值（非null）：增加20分
+    if (_gender != Gender.unknown) {
+      score += 20;
+    }
+    // 生日非默认值（非null）：增加20分
+    if (_birthday != null) {
+      score += 20;
+    }
     _completion = score.clamp(0, 100);
     setState(() {});
   }
@@ -428,12 +575,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
       if (xFile == null) return;
       final bytes = await xFile.readAsBytes();
 
-      // 按照头部区域比例裁剪：以设备当前宽高比为准，近似 16:9~21:9 的横幅
       final size = MediaQuery.of(context).size;
-      final aspect = size.width / 200.0; // headerHeight = 200，对应横幅比例
+      final aspect = size.width / 200.0;
       final cropped = await _cropBytes(bytes, aspectRatio: aspect.clamp(2.0, 4.0));
       if (cropped == null) return;
-      // 为避免大图占用内存，限制最大宽高，保持比例
       final preview = ImageUtils.resizeContainToJpeg(cropped, maxWidth: 1920, maxHeight: 1080);
       setState(() => _backdropPreview = preview);
       await _uploadBackdrop(preview);
@@ -486,8 +631,20 @@ class _EditProfilePageState extends State<EditProfilePage> {
       final fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final mf = MultipartFile.fromBytes(bytes, filename: fileName);
       await _userApi.uploadAvatar(userId: _userId, avatarData: mf);
-      // 更新本地缓存，立即显示
+      // 更新本地缓存
       Hive.box('user_box').put('avatar', bytes);
+
+      // 刷新 ProfileProvider 以获取新的头像URL
+      await context.read<ProfileProvider>().load(userId: _userId);
+
+      // 更新本地状态
+      final updatedUser = context.read<ProfileProvider>().user;
+      if (updatedUser != null) {
+        setState(() {
+          _avatarUrl = updatedUser.avatarUrl;
+        });
+      }
+
       _showToast('头像已更新');
     } catch (e) {
       _showError('头像上传失败：$e');
@@ -503,6 +660,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
       final mf = MultipartFile.fromBytes(bytes, filename: fileName);
       await _userApi.uploadProfileBackground(userId: _userId, backgroundData: mf);
       Hive.box('user_box').put('backdrop', bytes);
+
+      // 刷新 ProfileProvider 以获取新的背景URL
+      await context.read<ProfileProvider>().load(userId: _userId);
+
       _showToast('封面已更新');
     } catch (e) {
       _showError('封面上传失败：$e');

@@ -61,4 +61,20 @@ class UserService {
       'new_password': newPassword,
     });
   }
+
+  /// 获取关注列表
+  Future<Response> getFollowings({required String userId}) {
+    return dio.get('/social/friend/requests', queryParameters: {
+      'user_id': userId,
+      'type': 0, // type=0 查找我的关注
+    });
+  }
+
+  /// 获取粉丝列表
+  Future<Response> getFollowers({required String userId}) {
+    return dio.get('/social/friend/requests', queryParameters: {
+      'user_id': userId,
+      'type': 1, // type=1 查找我的粉丝
+    });
+  }
 }

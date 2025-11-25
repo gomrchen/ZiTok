@@ -1,3 +1,5 @@
+import '../utils/url_utils.dart';
+
 /// 用户性别枚举
 enum Gender { male, female, unknown }
 
@@ -71,39 +73,39 @@ class User {
       genderParsed = g == 1
           ? Gender.male
           : g == 2
-<<<<<<< HEAD
           ? Gender.female
           : Gender.unknown;
-=======
-              ? Gender.female
-              : Gender.unknown;
->>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
     } else {
       final g = rawGender.toString();
       genderParsed = g == 'male'
           ? Gender.male
           : g == 'female'
-<<<<<<< HEAD
           ? Gender.female
           : Gender.unknown;
-=======
-              ? Gender.female
-              : Gender.unknown;
->>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
     }
 
+
     // 后端字段兼容：avatar/avatar_url，backgroundUrl/background_url/profile_background_image_url，bio/signature
-    final String? avatar = (j['avatar'] ?? j['avatar_url']) as String?;
-    final String? background = (j['backgroundUrl'] ?? j['background_url'] ?? j['profile_background_image_url']) as String?;
+    String? avatar = (j['avatar'] ?? j['avatar_url']) as String?;
+    String? background = (j['backgroundUrl'] ?? j['background_url'] ?? j['profile_background_image_url']) as String?;
+
+
+    if (avatar != null && avatar.isNotEmpty) {
+      avatar = UrlUtils.resolveStorageUrl(avatar, defaultDir: 'avatars');
+      print('🔄 转换头像URL为: $avatar');
+    }
+
+    if (background != null && background.isNotEmpty) {
+      background = UrlUtils.resolveStorageUrl(background, defaultDir: 'covers');
+      print('🔄 转换背景URL为: $background');
+    }
+
+
     final String? signature = j['signature'] as String?;
-    final String? bio = (j['bio'] as String?) ?? signature;
+    final String? bio = (j['signature'] as String?) ?? signature;
 
     return User(
-<<<<<<< HEAD
       id: (j['user_id'] ?? '').toString(),
-=======
-      id: (j['id'] ?? '').toString(),
->>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
       username: (j['username'] ?? '').toString(),
       email: j['email'] as String?,
       avatarUrl: avatar,
@@ -119,7 +121,6 @@ class User {
   }
 
   Map<String, dynamic> toJson() => {
-<<<<<<< HEAD
     'id': id,
     'username': username,
     if (email != null) 'email': email,
@@ -134,22 +135,6 @@ class User {
     if (updatedAt != null) 'updated_at': updatedAt,
     if (deletedAt != null) 'deleted_at': deletedAt,
   };
-=======
-        'id': id,
-        'username': username,
-        if (email != null) 'email': email,
-        if (avatarUrl != null) 'avatar_url': avatarUrl,
-        if (profileBackgroundImageUrl != null) 'profile_background_image_url': profileBackgroundImageUrl,
-        if (name != null) 'name': name,
-        if (bio != null) 'bio': bio,
-        // 默认序列化为字符串协议，仓库会在更新时转换为数值协议（1/2/0）
-        'gender': switch (gender) { Gender.male => 'male', Gender.female => 'female', _ => 'unknown' },
-        if (birthday != null) 'birthday': birthday,
-        if (createdAt != null) 'created_at': createdAt,
-        if (updatedAt != null) 'updated_at': updatedAt,
-        if (deletedAt != null) 'deleted_at': deletedAt,
-      };
->>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
 
 }
 
@@ -188,16 +173,12 @@ class BaseStatus {
   final int code;
   final String msg;
   const BaseStatus({required this.code, required this.msg});
-<<<<<<< HEAD
   factory BaseStatus.fromJson(Map<String, dynamic> j) => BaseStatus(
     code: (j['code'] is int)
         ? j['code'] as int
         : int.tryParse(j['code']?.toString() ?? '0') ?? 0,
     msg: (j['message'] ?? j['msg'] ?? '').toString(),
   );
-=======
-  factory BaseStatus.fromJson(Map<String, dynamic> j) => BaseStatus(code: (j['code'] ?? 0) as int, msg: (j['msg'] ?? '').toString());
->>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
 }
 
 /// 用户响应（包含基础状态与用户数据）
@@ -206,13 +187,7 @@ class UserResponse {
   final User data;
   const UserResponse({required this.base, required this.data});
   factory UserResponse.fromJson(Map<String, dynamic> j) => UserResponse(
-<<<<<<< HEAD
     base: BaseStatus.fromJson(j),
     data: User.fromJson(j['data'] as Map<String, dynamic>),
   );
-=======
-        base: BaseStatus.fromJson(j['base'] as Map<String, dynamic>),
-        data: User.fromJson(j['data'] as Map<String, dynamic>),
-      );
->>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
 }

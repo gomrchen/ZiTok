@@ -62,13 +62,31 @@ class GenderSelectDialog extends StatelessWidget {
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          RadioListTile<int>(title: const Text('男'), value: 0, groupValue: current, onChanged: (v) => Navigator.pop(context, v)),
-          RadioListTile<int>(title: const Text('女'), value: 1, groupValue: current, onChanged: (v) => Navigator.pop(context, v)),
-          RadioListTile<int>(title: const Text('不显示'), value: -1, groupValue: current ?? -1, onChanged: (v) => Navigator.pop(context, null)),
+          RadioListTile<int>(
+              title: const Text('男'),
+              value: 1, // 改为1
+              groupValue: current,
+              onChanged: (v) => Navigator.pop(context, v)
+          ),
+          RadioListTile<int>(
+              title: const Text('女'),
+              value: 2, // 改为2
+              groupValue: current,
+              onChanged: (v) => Navigator.pop(context, v)
+          ),
+          RadioListTile<int>(
+              title: const Text('不显示'),
+              value: 3,
+              groupValue: current ?? 0,
+              onChanged: (v) => Navigator.pop(context, v) // 直接返回v，不是null
+          ),
         ],
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
+        TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消')
+        ),
       ],
     );
   }

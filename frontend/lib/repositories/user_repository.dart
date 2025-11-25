@@ -7,7 +7,6 @@ class UserRepository {
   const UserRepository({required this.api});
 
   Future<User> info({String? userId}) async {
-<<<<<<< HEAD
     try {
       print('🔍 UserRepository.info: 开始获取用户信息，userId: $userId');
 
@@ -83,37 +82,83 @@ class UserRepository {
     } catch (e) {
       print('❌ UserRepository.updateInfo 错误: $e');
       rethrow;
-=======
-    final resp = await api.info(userId: userId);
-    final body = resp.data as Map<String, dynamic>? ?? {};
-    final base = body['base'] as Map<String, dynamic>? ?? {};
-    final topCode = body['code'];
-    final code = (base['code'] is int
-        ? base['code'] as int
-        : topCode is int
-            ? topCode
-            : int.tryParse('${topCode}') ?? 0);
-    if (code != 10000 && code != 200) {
-      throw Exception((base['msg'] ?? body['message'] ?? '获取用户信息失败').toString());
     }
-    final rawData = body['data'];
-    final raw = (rawData is Map<String, dynamic>) ? rawData : body;
-    return User.fromJson(raw);
   }
 
-  Future<void> updateInfo(UserUpdateRequest req) async {
-    final resp = await api.updateInfo(req);
-    final body = resp.data as Map<String, dynamic>? ?? {};
-    final base = body['base'] as Map<String, dynamic>? ?? {};
-    final topCode = body['code'];
-    final code = (base['code'] is int
-        ? base['code'] as int
-        : topCode is int
-            ? topCode
-            : int.tryParse('${topCode}') ?? 0);
-    if (code != 10000 && code != 200) {
-      throw Exception((base['msg'] ?? body['message'] ?? '更新用户信息失败').toString());
->>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d
+
+  Future<int> getFollowingsCount({required String userId}) async {
+    try {
+      print('🔍 UserRepository.getFollowingsCount: 开始获取关注数量，userId: $userId');
+
+      final resp = await api.getFollowings(userId: userId);
+      final body = resp.data as Map<String, dynamic>? ?? {};
+
+      print('📦 UserRepository.getFollowingsCount: 原始响应: $body');
+
+      // 解析响应码
+      final code = body['code'];
+      final int statusCode;
+      if (code is int) {
+        statusCode = code;
+      } else if (code is String) {
+        statusCode = int.tryParse(code) ?? 0;
+      } else {
+        statusCode = 0;
+      }
+
+      // 检查响应状态
+      if (statusCode != 10000 && statusCode != 200) {
+        final errorMsg = body['message'] ?? '获取关注数量失败';
+        throw Exception(errorMsg.toString());
+      }
+
+      // 解析数据列表 - 根据你提供的响应格式
+      final data = body['data'] as List<dynamic>?;
+      final count = data?.length ?? 0;
+
+      print('✅ UserRepository.getFollowingsCount: 获取到关注数量: $count');
+      return count;
+    } catch (e) {
+      print('❌ UserRepository.getFollowingsCount 错误: $e');
+      rethrow;
+    }
+  }
+
+  Future<int> getFollowersCount({required String userId}) async {
+    try {
+      print('🔍 UserRepository.getFollowersCount: 开始获取粉丝数量，userId: $userId');
+
+      final resp = await api.getFollowers(userId: userId);
+      final body = resp.data as Map<String, dynamic>? ?? {};
+
+      print('📦 UserRepository.getFollowersCount: 原始响应: $body');
+
+      // 解析响应码
+      final code = body['code'];
+      final int statusCode;
+      if (code is int) {
+        statusCode = code;
+      } else if (code is String) {
+        statusCode = int.tryParse(code) ?? 0;
+      } else {
+        statusCode = 0;
+      }
+
+      // 检查响应状态
+      if (statusCode != 10000 && statusCode != 200) {
+        final errorMsg = body['message'] ?? '获取粉丝数量失败';
+        throw Exception(errorMsg.toString());
+      }
+
+      // 解析数据列表 - 根据你提供的响应格式
+      final data = body['data'] as List<dynamic>?;
+      final count = data?.length ?? 0;
+
+      print('✅ UserRepository.getFollowersCount: 获取到粉丝数量: $count');
+      return count;
+    } catch (e) {
+      print('❌ UserRepository.getFollowersCount 错误: $e');
+      rethrow;
     }
   }
 }
