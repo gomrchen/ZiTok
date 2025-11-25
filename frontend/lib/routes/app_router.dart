@@ -27,7 +27,7 @@ class AppRouter {
   static GoRouter buildRouter(AuthProvider auth) {
     return GoRouter(
       initialLocation: '/welcome',
-      refreshListenable: auth,
+      refreshListenable: null,
       routes: [
         GoRoute(
           path: '/welcome',
