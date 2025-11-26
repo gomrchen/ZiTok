@@ -96,7 +96,7 @@ class User {
     }
 
     if (background != null && background.isNotEmpty) {
-      background = UrlUtils.resolveStorageUrl(background, defaultDir: 'covers');
+      background = UrlUtils.resolveStorageUrl(background, defaultDir: 'avatars');
       print('🔄 转换背景URL为: $background');
     }
 

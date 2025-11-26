@@ -86,6 +86,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
         if (cachedAvatar != null) {
           _avatarPreview = cachedAvatar;
         }
+
+        final cachedBackdrop = box.get('backdrop') as Uint8List?;
+        if (cachedBackdrop != null) {
+          _backdropPreview = cachedBackdrop;
+        }
+
       });
       _recalcCompletion();
     }
@@ -127,27 +133,23 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-  // 顶部头部（封面 + 头像）
+// 顶部头部（封面 + 头像）
   Widget _buildHeader(BuildContext context, double headerHeight, ColorScheme cs) {
+    // 检查是否有背景图URL
+    final profileProvider = context.read<ProfileProvider>();
+    final user = profileProvider.user;
+    final String? backdropUrl = user?.profileBackgroundImageUrl;
+
+    print('🖼️ 编辑页面背景图检查:');
+    print('   - _backdropPreview: ${_backdropPreview != null ? "有预览" : "无预览"}');
+    print('   - backdropUrl: $backdropUrl');
+    print('   - backdropUrl 是否有效: ${backdropUrl != null && backdropUrl.isNotEmpty && backdropUrl != "null"}');
+
     return Stack(
       fit: StackFit.expand,
       children: [
-        Container(
-          height: headerHeight,
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [Color(0xFF2ED3BE), Color(0xFF1AAE9A)],
-            ),
-            image: _backdropPreview == null
-                ? null
-                : DecorationImage(
-              image: MemoryImage(_backdropPreview!),
-              fit: BoxFit.cover,
-            ),
-          ),
-        ),
+        // 背景容器 - 支持预览图和网络图
+        _buildHeaderBackground(headerHeight, backdropUrl),
         Positioned(
           top: Spacing.sm,
           left: Spacing.sm,
@@ -186,6 +188,49 @@ class _EditProfilePageState extends State<EditProfilePage> {
       ],
     );
   }
+
+// 重构头部背景构建方法
+  Widget _buildHeaderBackground(double headerHeight, String? backdropUrl) {
+    return Container(
+      height: headerHeight,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF2ED3BE), Color(0xFF1AAE9A)],
+        ),
+        image: _buildBackgroundImage(backdropUrl),
+      ),
+    );
+  }
+
+// 构建背景图片
+  DecorationImage? _buildBackgroundImage(String? backdropUrl) {
+    // 优先显示预览图
+    if (_backdropPreview != null) {
+      print('🎨 使用预览背景图');
+      return DecorationImage(
+        image: MemoryImage(_backdropPreview!),
+        fit: BoxFit.cover,
+      );
+    }
+
+    // 其次显示网络背景图
+    if (backdropUrl != null && backdropUrl.isNotEmpty && backdropUrl != 'null') {
+      print('🎨 使用网络背景图: $backdropUrl');
+      return DecorationImage(
+        image: NetworkImage(backdropUrl),
+        fit: BoxFit.cover,
+        onError: (exception, stackTrace) {
+          print('❌ 网络背景图加载失败: $exception');
+        },
+      );
+    }
+
+    print('🎨 没有背景图，使用默认渐变');
+    return null;
+  }
+
 
   Widget _buildAvatarButton(ColorScheme cs) {
     final double radius = 42;
@@ -553,33 +598,71 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<void> _onPickAvatar(ImageSource source) async {
     try {
+      print('🚀 开始选择头像，来源: $source');
       final xFile = await _picker.pickImage(source: source, maxWidth: 1200, maxHeight: 1200, imageQuality: 95);
-      if (xFile == null) return;
+      if (xFile == null) {
+        print('❌ 用户取消了头像选择');
+        return;
+      }
+
+      print('✅ 获取到图片文件，开始读取字节');
       final bytes = await xFile.readAsBytes();
+      print('📊 原始图片大小: ${bytes.length} bytes');
 
       // 裁剪为 1:1
+      print('✂️ 开始裁剪图片');
       final cropped = await _cropBytes(bytes, aspectRatio: 1.0);
-      if (cropped == null) return;
+      if (cropped == null) {
+        print('❌ 用户取消了裁剪');
+        return;
+      }
+      print('📊 裁剪后图片大小: ${cropped.length} bytes');
+
       // 压缩到 200x200
+      print('📐 开始压缩图片');
       final compressed = ImageUtils.resizeToJpeg(cropped, width: 200, height: 200);
+      print('📊 压缩后图片大小: ${compressed.length} bytes');
+
+      print('🎨 更新预览状态');
       setState(() => _avatarPreview = compressed);
+
+      print('⬆️ 开始上传头像');
       await _uploadAvatar(compressed);
-    } catch (e) {
-      _showError('选择头像失败：$e');
+      print('✅ 头像处理流程完成');
+
+    } catch (e, stackTrace) {
+      print('❌ 选择头像失败：$e');
+      print('📋 堆栈跟踪：$stackTrace');
+      if (mounted) {
+        _showError('选择头像失败：$e');
+      }
     }
   }
 
+// 在 edit_profile_page.dart 中修改 _onChangeBackdrop 方法
   Future<void> _onChangeBackdrop() async {
     try {
       final xFile = await _picker.pickImage(source: ImageSource.gallery, maxWidth: 2400, maxHeight: 2400, imageQuality: 95);
       if (xFile == null) return;
       final bytes = await xFile.readAsBytes();
 
-      final size = MediaQuery.of(context).size;
-      final aspect = size.width / 200.0;
-      final cropped = await _cropBytes(bytes, aspectRatio: aspect.clamp(2.0, 4.0));
+      // 获取个人页面头部高度和最大宽度
+      final profileHeaderHeight = 176.0; // 与 profile_page.dart 中的 headerHeight 一致
+      final profileMaxWidth = 520.0; // 与 profile_page.dart 中的 maxW 一致
+
+      // 计算个人页面背景图的宽高比（水平填充）
+      final aspectRatio = profileMaxWidth / profileHeaderHeight;
+
+      print('🎯 背景图裁剪参数:');
+      print('   - 个人页面头部高度: $profileHeaderHeight');
+      print('   - 个人页面最大宽度: $profileMaxWidth');
+      print('   - 计算宽高比: $aspectRatio');
+
+      final cropped = await _cropBytes(bytes, aspectRatio: aspectRatio);
       if (cropped == null) return;
-      final preview = ImageUtils.resizeContainToJpeg(cropped, maxWidth: 1920, maxHeight: 1080);
+
+      // 压缩到个人页面显示尺寸
+      final preview = ImageUtils.resizeContainToJpeg(cropped, maxWidth: profileMaxWidth.toInt(), maxHeight: profileHeaderHeight.toInt());
       setState(() => _backdropPreview = preview);
       await _uploadBackdrop(preview);
     } catch (e) {
@@ -587,38 +670,61 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
+// 修改 _cropBytes 方法中的界面高度计算
   Future<Uint8List?> _cropBytes(Uint8List bytes, {required double aspectRatio}) async {
-    return showModalBottomSheet<Uint8List>(
+    return showDialog<Uint8List>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Theme.of(context).colorScheme.surface,
+      barrierColor: Colors.black87,
       builder: (ctx) {
-        Uint8List? result;
-        return SafeArea(
-          child: Column(
-            children: [
-              Expanded(
-                child: Crop(
-                  image: bytes,
-                  controller: _cropController,
-                  aspectRatio: aspectRatio,
-                  onCropped: (data) {
-                    result = data;
-                    Navigator.pop(ctx, result);
-                  },
-                ),
+        final screenWidth = MediaQuery.of(context).size.width;
+        // 根据宽高比计算裁剪界面的高度
+        final cropHeight = screenWidth / aspectRatio;
+
+        return Dialog(
+          backgroundColor: Colors.transparent,
+          insetPadding: EdgeInsets.zero,
+          child: Container(
+            width: screenWidth,
+            height: cropHeight + 56, // 加上标题栏高度
+            color: Colors.black,
+            child: SafeArea(
+              child: Column(
+                children: [
+                  // 标题栏
+                  Container(
+                    height: 56,
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, null),
+                          child: const Text('取消', style: TextStyle(color: Colors.white)),
+                        ),
+                        const Text('裁剪图片', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                        TextButton(
+                          onPressed: () => _cropController.crop(),
+                          child: const Text('完成', style: TextStyle(color: Colors.blue)),
+                        ),
+                      ],
+                    ),
+                  ),
+                  // 裁剪区域 - 使用计算的高度
+                  Container(
+                    width: screenWidth,
+                    height: cropHeight,
+                    child: Crop(
+                      image: bytes,
+                      controller: _cropController,
+                      aspectRatio: aspectRatio,
+                      onCropped: (data) {
+                        Navigator.pop(ctx, data);
+                      },
+                    ),
+                  ),
+                ],
               ),
-              Padding(
-                padding: const EdgeInsets.all(Spacing.md),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    OutlinedButton(onPressed: () => Navigator.pop(ctx, null), child: const Text('取消')),
-                    FilledButton(onPressed: () => _cropController.crop(), child: const Text('完成裁剪')),
-                  ],
-                ),
-              ),
-            ],
+            ),
           ),
         );
       },
@@ -631,23 +737,25 @@ class _EditProfilePageState extends State<EditProfilePage> {
       final fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final mf = MultipartFile.fromBytes(bytes, filename: fileName);
       await _userApi.uploadAvatar(userId: _userId, avatarData: mf);
+
       // 更新本地缓存
       Hive.box('user_box').put('avatar', bytes);
 
-      // 刷新 ProfileProvider 以获取新的头像URL
+      // 刷新 ProfileProvider - 这里可能触发父组件的重建
       await context.read<ProfileProvider>().load(userId: _userId);
 
-      // 更新本地状态
-      final updatedUser = context.read<ProfileProvider>().user;
-      if (updatedUser != null) {
+      // 这里可能已经不在 mounted 状态
+      if (mounted) {
         setState(() {
-          _avatarUrl = updatedUser.avatarUrl;
+          _avatarUrl = context.read<ProfileProvider>().user?.avatarUrl;
         });
       }
 
       _showToast('头像已更新');
     } catch (e) {
-      _showError('头像上传失败：$e');
+      if (mounted) {
+        _showError('头像上传失败：$e');
+      }
     } finally {
       if (mounted) setState(() => _uploadingAvatar = false);
     }
@@ -659,6 +767,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
       final fileName = 'cover_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final mf = MultipartFile.fromBytes(bytes, filename: fileName);
       await _userApi.uploadProfileBackground(userId: _userId, backgroundData: mf);
+
+      // 更新本地缓存
       Hive.box('user_box').put('backdrop', bytes);
 
       // 刷新 ProfileProvider 以获取新的背景URL

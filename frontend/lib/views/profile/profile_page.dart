@@ -51,6 +51,8 @@ class _ProfilePageState extends State<ProfilePage> {
     print('   - avatarUrl: ${user?.avatarUrl ?? "null"}');
     print('   - bio: ${user?.bio ?? "null"}');
     print('   - profileBackgroundImageUrl: ${user?.profileBackgroundImageUrl ?? "null"}');
+    print('   - profileBackgroundImageUrl 类型: ${user?.profileBackgroundImageUrl.runtimeType}');
+    print('   - profileBackgroundImageUrl 长度: ${user?.profileBackgroundImageUrl?.length ?? 0}');
     print('   - _initialLoadComplete: $_initialLoadComplete');
     print('   - profile.loading: ${profile.loading}');
 
@@ -240,6 +242,12 @@ class _ProfileHeader extends StatelessWidget {
     const double headerHeight = 176;
     const double avatarRadius = 36;
 
+    // 添加背景图调试信息
+    print('🖼️ ProfileHeader 背景图信息:');
+    print('   - backgroundUrl: $backgroundUrl');
+    print('   - backgroundUrl 是否为空: ${backgroundUrl == null}');
+    print('   - backgroundUrl 是否为空字符串: ${backgroundUrl?.isEmpty ?? true}');
+
     return Semantics(
       label: '个人资料头部',
       child: Column(
@@ -247,25 +255,13 @@ class _ProfileHeader extends StatelessWidget {
         children: [
           Stack(
             children: [
+              // 背景容器 - 包含透明度渐变和横向缩放
+              _buildBackground(headerHeight, backgroundUrl),
+
+              // 内容层
               Container(
                 height: headerHeight,
                 width: double.infinity,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color(0xFF2BD2C4),
-                      Color(0xFFEFF9F7),
-                    ],
-                  ),
-                  image: backgroundUrl == null
-                      ? null
-                      : DecorationImage(
-                      image: NetworkImage(backgroundUrl!),
-                      fit: BoxFit.cover
-                  ),
-                ),
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
                   child: Align(
@@ -273,7 +269,7 @@ class _ProfileHeader extends StatelessWidget {
                     child: Row(
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
-                        // 头像部分 - 添加调试信息和错误处理
+                        // 头像部分
                         _buildAvatar(cs, avatarRadius),
                         const SizedBox(width: Spacing.md),
                         Expanded(
@@ -374,12 +370,66 @@ class _ProfileHeader extends StatelessWidget {
     );
   }
 
-  // 提取头像构建方法，添加调试和错误处理
-  Widget _buildAvatar(ColorScheme cs, double avatarRadius) {
-    print('🖼️ 头像URL: $avatarUrl'); // 调试信息
+  // 重构背景构建方法 - 添加上到下透明度渐变和横向缩放
+// 在 profile_page.dart 中确保 _buildBackground 方法使用正确的 fit
+  Widget _buildBackground(double headerHeight, String? backgroundUrl) {
+    print('🎨 构建背景 - URL: $backgroundUrl');
 
-    // 如果头像URL为空，显示默认图标
-    if (avatarUrl == null || avatarUrl!.isEmpty) {
+    // 如果有有效的背景图URL，显示网络图片
+    if (backgroundUrl != null && backgroundUrl.isNotEmpty && backgroundUrl != 'null') {
+      print('✅ 使用网络背景图: $backgroundUrl');
+      return SizedBox(
+        height: headerHeight,
+        width: double.infinity,
+        child: Stack(
+          children: [
+            // 背景图片 - 横向填充
+            Image.network(
+              backgroundUrl,
+              fit: BoxFit.fitWidth, // 确保使用 fitWidth 进行水平填充
+              width: double.infinity,
+              height: headerHeight,
+              errorBuilder: (context, error, stackTrace) {
+                print('❌ 背景图加载失败: $error');
+                return _buildGradientBackground(headerHeight);
+              },
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return _buildGradientBackground(headerHeight);
+              },
+            ),
+            // 渐变遮罩保持不变...
+          ],
+        ),
+      );
+    }
+
+    return _buildGradientBackground(headerHeight);
+  }
+
+  // 渐变背景构建方法
+  Widget _buildGradientBackground(double headerHeight) {
+    return Container(
+      height: headerHeight,
+      width: double.infinity,
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF2BD2C4),
+            Color(0xFFEFF9F7),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 头像构建方法
+  Widget _buildAvatar(ColorScheme cs, double avatarRadius) {
+    print('🖼️ 头像URL: $avatarUrl');
+
+    if (avatarUrl == null || avatarUrl!.isEmpty || avatarUrl == 'null') {
       print('⚠️ 头像URL为空，显示默认图标');
       return CircleAvatar(
         radius: avatarRadius,
@@ -392,12 +442,13 @@ class _ProfileHeader extends StatelessWidget {
       );
     }
 
-    // 如果有头像URL，显示网络图片
     return CircleAvatar(
       radius: avatarRadius,
       backgroundColor: const Color(0xFF2BD2C4),
       backgroundImage: NetworkImage(avatarUrl!),
-      // 添加错误处理，如果图片加载失败显示默认图标
+      onBackgroundImageError: (exception, stackTrace) {
+        print('❌ 头像图片加载失败: $exception');
+      },
       child: avatarUrl == null ? Icon(
           Icons.person,
           color: cs.onPrimary,

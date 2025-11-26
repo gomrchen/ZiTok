@@ -45,7 +45,7 @@ class UserService {
       'background_data': backgroundData,
       'user_id': userId,
     });
-    return dio.post('/user/profile/background', data: form);
+    return dio.post('/user/background', data: form);
   }
 
   /// 更新基本资料
