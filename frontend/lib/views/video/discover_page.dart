@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
+import '../../models/video.dart';
 import '../../providers/video_provider.dart';
 import '../../theme/theme_tokens.dart';
 import 'featured_page.dart';
@@ -110,15 +111,44 @@ class _RecommendFullScreen extends StatefulWidget {
 
 class _RecommendFullScreenState extends State<_RecommendFullScreen> {
   late final PageController _pageController;
+  List<dynamic> _items = [];
+  bool _loading = false;
+  bool _hasMore = true;
+  String? _error;
+  int _page = 1;
+
+  String _fmtLocal(int c) {
+    if (c >= 1000000) return '${(c / 1000000).toStringAsFixed(1)}M';
+    if (c >= 1000) return '${(c / 1000).toStringAsFixed(1)}k';
+    return '$c';
+  }
+
+  Future<void> _fetch({bool refresh = false}) async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    if (refresh) {
+      _page = 1;
+      _items = [];
+      _hasMore = true;
+      _error = null;
+    }
+    try {
+      final repo = context.read<VideoProvider>().repo;
+      final res = await repo.fetchDiscover(VideoQuery(page: _page, pageSize: 10));
+      _items.addAll(res.items);
+      _hasMore = res.hasMore;
+      _page += 1;
+    } catch (e) {
+      _error = e.toString();
+    } finally {
+      setState(() => _loading = false);
+    }
+  }
   @override
   void initState() {
     super.initState();
-    print("vdieosssssss:");
-
-    for (final v in widget.videos) {
-      print(v.videoUrl);
-    }
     _pageController = PageController();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _fetch(refresh: true));
   }
 
   @override
@@ -129,20 +159,27 @@ class _RecommendFullScreenState extends State<_RecommendFullScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (widget.videos.isEmpty) {
+    if (_loading && _items.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_error != null && _items.isEmpty) {
+      return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('推荐加载失败'), const SizedBox(height: 8), ElevatedButton(onPressed: () => _fetch(refresh: true), child: const Text('重试'))]));
+    }
+    if (_items.isEmpty) {
       return Center(
-        child: widget.isLoading
-            ? Column(mainAxisSize: MainAxisSize.min, children: const [CircularProgressIndicator(), SizedBox(height: 12), Text('正在加载推荐流...')])
-            : Column(mainAxisSize: MainAxisSize.min, children: [const Text('暂无推荐内容'), const SizedBox(height: 8), ElevatedButton(onPressed: widget.onRetry, child: const Text('重新加载'))]),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('暂无推荐内容'), const SizedBox(height: 8), ElevatedButton(onPressed: () => _fetch(refresh: true), child: const Text('重新加载'))]),
       );
     }
     return PageView.builder(
       scrollDirection: Axis.vertical,
       controller: _pageController,
-      itemCount: widget.videos.length,
-      onPageChanged: widget.onIndexChanged,
+      itemCount: _items.length,
+      onPageChanged: (i) {
+        widget.onIndexChanged(i);
+        if (_hasMore && i >= _items.length - 2) _fetch();
+      },
       itemBuilder: (context, i) {
-        final v = widget.videos[i];
+        final v = _items[i];
         return _FullScreenVideoItem(video: v);
       },
     );
@@ -160,6 +197,11 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
   late VideoPlayerController _controller;
   bool _initialized = false;
   String? _error;
+  String _fmtLocal(int c) {
+    if (c >= 1000000) return '${(c / 1000000).toStringAsFixed(1)}M';
+    if (c >= 1000) return '${(c / 1000).toStringAsFixed(1)}k';
+    return '$c';
+  }
   // 顶部栏：菜单展开占位
   void _onMenu() {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('菜单功能待接入'), duration: Duration(milliseconds: 1200)));
@@ -293,7 +335,7 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
               const SizedBox(height: Spacing.md),
               _ActionIcon(icon: Icons.chat_bubble_outline, label: '1.2k', onTap: () {
                 // 打开评论弹窗
-                showCommentsSheet(context, videoId: 'v_2');//widget.video.id);
+                showCommentsSheet(context, videoId: 'v_2');
               }),
               const SizedBox(height: Spacing.md),
               _ActionIcon(icon: Icons.share_outlined, label: '4.6k', onTap: _onShare),
@@ -312,9 +354,9 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
             children: [
               Text('@${widget.video.uid ?? '未知作者'}', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white)),
               const SizedBox(height: 8),
-              Text('Video description here. #hashtag #anothertag', style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70)),
+              Text('${widget.video.intro ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70)),
               const SizedBox(height: 8),
-              Text('Original Audio · song name', style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70)),
+              Text('点赞 ${_fmtLocal(widget.video.likes ?? 0)} · 收藏 ${_fmtLocal(widget.video.stars ?? 0)}', style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70)),
             ],
           ),
         ),

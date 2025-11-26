@@ -3,14 +3,16 @@ import '../models/video.dart';
 import '../services/video_service.dart';
 import '../services/cache.dart';
 import '../utils/url_utils.dart';
+import '../providers/auth_provider.dart';
 
 class VideoRepository {
   final VideoService api;
   final CacheManager cache;
-  const VideoRepository({required this.api, required this.cache});
+  final String? Function()? getUserId;
+  const VideoRepository({required this.api, required this.cache, this.getUserId});
 
   Future<PagedResult<Video>> fetchDiscover(VideoQuery query) async {
-    final resp = await api.list(page: query.page, size: query.pageSize);
+    final resp = await api.list(userId: getUserId?.call(), page: query.page, size: query.pageSize);
     final root = resp.data as Map<String, dynamic>? ?? {};
     List<dynamic> raw = [];
     if (root['data'] is List) {
@@ -73,7 +75,7 @@ class VideoRepository {
   }
 
   Future<PagedResult<Video>> fetchFollow(VideoQuery query) async {
-    final resp = await api.list(page: query.page, size: query.pageSize);
+    final resp = await api.list(userId: getUserId?.call(), page: query.page, size: query.pageSize);
     final root = resp.data as Map<String, dynamic>? ?? {};
     List<dynamic> raw = [];
     if (root['data'] is List) {

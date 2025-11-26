@@ -1,5 +1,7 @@
 import 'package:dio/dio.dart';
 
+
+
 class VideoService {
   final Dio dio;
   VideoService(this.dio);
@@ -23,8 +25,7 @@ class VideoService {
   }
 
   Future<Response> detail({required String videoId, int page = 1, int size = 10}) {
-    return dio.get('/video/1', queryParameters: {
-      'video_id': videoId,
+    return dio.get('/video/$videoId', queryParameters: {
       'page': page,
       'size': size,
     });

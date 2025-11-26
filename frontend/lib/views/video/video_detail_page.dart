@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../../providers/video_provider.dart';
-import '../../models/video.dart';
 import '../../widgets/advanced_video_player.dart';
+import '../../models/video.dart';
 import 'widgets/video_detail_content.dart';
 import 'package:go_router/go_router.dart';
 
@@ -20,12 +20,10 @@ class VideoDetailPage extends StatelessWidget {
         orElse: () => const Video(id: ''),
       ),
     );
-    // 上下分区：上半视频播放器 + 下半内容滚动区
     return Scaffold(
-      appBar: null, // 移除顶部标题行
+      appBar: null,
       body: Column(
         children: [
-          // 上半：高级视频播放器，宽度自适应
           Padding(
             padding: const EdgeInsets.only(top: 0),
             child: AdvancedVideoPlayer(
@@ -36,22 +34,16 @@ class VideoDetailPage extends StatelessWidget {
               autoPlay: true,
               looping: false,
               onBack: () {
-                debugPrint('VideoDetailPage: onBack pressed');
                 if (Navigator.of(context).canPop()) {
-                  debugPrint('VideoDetailPage: Navigator.pop');
                   Navigator.of(context).pop();
                 } else {
-                  debugPrint('VideoDetailPage: fallback go(/home)');
                   context.go('/home');
                 }
               },
               onInitialized: () => context.read<VideoProvider>().visit(video.id),
             ),
           ),
-          // 下半：内容展示区（评论 / 简介 / 笔记）
-          Expanded(
-            child: VideoDetailContent(video: video),
-          ),
+          Expanded(child: VideoDetailContent(video: video)),
         ],
       ),
     );

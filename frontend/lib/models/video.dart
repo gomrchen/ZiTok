@@ -30,12 +30,16 @@ class Video {
         coverUrl: (j['cover_url'] as String?) ?? (j['coverUrl'] as String?),
         intro: (j['intro'] ?? j['description']) as String?,
         title: j['title'] as String?,
-        stars: j['starts'] is int ? j['starts'] as int : int.tryParse('${j['starts']}'),
+        stars: j['starts'] is int
+            ? j['starts'] as int
+            : (j['favoriteCount'] is int
+                ? j['favoriteCount'] as int
+                : int.tryParse('${j['starts'] ?? j['favoriteCount']}')),
         likes: j['likes'] is int
             ? j['likes'] as int
             : (j['like_count'] is int
                 ? j['like_count'] as int
-                : (j['favoriteCount'] is int ? j['favoriteCount'] as int : int.tryParse('${j['like_count'] ?? j['likes'] ?? j['favoriteCount']}'))),
+                : int.tryParse('${j['like_count'] ?? j['likes']}')),
         views: j['views'] is int
             ? j['views'] as int
             : (j['visit_count'] is int ? j['visit_count'] as int : int.tryParse('${j['visit_count'] ?? j['views']}')),
@@ -70,12 +74,13 @@ class Video {
 }
 
 class VideoQuery {
+  final String? userId;
   final int page;
   final int pageSize;
   final String? keyword;
   final List<String>? tags;
 
-  const VideoQuery({this.page = 1, this.pageSize = 20, this.keyword, this.tags});
+  const VideoQuery({this.userId, this.page = 1, this.pageSize = 20, this.keyword, this.tags});
 }
 
 class PagedResult<T> {
