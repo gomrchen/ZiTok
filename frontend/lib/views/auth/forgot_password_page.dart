@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/theme_tokens.dart';
+import '../../utils/validators.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -12,18 +13,79 @@ class ForgotPasswordPage extends StatefulWidget {
 }
 
 class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
-  final _usernameCtrl = TextEditingController();
+  final _newPasswordCtrl = TextEditingController();
   final _emailCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   bool _isSendingCode = false;
   int _countdown = 0;
+  bool _isNewPasswordVisible = false;
+ // bool _isConfirmPasswordVisible = false;
 
   @override
   void dispose() {
-    _usernameCtrl.dispose();
+    _newPasswordCtrl.dispose();
     _emailCtrl.dispose();
     _codeCtrl.dispose();
     super.dispose();
+  }
+  
+  void _showError(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
+  }
+  
+  bool _validateSendCodeInputs() {
+    if (_emailCtrl.text.trim().isEmpty) {
+      _showError('请输入邮箱');
+      return false;
+    }
+    
+    if (!isValidEmail(_emailCtrl.text)) {
+      _showError('请输入有效的邮箱地址');
+      return false;
+    }
+    
+    return true;
+  }
+  
+  bool _validateResetPasswordInputs() {
+    if (_emailCtrl.text.trim().isEmpty) {
+      _showError('请输入邮箱');
+      return false;
+    }
+    
+    if (!isValidEmail(_emailCtrl.text)) {
+      _showError('请输入有效的邮箱地址');
+      return false;
+    }
+    
+    if (_codeCtrl.text.trim().isEmpty) {
+      _showError('请输入验证码');
+      return false;
+    }
+    
+    if (!isValidOtp(_codeCtrl.text)) {
+      _showError('验证码必须为6位数字');
+      return false;
+    }
+    
+    if (_newPasswordCtrl.text.trim().isEmpty) {
+      _showError('请输入新密码');
+      return false;
+    }
+    
+    if (!isValidPassword(_newPasswordCtrl.text)) {
+      _showError('新密码必须包含字母和数字，长度8-20位');
+      return false;
+    }
+    
+
+    
+    
+    return true;
   }
 
   void _startCountdown() {
@@ -52,20 +114,15 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   }
 
   Future<void> _sendVerificationCode() async {
-    if (_usernameCtrl.text.isEmpty || _emailCtrl.text.isEmpty) {
-      // 显示错误提示
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请填写用户名和邮箱')),
-        );
-      }
+    // 验证输入
+    if (!_validateSendCodeInputs()) {
       return;
     }
 
     try {
-      // TODO: 实现发送验证码的逻辑
-      // 这里应该调用auth provider或repository的方法
-      print('发送验证码到: ${_emailCtrl.text}');
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.sendVerificationCode(_emailCtrl.text);
+      
       _startCountdown();
       
       if (mounted) {
@@ -83,32 +140,36 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
   }
 
   Future<void> _resetPassword() async {
-    if (_usernameCtrl.text.isEmpty || 
-        _emailCtrl.text.isEmpty || 
-        _codeCtrl.text.isEmpty) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请填写所有必填字段')),
-        );
-      }
+    // 验证输入
+    if (!_validateResetPasswordInputs()) {
       return;
     }
 
-    // TODO: 实现重置密码的逻辑
-    print('重置密码: 用户名=${_usernameCtrl.text}, 邮箱=${_emailCtrl.text}, 验证码=${_codeCtrl.text}');
-    
-    // 模拟成功
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('密码重置成功，请登录')),
+    try {
+      await context.read<AuthProvider>().changePassword(
+        _emailCtrl.text.trim(),
+         _codeCtrl.text.trim(),
+         _newPasswordCtrl.text.trim(),
       );
       
-      // 返回登录页面
-      Future.delayed(const Duration(seconds: 1), () {
-        if (mounted) {
-          context.go('/auth/login');
-        }
-      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('密码重置成功，请登录')),
+        );
+        
+        // 返回登录页面
+        Future.delayed(const Duration(seconds: 1), () {
+          if (mounted) {
+            context.go('/auth/login');
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('重置失败: ${e.toString()}')),
+        );
+      }
     }
   }
 
@@ -137,11 +198,24 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
                     const SizedBox(height: Spacing.lg),
                     // 表单
                     TextField(
-                      controller: _usernameCtrl,
-                      keyboardType: TextInputType.text,
-                      decoration: const InputDecoration(
-                        labelText: '用户名',
-                        hintText: '请输入您的用户名',
+                      controller: _newPasswordCtrl,
+                      keyboardType: TextInputType.visiblePassword,
+                      obscureText: !_isNewPasswordVisible,
+                      decoration: InputDecoration(
+                        labelText: '新密码',
+                        hintText: '请设置新密码',
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _isNewPasswordVisible
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _isNewPasswordVisible = !_isNewPasswordVisible;
+                            });
+                          },
+                        ),
                       ),
                     ),
                     const SizedBox(height: Spacing.md),

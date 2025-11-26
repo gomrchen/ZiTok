@@ -51,7 +51,7 @@ class ZitokApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final authRepository = AuthRepository(
-      authService: AuthService(AppBootstrap.apiClient),
+      authService: AuthService(AppBootstrap.apiClient, prefs: AppBootstrap.prefs),
       prefs: AppBootstrap.prefs,
     );
     final videoRepository = VideoRepository(

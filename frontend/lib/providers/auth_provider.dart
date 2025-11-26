@@ -58,14 +58,15 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> changePassword(String email,String oldPassword, String newPassword) async {
+//修改密码
+  Future<void> changePassword(String email,String code, String newPassword) async {
     _loading = true;
     _error = null;
     notifyListeners();
     try {
       await authRepository.changePassword(
         email: email,
-        oldPassword: oldPassword,
+        code: code,
         newPassword: newPassword,
       );
     } catch (e) {
@@ -76,7 +77,21 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
-
+  /// 发送验证码到邮箱
+  Future<void> sendVerificationCode(String email) async {
+    _loading = true;
+    _error = null;
+    notifyListeners();
+    try {
+      await authRepository.sendVerificationCode(email: email);
+    } catch (e) {
+      _error = e.toString();
+      rethrow;
+    } finally {
+      _loading = false;
+      notifyListeners();
+    }
+  }
   /// 登出，清除用户状态
   Future<void> logout() async {
     _loading = true;

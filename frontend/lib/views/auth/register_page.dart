@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/theme_tokens.dart';
+import '../../utils/validators.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -17,7 +18,41 @@ class _RegisterPageState extends State<RegisterPage> {
   final _pwdCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
   bool _isSendingCode = false;
+  bool _isPasswordVisible = false;
   int _countdown = 0;
+
+  // 注册非空验证函数
+  bool _validateInputs() {
+    if (_usernameCtrl.text.trim().isEmpty) {
+      _showError('请输入用户名');
+      return false;
+    }
+    
+    if (_emailCtrl.text.trim().isEmpty) {
+      _showError('请输入邮箱');
+      return false;
+    }
+    
+    if (_pwdCtrl.text.trim().isEmpty) {
+      _showError('请输入密码');
+      return false;
+    }
+    
+    if (_codeCtrl.text.trim().isEmpty) {
+      _showError('请输入验证码');
+      return false;
+    }
+    
+    return true;
+  }
+  
+  void _showError(String message) {
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    }
+  }
 
   @override
   void dispose() {
@@ -54,31 +89,45 @@ class _RegisterPageState extends State<RegisterPage> {
   }
 
   Future<void> _sendVerificationCode() async {
+    // 检查邮箱是否为空
     if (_emailCtrl.text.isEmpty) {
-      // 显示错误提示
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('请先填写邮箱')));
-      }
+      _showError('请先填写邮箱');
+      return;
+    }
+    
+    // 添加邮箱格式验证
+    if (!isValidEmail(_emailCtrl.text)) {
+      _showError('请输入有效的邮箱地址');
       return;
     }
 
-    try {
-      // TODO: 实现发送验证码的逻辑
-      print('发送验证码到: ${_emailCtrl.text}');
-      _startCountdown();
+    setState(() {
+      _isSendingCode = true;
+    });
 
+    try {
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      await authProvider.sendVerificationCode(_emailCtrl.text);
+      
+      // 开始倒计时
+      _startCountdown();
+      
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('验证码已发送，请查收邮箱')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('验证码已发送，请查收邮箱')),
+        );
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('发送失败: ${e.toString()}')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('发送失败: ${e.toString()}')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSendingCode = false;
+        });
       }
     }
   }
@@ -120,13 +169,27 @@ class _RegisterPageState extends State<RegisterPage> {
                         hintText: 'Enter your email',
                       ),
                     ),
-                    const SizedBox(height: Spacing.md),
+                    const SizedBox(height: Spacing.lg),
+                    // 表单
                     TextField(
                       controller: _pwdCtrl,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: '密码（可选）',
-                        hintText: 'Set an optional password',
+                      keyboardType: TextInputType.visiblePassword,
+                      obscureText: !_isPasswordVisible,
+                      decoration: InputDecoration(
+                        labelText: '新密码',
+                        hintText: '请设置密码',
+                        suffixIcon: IconButton(
+                          icon: Icon(
+                            _isPasswordVisible
+                                ? Icons.visibility
+                                : Icons.visibility_off,
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _isPasswordVisible = !_isPasswordVisible;
+                            });
+                          },
+                        ),
                       ),
                     ),
                     const SizedBox(height: Spacing.md),
@@ -170,12 +233,18 @@ class _RegisterPageState extends State<RegisterPage> {
                         onPressed: auth.loading
                             ? null
                             : () async {
+                                // 先验证输入
+                                if (!_validateInputs()) {
+                                  return;
+                                }
+                                
                                 await context.read<AuthProvider>().register(
                                   _usernameCtrl.text.trim(),
                                   _emailCtrl.text.trim(),
                                   _pwdCtrl.text.trim(),
                                   _codeCtrl.text.trim(),
                                 );
+                                
                                 if (mounted &&
                                     context
                                         .read<AuthProvider>()

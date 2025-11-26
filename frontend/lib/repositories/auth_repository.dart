@@ -118,28 +118,29 @@ class AuthRepository {
   /// 修改密码
   Future<void> changePassword({
     required String email,
-    required String oldPassword,
+    required String code,
     required String newPassword,
   }) async {
     final res = await authService.changePassword(
       email: email,
-      oldPassword: oldPassword,
+      code: code,
       newPassword: newPassword,
     );
     final body = res.data as Map<String, dynamic>? ?? {};
+    print(body);
     final base = body['base'] as Map<String, dynamic>? ?? {};
     final topCode = body['code'];
-    final code = (base['code'] is int
+    final resCode = (base['code'] is int
         ? base['code'] as int
         : topCode is int
         ? topCode
         : int.tryParse('${topCode}') ?? 0);
-    if (code == 0 && (res.statusCode == 200)) {
+    if (resCode == 0 && (res.statusCode == 200)) {
       return;
     }
-    if (code != 10000 && code != 200) {
+    if (resCode != 10000 && resCode != 200) {
       final msg = (base['msg'] ?? body['message'] ?? '修改密码失败').toString();
-      throw AuthException(message: msg, code: code);
+      throw AuthException(message: msg, code: resCode);
     }
   }
 
@@ -157,7 +158,26 @@ class AuthRepository {
       await prefs.remove('auth_user_id');
     }
   }
+  
+    /// 发送验证码到邮箱
+  Future<void> sendVerificationCode({required String email}) async {
+    final res = await authService.sendVerificationCode(email: email);
+    final body = res.data as Map<String, dynamic>? ?? {};
+    final base = body['base'] as Map<String, dynamic>? ?? {};
+    final topCode = body['code'];
+    final code = (base['code'] is int
+        ? base['code'] as int
+        : topCode is int
+        ? topCode
+        : int.tryParse('${topCode}') ?? 0);
+    if (code != 10000 && code != 200 && !(code == 0 && res.statusCode == 200)) {
+      final msg = (base['msg'] ?? body['message'] ?? '发送验证码失败').toString();
+      throw AuthException(message: msg, code: code);
+    }
+  }
 }
+
+
 
 /// 认证异常类型
 class AuthException implements Exception {
