@@ -27,30 +27,30 @@ class _RegisterPageState extends State<RegisterPage> {
       _showError('请输入用户名');
       return false;
     }
-    
+
     if (_emailCtrl.text.trim().isEmpty) {
       _showError('请输入邮箱');
       return false;
     }
-    
+
     if (_pwdCtrl.text.trim().isEmpty) {
       _showError('请输入密码');
       return false;
     }
-    
+
     if (_codeCtrl.text.trim().isEmpty) {
       _showError('请输入验证码');
       return false;
     }
-    
+
     return true;
   }
-  
+
   void _showError(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     }
   }
 
@@ -94,7 +94,7 @@ class _RegisterPageState extends State<RegisterPage> {
       _showError('请先填写邮箱');
       return;
     }
-    
+
     // 添加邮箱格式验证
     if (!isValidEmail(_emailCtrl.text)) {
       _showError('请输入有效的邮箱地址');
@@ -108,20 +108,20 @@ class _RegisterPageState extends State<RegisterPage> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.sendVerificationCode(_emailCtrl.text);
-      
+
       // 开始倒计时
       _startCountdown();
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('验证码已发送，请查收邮箱')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('验证码已发送，请查收邮箱')));
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('发送失败: ${e.toString()}')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('发送失败: ${e.toString()}')));
       }
     } finally {
       if (mounted) {
@@ -237,19 +237,20 @@ class _RegisterPageState extends State<RegisterPage> {
                                 if (!_validateInputs()) {
                                   return;
                                 }
-                                
+
                                 await context.read<AuthProvider>().register(
                                   _usernameCtrl.text.trim(),
                                   _emailCtrl.text.trim(),
                                   _pwdCtrl.text.trim(),
                                   _codeCtrl.text.trim(),
                                 );
-                                
+
                                 if (mounted &&
                                     context
                                         .read<AuthProvider>()
-                                        .isAuthenticated) {
-                                  context.go('/home');
+                                        .isRegistered) {
+                                  // 注册成功后跳转到登录页，让用户手动登录
+                                  context.go('/auth/login');
                                 }
                               },
                         child: auth.loading
@@ -260,7 +261,7 @@ class _RegisterPageState extends State<RegisterPage> {
                                   strokeWidth: 2,
                                 ),
                               )
-                            : const Text('注册并进入应用'),
+                            : const Text('注册后登录'),
                       ),
                     ),
                     const SizedBox(height: Spacing.md),

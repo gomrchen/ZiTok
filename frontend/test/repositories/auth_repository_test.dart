@@ -6,7 +6,7 @@ import 'package:zitok/services/api_client.dart';
 import 'package:dio/dio.dart';
 
 class FakeAuthService extends AuthService {
-  FakeAuthService(super.client);
+  FakeAuthService(super.client, {required super.prefs});
 
   @override
   Future<Response> login({required String username, required String password}) {
@@ -97,7 +97,10 @@ void main() {
       SharedPreferences.setMockInitialValues({});
       prefs = await SharedPreferences.getInstance();
       final client = ApiClient(baseUrl: 'http://example', prefs: prefs);
-      repo = AuthRepository(authService: FakeAuthService(client), prefs: prefs);
+      repo = AuthRepository(
+        authService: FakeAuthService(client, prefs: prefs),
+        prefs: prefs,
+      );
     });
 
     test('login returns User and persists id', () async {

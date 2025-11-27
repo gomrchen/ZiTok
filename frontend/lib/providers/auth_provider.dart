@@ -9,10 +9,12 @@ class AuthProvider extends ChangeNotifier {
   bool _loading = false;
   String? _error;
   User? _user;
+ User?_registeredUser;
 
   AuthProvider({required this.authRepository});
 
   bool get isAuthenticated => _user != null;
+  bool get isRegistered => _registeredUser != null;
   bool get loading => _loading;
   String? get error => _error;
   User? get user => _user;
@@ -44,7 +46,7 @@ class AuthProvider extends ChangeNotifier {
     _error = null;
     notifyListeners();
     try {
-      _user = await authRepository.register(
+      _registeredUser = await authRepository.register(
         username: username,
         email: email,
         password: password,

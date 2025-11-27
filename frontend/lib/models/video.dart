@@ -8,6 +8,7 @@ class Video {
   final int? stars;
   final int? likes;
   final int? views;
+  final int? comments;
   final List<String> tags;
 
   const Video({
@@ -21,6 +22,7 @@ class Video {
     this.likes,
     this.views,
     this.tags = const [],
+    this.comments,
   });
 
   factory Video.fromJson(Map<String, dynamic> j) => Video(
@@ -40,6 +42,7 @@ class Video {
             ? j['views'] as int
             : (j['visit_count'] is int ? j['visit_count'] as int : int.tryParse('${j['visit_count'] ?? j['views']}')),
         tags: (j['tags'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
+        comments: j['commentCount'] is int ? j['commentCount'] as int : int.tryParse('${j['commentCount']}')
       );
 
   Video copyWith({

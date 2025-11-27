@@ -272,7 +272,7 @@ class _ChangePasswordPageState extends State<ChangePasswordPage> {
                     SizedBox(
                       width: double.infinity,
                       child: OutlinedButton(
-                        onPressed: () => context.go('/auth/login'),
+                        onPressed: () => context.go('/settings'),
                         child: RichText(
                           text: TextSpan(
                             text: '记得密码？',

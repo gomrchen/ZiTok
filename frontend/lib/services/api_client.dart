@@ -25,7 +25,6 @@ class ApiClient {
             receiveTimeout: const Duration(seconds: 20),
             sendTimeout: const Duration(seconds: 20),
             headers: {
-              'User-Agent': 'ZitokApp/1.0',
               'Accept-Language': 'zh-CN',
             },
           ),
@@ -87,12 +86,12 @@ class ApiClient {
     final token = prefs.getString('access_token');
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
-      options.headers['Access-Token'] = token;
+      // 移除Access-Token以避免CORS问题，仅保留标准Bearer认证
     }
-    final refresh = prefs.getString('refresh_token');
+   /*final refresh = prefs.getString('refresh_token');
     if (refresh != null && refresh.isNotEmpty) {
       options.headers['Refresh-Token'] = refresh;
-    }
+    }*/
   }
 
   /// 解析业务码，兼容顶层 `code` 与 `base.code`

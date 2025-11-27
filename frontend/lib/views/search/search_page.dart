@@ -11,7 +11,7 @@ class SearchPage extends StatefulWidget {
 
 class _SearchPageState extends State<SearchPage> {
   final TextEditingController _searchController = TextEditingController();
-  FocusNode _searchFocusNode = FocusNode();
+  late final FocusNode _searchFocusNode = FocusNode();
 
   @override
   void initState() {
@@ -43,8 +43,9 @@ class _SearchPageState extends State<SearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: cs.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -71,19 +72,19 @@ class _SearchPageState extends State<SearchPage> {
                     child: Container(
                       height: 36,
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF2F2F2),
+                        color: cs.surfaceContainer,
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Row(
                         children: [
-                          const Padding(
-                            padding: EdgeInsets.symmetric(
+                          Padding(
+                            padding: const EdgeInsets.symmetric(
                               horizontal: Spacing.sm,
                             ),
                             child: Icon(
                               Icons.search,
                               size: 18,
-                              color: Color(0xFF999999),
+                              color: cs.onSurfaceVariant,
                             ),
                           ),
                           Expanded(
@@ -112,10 +113,10 @@ class _SearchPageState extends State<SearchPage> {
                     padding: const EdgeInsets.only(left: Spacing.sm),
                     child: TextButton(
                       onPressed: _handleSearch,
-                      child: const Text(
+                      child: Text(
                         '搜索',
                         style: TextStyle(
-                          color: Colors.black,
+                          color: cs.primary,
                           fontSize: 14,
                           fontWeight: FontWeight.normal,
                         ),

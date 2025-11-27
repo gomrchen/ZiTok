@@ -24,7 +24,6 @@ import 'providers/user_provider.dart';
 import 'repositories/comment_repository.dart';
 import 'services/comment_service.dart';
 import 'providers/comment_provider.dart';
-import '';
 
 class AppBootstrap {
   static late SharedPreferences prefs;

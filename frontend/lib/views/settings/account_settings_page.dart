@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../../providers/settings_provider.dart';
-import '../../providers/theme_provider.dart';
 import '../../theme/theme_tokens.dart';
 import '../../providers/auth_provider.dart';
 
@@ -11,8 +9,6 @@ class AccountSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sp = context.watch<SettingsProvider>();
-    final tp = context.read<ThemeProvider>();
     return Scaffold(
       appBar: AppBar(title: const Text('账户设置')),
       body: ListView(
@@ -41,31 +37,6 @@ class AccountSettingsPage extends StatelessWidget {
       ),
     );
   }
-
-  /*Future<String?> _showLanguageSheet(
-    BuildContext context,
-    String current,
-  ) async {
-    return showModalBottomSheet<String>(
-      context: context,
-      showDragHandle: true,
-      builder: (context) {
-        const langs = ['简体中文', 'English'];
-        return ListView(
-          children: langs
-              .map(
-                (e) => RadioListTile<String>(
-                  value: e,
-                  groupValue: current,
-                  title: Text(e),
-                  onChanged: (v) => Navigator.pop(context, v),
-                ),
-              )
-              .toList(),
-        );
-      },
-    );
-  }*/
 
   void _confirmLogout(BuildContext context) {
     showDialog(

@@ -36,6 +36,7 @@ class FeaturedBody extends StatelessWidget {
         SliverToBoxAdapter(
           child: Padding(
             padding: const EdgeInsets.all(Spacing.md),
+            ///！！！
             child: _FeaturedHeroCard(video: vp.featured.isNotEmpty ? vp.featured.first : null),
           ),
         ),
@@ -57,6 +58,7 @@ class FeaturedBody extends StatelessWidget {
               (context, i) {
                 if (i < vp.featured.length) {
                   final v = vp.featured[i];
+                  //！！！！！
                   return _FeaturedListItem(video: v);
                 }
                 return const Padding(

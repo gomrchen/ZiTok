@@ -74,12 +74,14 @@ class _DiscoverPageState extends State<DiscoverPage>
     print("vpPPPPP:");
     print(vp.discover);
     final theme = Theme.of(context);
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
+      backgroundColor: cs.background,
       appBar: AppBar(
         automaticallyImplyLeading: false,
         titleSpacing: 0,
         elevation: 0,
-        backgroundColor: Colors.white,
+        backgroundColor: cs.surface,
         // 添加搜索输入框
         title: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
@@ -87,21 +89,21 @@ class _DiscoverPageState extends State<DiscoverPage>
             onTap: _onSearchTap,
             child: Container(
               decoration: BoxDecoration(
-                color: const Color(0xFFF2F2F2), // 灰色背景
+                color: cs.surfaceContainer,
                 borderRadius: BorderRadius.circular(8),
               ),
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               child: Row(
                 children: [
-                  const Icon(
+                  Icon(
                     Icons.search,
-                    color: Color(0xFF999999),
+                    color: cs.onSurfaceVariant,
                     size: 18,
                   ), // 搜索图标
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     '搜索视频、用户或话题', // placeholder
-                    style: TextStyle(color: Color(0xFF999999), fontSize: 14),
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
                   ),
                 ],
               ),
@@ -114,8 +116,10 @@ class _DiscoverPageState extends State<DiscoverPage>
             Tab(text: '精选'),
             Tab(text: '推荐'),
           ],
-          labelColor: const Color(0xFF000000),
-          unselectedLabelColor: const Color(0xFF999999),
+          labelColor: cs.primary,
+          unselectedLabelColor: cs.onSurfaceVariant,
+          indicatorColor: cs.primary,
+          dividerColor: cs.outline,
         ),
       ),
       body: TabBarView(

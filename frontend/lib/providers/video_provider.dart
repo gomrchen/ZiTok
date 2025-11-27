@@ -202,7 +202,7 @@ class VideoProvider extends ChangeNotifier {
     debugPrint('VideoProvider.loadMoreFeatured: page=$_featuredPage');
     _loadingFeatured = true;
     notifyListeners();
-    final res = await repo.fetchFeatured(VideoQuery(page: _featuredPage, pageSize: 20, keyword: _keyword, tags: _filters));
+    final res = await repo.fetchFeatured(VideoQuery(page: _featuredPage, pageSize: 10, keyword: _keyword, tags: _filters));
     _featured.addAll(res.items);
     _featuredHasMore = res.hasMore;
     _featuredPage += 1;
