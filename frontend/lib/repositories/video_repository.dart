@@ -1,9 +1,9 @@
 import 'package:flutter/foundation.dart';
 import '../models/video.dart';
+import '../models/video_publish.dart';
 import '../services/video_service.dart';
 import '../services/cache.dart';
 import '../utils/url_utils.dart';
-import '../providers/auth_provider.dart';
 
 class VideoRepository {
   final VideoService api;
@@ -109,5 +109,43 @@ class VideoRepository {
 
   Future<void> visit(String videoId) async {
     await api.visit(videoId: videoId);
+  }
+
+  /// 发布视频
+  ///
+  /// [request] 视频发布请求
+  /// [onProgress] 上传进度回调 (0.0 ~ 1.0)
+  Future<VideoPublishResponse> publish(
+    VideoPublishRequest request, {
+    void Function(double progress)? onProgress,
+  }) async {
+    try {
+      final resp = await api.publish(
+        filePath: request.filePath,
+        title: request.title,
+        description: request.description,
+        userId: request.userId,
+        onProgress: onProgress != null
+            ? (sent, total) {
+                final progress = total > 0 ? sent / total : 0.0;
+                onProgress(progress);
+              }
+            : null,
+      );
+
+      final data = resp.data as Map<String, dynamic>? ?? {};
+      final response = VideoPublishResponse.fromJson(data);
+
+      if (response.isSuccess) {
+        // 发布成功后清除缓存，以便刷新列表时获取最新数据
+        await cache.remove('video_hot');
+        debugPrint('VideoRepository.publish: success, cache cleared');
+      }
+
+      return response;
+    } catch (e) {
+      debugPrint('VideoRepository.publish: error=$e');
+      rethrow;
+    }
   }
 }

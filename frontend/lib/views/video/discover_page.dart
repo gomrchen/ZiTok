@@ -4,6 +4,7 @@ import 'package:video_player/video_player.dart';
 import '../../models/video.dart';
 import '../../providers/video_provider.dart';
 import '../../theme/theme_tokens.dart';
+import '../../services/video/video_preload_manager.dart';
 import 'featured_page.dart';
 import 'widgets/md_notes_sheet.dart';
 import '../../widgets/comment_sheet.dart';
@@ -15,15 +16,19 @@ class DiscoverPage extends StatefulWidget {
   State<DiscoverPage> createState() => _DiscoverPageState();
 }
 
-class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMixin {
+class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tab;
   int _currentRecommendIndex = 0;
   final Map<String, VideoPlayerController> _controllers = {};
+  final VideoPreloadManager _preloadManager = VideoPreloadManager.instance;
+  bool _isPageVisible = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _tab = TabController(length: 2, vsync: this);
+    _tab.addListener(_onTabChanged);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final vp = context.read<VideoProvider>();
       if (vp.discover.isEmpty) {
@@ -37,27 +42,76 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     for (final c in _controllers.values) {
       c.dispose();
     }
+    _tab.removeListener(_onTabChanged);
     _tab.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    // 应用进入后台时暂停所有视频
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _pauseAllVideos();
+      _isPageVisible = false;
+    } else if (state == AppLifecycleState.resumed) {
+      _isPageVisible = true;
+      // 恢复当前视频（如果在推荐页）
+      if (_tab.index == 1 && _controllers.isNotEmpty) {
+        final vp = context.read<VideoProvider>();
+        if (_currentRecommendIndex < vp.discover.length) {
+          final v = vp.discover[_currentRecommendIndex];
+          _controllers[v.id]?.play();
+        }
+      }
+    }
+  }
+
+  void _onTabChanged() {
+    // Tab切换时暂停非当前页的视频
+    if (_tab.index != 1) {
+      _pauseAllVideos();
+    }
+  }
+
+  void _pauseAllVideos() {
+    for (final c in _controllers.values) {
+      c.pause();
+    }
+    _preloadManager.pauseAll();
+  }
+
   Future<void> _playIndex(List videos, int index) async {
     if (index < 0 || index >= videos.length) return;
+    if (!_isPageVisible) return; // 页面不可见时不播放
+
     setState(() => _currentRecommendIndex = index);
     final v = videos[index];
-    // 释放上一条
+
+    // 暂停所有其他视频
     for (final entry in _controllers.entries) {
       if (entry.key != v.id) entry.value.pause();
     }
+
+    // 更新预加载管理器的当前索引
+    _preloadManager.updateCurrentIndex(index);
+
     // 当前控制器
     var ctrl = _controllers[v.id];
     if (ctrl == null) {
-      ctrl = VideoPlayerController.networkUrl(Uri.parse(v.videoUrl));
-      _controllers[v.id] = ctrl;
-      await ctrl.initialize();
+      // 尝试从预加载管理器获取
+      ctrl = _preloadManager.getPreloadedController(v.id);
+      if (ctrl != null) {
+        _controllers[v.id] = ctrl;
+        debugPrint('DiscoverPage: using preloaded controller for ${v.id}');
+      } else {
+        ctrl = VideoPlayerController.networkUrl(Uri.parse(v.videoUrl));
+        _controllers[v.id] = ctrl;
+        await ctrl.initialize();
+      }
     }
     ctrl.setLooping(true);
     await ctrl.play();
@@ -66,11 +120,19 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
   @override
   Widget build(BuildContext context) {
     final vp = context.watch<VideoProvider>();
-    print("vpPPPPP:");
-    print(vp.discover);
+
+    // 更新预加载列表
+    if (vp.discover.isNotEmpty) {
+      final preloadItems = vp.discover.asMap().entries.map((e) => PreloadItem(
+        videoId: e.value.id,
+        videoUrl: e.value.videoUrl ?? '',
+        index: e.key,
+      )).toList();
+      _preloadManager.setVideoList(preloadItems);
+    }
+
     return Scaffold(
       appBar: AppBar(
-        // 不显示“发现”标题，仅保留底部 TabBar
         toolbarHeight: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 0,
@@ -83,9 +145,7 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
       body: TabBarView(
         controller: _tab,
         children: [
-          // 精选模式：复用 FeaturedBody（无嵌套 Scaffold）
           const FeaturedBody(),
-          // 推荐模式：竖直PageView全屏播放
           _RecommendFullScreen(
             videos: vp.discover,
             isLoading: vp.loadingDiscover,
@@ -94,7 +154,6 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
           ),
         ],
       ),
-      // 底部导航由 Router 壳提供，页面内不再渲染
     );
   }
 }
@@ -116,12 +175,6 @@ class _RecommendFullScreenState extends State<_RecommendFullScreen> {
   bool _hasMore = true;
   String? _error;
   int _page = 1;
-
-  String _fmtLocal(int c) {
-    if (c >= 1000000) return '${(c / 1000000).toStringAsFixed(1)}M';
-    if (c >= 1000) return '${(c / 1000).toStringAsFixed(1)}k';
-    return '$c';
-  }
 
   Future<void> _fetch({bool refresh = false}) async {
     if (_loading) return;
@@ -193,15 +246,19 @@ class _FullScreenVideoItem extends StatefulWidget {
   State<_FullScreenVideoItem> createState() => _FullScreenVideoItemState();
 }
 
-class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
+class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with WidgetsBindingObserver {
   late VideoPlayerController _controller;
   bool _initialized = false;
+  bool _isBuffering = false;
   String? _error;
+  bool _wasPlayingBeforePause = false;
+
   String _fmtLocal(int c) {
     if (c >= 1000000) return '${(c / 1000000).toStringAsFixed(1)}M';
     if (c >= 1000) return '${(c / 1000).toStringAsFixed(1)}k';
     return '$c';
   }
+
   // 顶部栏：菜单展开占位
   void _onMenu() {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('菜单功能待接入'), duration: Duration(milliseconds: 1200)));
@@ -223,6 +280,7 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
       },
     );
   }
+
   // 分享占位：显示气泡提示（2秒消失）
   void _onShare() {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -232,36 +290,93 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> {
         behavior: SnackBarBehavior.floating,
         margin: const EdgeInsets.all(16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: Colors.black.withOpacity(0.85),
+        backgroundColor: Colors.black.withValues(alpha: 0.85),
       ),
     );
   }
+
   // 跳转视频详情
   void _openDetails() {
+    // 暂停当前视频再跳转
+    _controller.pause();
     context.go('/video/${widget.video.id}');
   }
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    _initController();
+  }
+
+  Future<void> _initController() async {
     final url = widget.video.videoUrl ?? '';
     if (url.isEmpty) {
-      _error = '视频地址为空';
+      setState(() => _error = '视频地址为空');
       return;
     }
+
+    // 尝试从预加载管理器获取
+    final preloadManager = VideoPreloadManager.instance;
+    final preloaded = preloadManager.getPreloadedController(widget.video.id);
+
+    if (preloaded != null) {
+      _controller = preloaded;
+      if (mounted) {
+        setState(() => _initialized = true);
+        _controller.setLooping(true);
+        _controller.play();
+        context.read<VideoProvider>().visit(widget.video.id);
+      }
+      debugPrint('_FullScreenVideoItem: using preloaded controller');
+      return;
+    }
+
+    // 创建新控制器
     _controller = VideoPlayerController.networkUrl(Uri.parse(url));
-    _controller.initialize().then((_) {
-      if (mounted) setState(() => _initialized = true);
-      _controller.setLooping(true);
-      _controller.play();
-      context.read<VideoProvider>().visit(widget.video.id);
-    }).catchError((e) {
+    _controller.addListener(_onControllerUpdate);
+
+    try {
+      await _controller.initialize();
+      if (mounted) {
+        setState(() => _initialized = true);
+        _controller.setLooping(true);
+        _controller.play();
+        context.read<VideoProvider>().visit(widget.video.id);
+      }
+    } catch (e) {
       debugPrint('FullScreenVideoItem: initialize error $e');
       if (mounted) setState(() => _error = '视频加载失败');
-    });
+    }
+  }
+
+  void _onControllerUpdate() {
+    if (!mounted) return;
+
+    final wasBuffering = _isBuffering;
+    final isBufferingNow = _controller.value.isBuffering;
+
+    if (wasBuffering != isBufferingNow) {
+      setState(() => _isBuffering = isBufferingNow);
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      _wasPlayingBeforePause = _controller.value.isPlaying;
+      _controller.pause();
+    } else if (state == AppLifecycleState.resumed) {
+      if (_wasPlayingBeforePause) {
+        _controller.play();
+      }
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _controller.removeListener(_onControllerUpdate);
     _controller.dispose();
     super.dispose();
   }
@@ -455,7 +570,7 @@ class _LikeActionIconState extends State<_LikeActionIcon> with TickerProviderSta
                     final t = burst.value; // 0~1
                     final radius = 18 * t;
                     final opacity = (1 - t).clamp(0.0, 1.0);
-                    Color c = Colors.red.withOpacity(opacity);
+                    Color c = Colors.red.withValues(alpha: opacity);
                     return Stack(children: [
                       _particle(Offset(0, -radius), c),
                       _particle(Offset(0, radius), c),
@@ -480,7 +595,7 @@ class _LikeActionIconState extends State<_LikeActionIcon> with TickerProviderSta
           ),
         ),
         const SizedBox(height: 6),
-        Text('${_formatCount(count)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white)),
+        Text(_formatCount(count), style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white)),
       ],
     );
   }

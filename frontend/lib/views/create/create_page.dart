@@ -3,9 +3,13 @@ import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:video_player/video_player.dart';
+import 'package:provider/provider.dart';
 import 'dart:convert';
 import '../../theme/theme_tokens.dart';
 import '../../utils/content_validator.dart';
+import '../../providers/video_provider.dart';
+import '../../providers/auth_provider.dart';
+import '../../models/video_publish.dart';
 import 'widgets/step_indicator.dart';
 import 'widgets/upload_box.dart';
 import 'video_controller.dart';
@@ -30,6 +34,7 @@ class _CreatePageState extends State<CreatePage> {
   bool markdownEditMode = true; // 上传/编辑切换
 
   // 内容编辑
+  final TextEditingController _titleCtl = TextEditingController();
   final TextEditingController _descCtl = TextEditingController();
   final TextEditingController _tagCtl = TextEditingController();
   final List<String> _tags = [];
@@ -41,8 +46,10 @@ class _CreatePageState extends State<CreatePage> {
 
   @override
   void dispose() {
+    _titleCtl.dispose();
     _descCtl.dispose();
     _tagCtl.dispose();
+    _vc?.dispose();
     super.dispose();
   }
 
@@ -223,29 +230,65 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   String? _validateBeforePublish() {
-    // 不允许全部为空
-    final allEmpty = (videoSource == null || videoSource!.isEmpty) && mdContent.trim().isEmpty && _descCtl.text.trim().isEmpty;
-    if (allEmpty) return '发布失败：视频、笔记与描述不能全部为空';
-    // 文件与文本安全
+    // 视频必须存在
+    if (videoSource == null || videoSource!.isEmpty) {
+      return '请先选择要发布的视频';
+    }
+    // 标题必须存在
+    if (_titleCtl.text.trim().isEmpty) {
+      return '请输入视频标题';
+    }
+    // 文件格式校验
     if (videoName != null && !ContentValidator.isSupportedVideo(videoName!)) {
       return '不支持的视频格式（仅支持 mp4/mov/avi/mkv）';
     }
     if (mdFileName != null && !ContentValidator.isSupportedMarkdown(mdFileName!)) {
       return 'Markdown 文件扩展名不正确';
     }
-    final illegal = ContentValidator.findIllegal('${_descCtl.text}\n$mdContent');
+    // 内容安全校验
+    final illegal = ContentValidator.findIllegal('${_titleCtl.text}\n${_descCtl.text}\n$mdContent');
     if (illegal != null) return '内容含不合规词：$illegal';
     return null;
   }
 
-  void _publish() {
+  Future<void> _publish() async {
     final err = _validateBeforePublish();
     if (err != null) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
       return;
     }
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('发布成功（本地模拟）')));
-    _animateToStep(CreateStep.publish);
+
+    // 获取用户ID
+    final authProvider = context.read<AuthProvider>();
+    final userId = authProvider.user?.id;
+    if (userId == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先登录后再发布视频')),
+      );
+      return;
+    }
+
+    // Web平台暂不支持
+    if (kIsWeb) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Web平台暂不支持视频上传，请使用移动端或桌面端')),
+      );
+      return;
+    }
+
+    // 开始发布
+    final videoProvider = context.read<VideoProvider>();
+    final success = await videoProvider.publishVideo(
+      filePath: videoSource!,
+      title: _titleCtl.text.trim(),
+      description: _descCtl.text.trim(),
+      userId: userId,
+      tags: _tags,
+    );
+
+    if (success) {
+      await _animateToStep(CreateStep.publish);
+    }
   }
 
   @override
@@ -356,242 +399,388 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   Widget _buildEdit(double width, double minPreviewHeight, bool isWide) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (!isWide) ...[
-          // 纵向：Markdown 预览 -> 视频预览
-          _CardContainer(
-            label: 'Markdown 预览',
-            child: ConstrainedBox(
-              constraints: BoxConstraints(minHeight: minPreviewHeight),
-              child: Padding(
-                padding: const EdgeInsets.all(Spacing.md),
-                child: Markdown(
-                  data: mdContent.isEmpty ? '（暂无内容）' : mdContent,
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
+    return Consumer<VideoProvider>(
+      builder: (context, videoProvider, child) {
+        final progress = videoProvider.publishProgress;
+        final isUploading = progress.isInProgress;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 视频标题输入（必填）
+            _CardContainer(
+              label: '视频标题 *',
+              child: TextField(
+                controller: _titleCtl,
+                enabled: !isUploading,
+                decoration: const InputDecoration(
+                  hintText: '请输入视频标题（必填）',
+                  border: InputBorder.none,
                 ),
+                maxLines: 1,
               ),
             ),
-          ),
-          const SizedBox(height: Spacing.lg),
-          _CardContainer(
-            label: '视频预览',
-            child: AspectRatio(
-              aspectRatio: _vc != null && _vc!.value.isInitialized ? _vc!.value.aspectRatio : 16 / 9,
-              child: _vc != null && _vcReady
-                  ? Stack(
-                      alignment: Alignment.bottomCenter,
-                      children: [
-                        VideoPlayer(_vc!),
-                        VideoProgressIndicator(_vc!, allowScrubbing: true),
-                      ],
-                    )
-                  : _VideoPlaceholder(name: videoName),
-            ),
-          ),
-        ] else ...[
-          // 宽屏：并排布局
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: _CardContainer(
-                  label: 'Markdown 预览',
-                  child: Builder(builder: (context) {
-                    final double cardWidth = (width - Spacing.lg) / 2;
-                    final double aspect = _vc != null && _vc!.value.isInitialized ? _vc!.value.aspectRatio : 16 / 9;
-                    final double videoH = cardWidth / aspect;
-                    final double cardHeight = videoH < minPreviewHeight ? minPreviewHeight : videoH;
-                    return SizedBox(
-                      height: cardHeight,
-                      child: Padding(
-                        padding: const EdgeInsets.all(Spacing.md),
-                        child: Markdown(
-                          data: mdContent.isEmpty ? '（暂无内容）' : mdContent,
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
+            const SizedBox(height: Spacing.lg),
+            if (!isWide) ...[
+              // 纵向：Markdown 预览 -> 视频预览
+              _CardContainer(
+                label: 'Markdown 预览',
+                child: ConstrainedBox(
+                  constraints: BoxConstraints(minHeight: minPreviewHeight),
+                  child: Padding(
+                    padding: const EdgeInsets.all(Spacing.md),
+                    child: Markdown(
+                      data: mdContent.isEmpty ? '（暂无内容）' : mdContent,
+                      shrinkWrap: true,
+                      physics: const NeverScrollableScrollPhysics(),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: Spacing.lg),
+              _CardContainer(
+                label: '视频预览',
+                child: AspectRatio(
+                  aspectRatio: _vc != null && _vc!.value.isInitialized ? _vc!.value.aspectRatio : 16 / 9,
+                  child: _vc != null && _vcReady
+                      ? Stack(
+                          alignment: Alignment.bottomCenter,
+                          children: [
+                            VideoPlayer(_vc!),
+                            VideoProgressIndicator(_vc!, allowScrubbing: true),
+                          ],
+                        )
+                      : _VideoPlaceholder(name: videoName),
+                ),
+              ),
+            ] else ...[
+              // 宽屏：并排布局
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: _CardContainer(
+                      label: 'Markdown 预览',
+                      child: Builder(builder: (context) {
+                        final double cardWidth = (width - Spacing.lg) / 2;
+                        final double aspect = _vc != null && _vc!.value.isInitialized ? _vc!.value.aspectRatio : 16 / 9;
+                        final double videoH = cardWidth / aspect;
+                        final double cardHeight = videoH < minPreviewHeight ? minPreviewHeight : videoH;
+                        return SizedBox(
+                          height: cardHeight,
+                          child: Padding(
+                            padding: const EdgeInsets.all(Spacing.md),
+                            child: Markdown(
+                              data: mdContent.isEmpty ? '（暂无内容）' : mdContent,
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                            ),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                  const SizedBox(width: Spacing.lg),
+                  Expanded(
+                    child: _CardContainer(
+                      label: '视频预览',
+                      child: Builder(builder: (context) {
+                        final double cardWidth = (width - Spacing.lg) / 2;
+                        final double aspect = _vc != null && _vc!.value.isInitialized ? _vc!.value.aspectRatio : 16 / 9;
+                        final double videoH = cardWidth / aspect;
+                        final double cardHeight = videoH < minPreviewHeight ? minPreviewHeight : videoH;
+                        return SizedBox(
+                          height: cardHeight,
+                          child: AspectRatio(
+                            aspectRatio: aspect,
+                            child: _vc != null && _vcReady
+                                ? Stack(
+                                    alignment: Alignment.bottomCenter,
+                                    children: [
+                                      VideoPlayer(_vc!),
+                                      VideoProgressIndicator(_vc!, allowScrubbing: true),
+                                    ],
+                                  )
+                                : _VideoPlaceholder(name: videoName),
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+            const SizedBox(height: Spacing.lg),
+            // 描述 & 标签
+            if (!isWide) ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    _CardContainer(
+                      label: '作品描述',
+                      child: TextField(
+                        controller: _descCtl,
+                        enabled: !isUploading,
+                        decoration: const InputDecoration(
+                          hintText: '为视频添加发布后描述',
+                          border: InputBorder.none,
+                        ),
+                        minLines: 4,
+                        maxLines: 8,
+                      ),
+                    ),
+                    const SizedBox(height: Spacing.lg),
+                    _CardContainer(
+                      label: '视频标签',
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          TextField(
+                            controller: _tagCtl,
+                            enabled: !isUploading,
+                            decoration: const InputDecoration(
+                              hintText: '输入后按回车或逗号添加',
+                              border: InputBorder.none,
+                            ),
+                            onSubmitted: (_) => _addTagFromInput(),
+                          ),
+                          const SizedBox(height: Spacing.sm),
+                          Wrap(
+                            spacing: Spacing.sm,
+                            runSpacing: Spacing.sm,
+                            children: _tags
+                                .map((t) => Chip(
+                                      label: Text(t),
+                                      onDeleted: isUploading ? null : () => setState(() => _tags.remove(t)),
+                                    ))
+                                .toList(),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ] else ...[
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: _CardContainer(
+                        label: '作品描述',
+                        child: TextField(
+                          controller: _descCtl,
+                          enabled: !isUploading,
+                          decoration: const InputDecoration(
+                            hintText: '为视频添加发布后描述',
+                            border: InputBorder.none,
+                          ),
+                          minLines: 4,
+                          maxLines: 8,
                         ),
                       ),
-                    );
-                  }),
-                ),
-              ),
-              const SizedBox(width: Spacing.lg),
-              Expanded(
-                child: _CardContainer(
-                  label: '视频预览',
-                  child: Builder(builder: (context) {
-                    final double cardWidth = (width - Spacing.lg) / 2;
-                    final double aspect = _vc != null && _vc!.value.isInitialized ? _vc!.value.aspectRatio : 16 / 9;
-                    final double videoH = cardWidth / aspect;
-                    final double cardHeight = videoH < minPreviewHeight ? minPreviewHeight : videoH;
-                    return SizedBox(
-                      height: cardHeight,
-                      child: AspectRatio(
-                        aspectRatio: aspect,
-                        child: _vc != null && _vcReady
-                            ? Stack(
-                                alignment: Alignment.bottomCenter,
-                                children: [
-                                  VideoPlayer(_vc!),
-                                  VideoProgressIndicator(_vc!, allowScrubbing: true),
-                                ],
-                              )
-                            : _VideoPlaceholder(name: videoName),
+                    ),
+                    const SizedBox(width: Spacing.md),
+                    Expanded(
+                      child: _CardContainer(
+                        label: '视频标签',
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.stretch,
+                          children: [
+                            TextField(
+                              controller: _tagCtl,
+                              enabled: !isUploading,
+                              decoration: const InputDecoration(
+                                hintText: '输入后按回车或逗号添加',
+                                border: InputBorder.none,
+                              ),
+                              onSubmitted: (_) => _addTagFromInput(),
+                            ),
+                            const SizedBox(height: Spacing.sm),
+                            Wrap(
+                              spacing: Spacing.sm,
+                              runSpacing: Spacing.sm,
+                              children: _tags
+                                  .map((t) => Chip(
+                                        label: Text(t),
+                                        onDeleted: isUploading ? null : () => setState(() => _tags.remove(t)),
+                                      ))
+                                  .toList(),
+                            ),
+                          ],
+                        ),
                       ),
-                    );
-                  }),
+                    ),
+                  ],
                 ),
               ),
             ],
-          ),
-        ],
-        const SizedBox(height: Spacing.lg),
-        // 描述 & 标签：使用卡片容器风格，并在窄屏时竖向排列
-        if (!isWide) ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                _CardContainer(
-                  label: '作品描述',
-                  child: TextField(
-                    controller: _descCtl,
-                    decoration: const InputDecoration(
-                      hintText: '为视频添加发布后描述',
-                      border: InputBorder.none,
+            const SizedBox(height: Spacing.lg),
+            // 上传进度或发布按钮
+            if (isUploading) ...[
+              _UploadProgressWidget(progress: progress),
+            ] else if (progress.isFailed) ...[
+              _CardContainer(
+                label: '发布失败',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      progress.errorMessage ?? '未知错误',
+                      style: TextStyle(color: Theme.of(context).colorScheme.error),
                     ),
-                    minLines: 4,
-                    maxLines: 8,
-                  ),
-                ),
-                const SizedBox(height: Spacing.lg),
-                _CardContainer(
-                  label: '视频标签',
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      TextField(
-                        controller: _tagCtl,
-                        decoration: const InputDecoration(
-                          hintText: '输入后按回车或逗号添加',
-                          border: InputBorder.none,
-                        ),
-                        onSubmitted: (_) => _addTagFromInput(),
-                      ),
-                      const SizedBox(height: Spacing.sm),
-                      Wrap(
-                        spacing: Spacing.sm,
-                        runSpacing: Spacing.sm,
-                        children: _tags
-                            .map((t) => Chip(
-                                  label: Text(t),
-                                  onDeleted: () => setState(() => _tags.remove(t)),
-                                ))
-                            .toList(),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ] else ...[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-            child: Row(
-              children: [
-                Expanded(
-                  child: _CardContainer(
-                    label: '作品描述',
-                    child: TextField(
-                      controller: _descCtl,
-                      decoration: const InputDecoration(
-                        hintText: '为视频添加发布后描述',
-                        border: InputBorder.none,
-                      ),
-                      minLines: 4,
-                      maxLines: 8,
+                    const SizedBox(height: Spacing.md),
+                    FilledButton(
+                      onPressed: () {
+                        videoProvider.resetPublishProgress();
+                        _publish();
+                      },
+                      child: const Text('重试'),
                     ),
-                  ),
+                  ],
                 ),
-                const SizedBox(width: Spacing.md),
-                Expanded(
-                  child: _CardContainer(
-                    label: '视频标签',
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        TextField(
-                          controller: _tagCtl,
-                          decoration: const InputDecoration(
-                            hintText: '输入后按回车或逗号添加',
-                            border: InputBorder.none,
-                          ),
-                          onSubmitted: (_) => _addTagFromInput(),
-                        ),
-                        const SizedBox(height: Spacing.sm),
-                        Wrap(
-                          spacing: Spacing.sm,
-                          runSpacing: Spacing.sm,
-                          children: _tags
-                              .map((t) => Chip(
-                                    label: Text(t),
-                                    onDeleted: () => setState(() => _tags.remove(t)),
-                                  ))
-                              .toList(),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-        const SizedBox(height: Spacing.lg),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton(onPressed: _publish, child: const Text('发布')),
-        ),
-      ],
+              ),
+            ] else ...[
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton(onPressed: _publish, child: const Text('发布')),
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 
   Widget _buildPublish(double width) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _CardContainer(
-          label: '发布预览',
-          child: Padding(
-            padding: const EdgeInsets.all(Spacing.md),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+    return Consumer<VideoProvider>(
+      builder: (context, videoProvider, child) {
+        final progress = videoProvider.publishProgress;
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            if (progress.isSuccess) ...[
+              _CardContainer(
+                label: '发布成功',
+                child: Padding(
+                  padding: const EdgeInsets.all(Spacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.check_circle_outline,
+                        size: 64,
+                        color: Theme.of(context).colorScheme.primary,
+                      ),
+                      const SizedBox(height: Spacing.md),
+                      Text(
+                        '视频发布成功！',
+                        style: Theme.of(context).textTheme.headlineSmall,
+                      ),
+                      const SizedBox(height: Spacing.sm),
+                      Text(
+                        '您的视频已提交，后台正在处理中',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: Spacing.lg),
+              _CardContainer(
+                label: '视频信息',
+                child: Padding(
+                  padding: const EdgeInsets.all(Spacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [const Icon(Icons.video_file), const SizedBox(width: 8), Text(videoName ?? '无视频')]),
+                      const SizedBox(height: Spacing.md),
+                      Text('标题：${_titleCtl.text.isEmpty ? '（空）' : _titleCtl.text}'),
+                      const SizedBox(height: Spacing.md),
+                      Text('描述：${_descCtl.text.isEmpty ? '（空）' : _descCtl.text}'),
+                      const SizedBox(height: Spacing.md),
+                      Text('标签：${_tags.isEmpty ? '（无）' : _tags.join(', ')}'),
+                    ],
+                  ),
+                ),
+              ),
+            ] else ...[
+              _CardContainer(
+                label: '发布预览',
+                child: Padding(
+                  padding: const EdgeInsets.all(Spacing.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(children: [const Icon(Icons.video_file), const SizedBox(width: 8), Text(videoName ?? '无视频')]),
+                      const SizedBox(height: Spacing.md),
+                      Text('标题：${_titleCtl.text.isEmpty ? '（空）' : _titleCtl.text}'),
+                      const SizedBox(height: Spacing.md),
+                      Text('描述：${_descCtl.text.isEmpty ? '（空）' : _descCtl.text}'),
+                      const SizedBox(height: Spacing.md),
+                      Text('标签：${_tags.isEmpty ? '（无）' : _tags.join(', ')}'),
+                      const SizedBox(height: Spacing.md),
+                      const Text('Markdown 片段：'),
+                      const SizedBox(height: Spacing.sm),
+                      Text(ContentValidator.summarize(mdContent, maxLen: 240)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: Spacing.lg),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                Row(children: [const Icon(Icons.video_file), const SizedBox(width: 8), Text(videoName ?? '无视频')]),
-                const SizedBox(height: Spacing.md),
-                Text('描述：${_descCtl.text.isEmpty ? '（空）' : _descCtl.text}'),
-                const SizedBox(height: Spacing.md),
-                Text('标签：${_tags.isEmpty ? '（无）' : _tags.join(', ')}'),
-                const SizedBox(height: Spacing.md),
-                Text('Markdown 片段：'),
-                const SizedBox(height: Spacing.sm),
-                Text(ContentValidator.summarize(mdContent, maxLen: 240)),
+                if (progress.isSuccess) ...[
+                  OutlinedButton(
+                    onPressed: () {
+                      videoProvider.resetPublishProgress();
+                      _resetForm();
+                      _animateToStep(CreateStep.prepare);
+                    },
+                    child: const Text('发布新视频'),
+                  ),
+                  const SizedBox(width: Spacing.md),
+                  FilledButton(
+                    onPressed: () => Navigator.of(context).maybePop(),
+                    child: const Text('返回首页'),
+                  ),
+                ] else ...[
+                  FilledButton(
+                    onPressed: () => _animateToStep(CreateStep.edit),
+                    child: const Text('返回 · 继续编辑'),
+                  ),
+                ],
               ],
             ),
-          ),
-        ),
-        const SizedBox(height: Spacing.lg),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton(onPressed: () => _animateToStep(CreateStep.prepare), child: const Text('返回 · 继续编辑')),
-        ),
-      ],
+          ],
+        );
+      },
     );
+  }
+
+  void _resetForm() {
+    setState(() {
+      videoName = null;
+      videoSource = null;
+      mdFileName = null;
+      mdContent = '';
+      _titleCtl.clear();
+      _descCtl.clear();
+      _tagCtl.clear();
+      _tags.clear();
+      _vc?.dispose();
+      _vc = null;
+      _vcReady = false;
+    });
   }
 }
 
@@ -659,6 +848,67 @@ class _VideoPlaceholder extends StatelessWidget {
           Icon(Icons.play_circle_outline, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant),
           const SizedBox(height: 8),
           Text(name ?? '未选择视频'),
+        ],
+      ),
+    );
+  }
+}
+
+class _UploadProgressWidget extends StatelessWidget {
+  final PublishProgress progress;
+  const _UploadProgressWidget({required this.progress});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.all(Spacing.lg),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        borderRadius: Radii.md,
+        border: Border.all(color: cs.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 3,
+                  value: progress.isUploading ? progress.progress : null,
+                ),
+              ),
+              const SizedBox(width: Spacing.md),
+              Expanded(
+                child: Text(
+                  progress.message ?? '处理中...',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+              ),
+            ],
+          ),
+          if (progress.isUploading) ...[
+            const SizedBox(height: Spacing.md),
+            ClipRRect(
+              borderRadius: BorderRadius.circular(4),
+              child: LinearProgressIndicator(
+                value: progress.progress,
+                minHeight: 8,
+                backgroundColor: cs.surfaceContainerHighest,
+              ),
+            ),
+            const SizedBox(height: Spacing.sm),
+            Text(
+              '${(progress.progress * 100).toStringAsFixed(1)}%',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: cs.onSurfaceVariant,
+                  ),
+              textAlign: TextAlign.end,
+            ),
+          ],
         ],
       ),
     );
