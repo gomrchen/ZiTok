@@ -1,5 +1,8 @@
+import 'dart:io';
+
 import 'package:dio/dio.dart';
 import '../models/user_models.dart';
+import '../models/video.dart';
 
 /// 用户接口服务（对接真实 API）
 class UserService {
@@ -76,5 +79,109 @@ class UserService {
       'user_id': userId,
       'type': 1, // type=1 查找我的粉丝
     });
+  }
+
+  Future<List<Video>> getVideos({
+    required String userId,
+    int page = 1,
+    int size = 999,
+  }) async {
+    try {
+      final response = await dio.get('/video/list', queryParameters: {
+        'user_id': userId,
+        'page': page,
+        'size': size,
+      });
+
+      // 解析响应数据
+      if (response.data['code'] == '10000') {
+        final List<dynamic> dataList = response.data['data'] ?? [];
+        return dataList.map((item) => Video.fromJson(item)).toList();
+      } else {
+        throw Exception('获取视频列表失败: ${response.data['message']}');
+      }
+    } catch (e) {
+      print('❌ 获取视频列表失败: $e');
+      rethrow;
+    }
+  }
+
+
+
+  /// 删除视频
+  Future<Response> deleteVideo({required String videoId}) async {
+    try {
+      print('🗑️ 开始删除视频，videoId: $videoId');
+      final response = await dio.delete('/video/$videoId');
+      print('✅ 视频删除成功');
+      return response;
+    } catch (e) {
+      print('❌ 删除视频失败: $e');
+      rethrow;
+    }
+  }
+
+  /// 在 UserService 类中添加这个方法
+  Future<Map<String, dynamic>> getComments({
+    required String videoId,
+    int page = 1,
+    int size = 999,
+  }) async {
+    try {
+      final response = await dio.get(
+        '/video/comments',
+        queryParameters: {
+          'video_id': videoId,
+          'page': page,
+          'size': size,
+        },
+      );
+      return response.data;
+    } catch (e) {
+      print('❌ 获取评论失败: $e');
+      rethrow;
+    }
+  }
+
+
+  /// 上传头像（multipart/form-data）
+  Future<Response> uploadVideoCover({required String userId, required MultipartFile coverData}) {
+    final form = FormData.fromMap({
+      'avatar_data': coverData,
+      'user_id': userId,
+    });
+    return dio.post('/video/{video_id}/cover', data: form);
+  }
+
+
+
+  /// 更新视频信息（包括封面）
+  Future<Map<String, dynamic>> updateVideoInfo({
+    required String videoId,
+    String? title,
+    String? description,
+    List<String>? tags,
+    String? coverUrl,
+  }) async {
+    try {
+      print('🔄 开始更新视频信息，videoId: $videoId');
+
+      final Map<String, dynamic> data = {};
+      if (title != null) data['title'] = title;
+      if (description != null) data['description'] = description;
+      if (tags != null) data['tags'] = tags;
+      if (coverUrl != null) data['cover_url'] = coverUrl;
+
+      final response = await dio.put(
+        '/video/$videoId',
+        data: data,
+      );
+
+      print('✅ 视频信息更新成功: ${response.statusCode}');
+      return response.data;
+    } catch (e) {
+      print('❌ 视频信息更新失败: $e');
+      rethrow;
+    }
   }
 }

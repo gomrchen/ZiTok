@@ -4,11 +4,16 @@ import 'package:go_router/go_router.dart';
 import 'package:hive/hive.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../app.dart';
+import '../../models/video.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/messaging_provider.dart';
+import '../../services/user_service.dart';
 import '../../theme/theme_tokens.dart';
 import '../../providers/profile_provider.dart';
 import '../../models/user_models.dart';
+import '../../utils/url_utils.dart';
+import 'package:flutter/foundation.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -698,30 +703,431 @@ class _NotesTab extends StatelessWidget {
   }
 }
 
-class _VideosTab extends StatelessWidget {
+
+class _VideosTab extends StatefulWidget {
+  @override
+  State<_VideosTab> createState() => _VideosTabState();
+}
+
+class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
+  List<Video> _videos = [];
+  bool _loading = false;
+  String? _error;
+  String? _userId;
+  bool _needsRefresh = false; // 添加刷新标志
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addObserver(this); // 添加生命周期监听
+    _getUserIdAndLoadVideos();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this); // 移除监听
+    super.dispose();
+  }
+
+  // 监听应用状态变化
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // 当应用从后台回到前台时，检查是否需要刷新
+      if (_needsRefresh) {
+        _loadVideos();
+        _needsRefresh = false;
+      }
+    }
+  }
+
+  // 修改：添加路由监听来检测页面返回
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // 监听路由变化，当页面重新可见时刷新数据
+    ModalRoute? route = ModalRoute.of(context);
+    if (route != null) {
+      route.addScopedWillPopCallback(() {
+        // 当页面即将被弹出时（返回），设置需要刷新
+        _needsRefresh = true;
+        return SynchronousFuture(true);
+      });
+    }
+  }
+
+  void _getUserIdAndLoadVideos() {
+    print('🔍 _VideosTab: 开始获取用户ID');
+
+    // 方法1: 从 ProfileProvider 获取（主要方法）
+    final profileProvider = context.read<ProfileProvider>();
+    final profileUser = profileProvider.user;
+
+    if (profileUser != null && profileUser.id.isNotEmpty) {
+      print('✅ _VideosTab: 从ProfileProvider获取到用户ID: ${profileUser.id}');
+      _userId = profileUser.id;
+      _loadVideos();
+      return;
+    }
+
+    // 方法2: 从 AuthProvider 获取（备用方法）
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final authUser = authProvider.user;
+      if (authUser != null && authUser.id.isNotEmpty) {
+        print('✅ _VideosTab: 从AuthProvider获取到用户ID: ${authUser.id}');
+        _userId = authUser.id;
+        _loadVideos();
+        return;
+      }
+    } catch (e) {
+      print('⚠️ _VideosTab: 从AuthProvider获取用户ID失败: $e');
+    }
+
+    // 方法3: 从本地存储获取（最后备选）
+    _getUserIdFromStorage();
+  }
+
+  void _getUserIdFromStorage() async {
+    try {
+      print('🔍 _VideosTab: 尝试从本地存储获取用户ID');
+
+      // 首先尝试从 Hive 获取
+      final box = await Hive.openBox('user_box');
+      final String? hiveUserId = box.get('id') as String?;
+
+      if (hiveUserId != null && hiveUserId.isNotEmpty) {
+        print('✅ _VideosTab: 从Hive获取到用户ID: $hiveUserId');
+        setState(() {
+          _userId = hiveUserId;
+        });
+        _loadVideos();
+        return;
+      }
+
+      // 然后尝试从 SharedPreferences 获取
+      final prefs = await SharedPreferences.getInstance();
+      final String? prefsUserId = prefs.getString('auth_user_id');
+
+      if (prefsUserId != null && prefsUserId.isNotEmpty) {
+        print('✅ _VideosTab: 从SharedPreferences获取到用户ID: $prefsUserId');
+        setState(() {
+          _userId = prefsUserId;
+        });
+        _loadVideos();
+        return;
+      }
+
+      print('❌ _VideosTab: 无法从任何地方获取用户ID');
+      setState(() {
+        _error = '无法获取用户ID，请重新登录';
+        _loading = false;
+      });
+    } catch (e) {
+      print('❌ _VideosTab: 从本地存储获取用户ID失败: $e');
+      setState(() {
+        _error = '获取用户信息失败: $e';
+        _loading = false;
+      });
+    }
+  }
+
+  Future<void> _loadVideos() async {
+    if (_userId == null || _userId!.isEmpty) {
+      print('⚠️ _VideosTab: 用户ID为空，无法加载视频');
+      setState(() {
+        _error = '用户ID为空，无法加载视频';
+        _loading = false;
+      });
+      return;
+    }
+
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+
+    try {
+      print('🔍 _VideosTab: 开始加载用户视频，userId: $_userId');
+
+      final userService = UserService(AppBootstrap.apiClient.dio);
+      final videos = await userService.getVideos(
+        userId: _userId!,
+        page: 1,
+        size: 20,
+      );
+
+      if (mounted) {
+        setState(() {
+          _videos = videos;
+        });
+      }
+
+      print('✅ _VideosTab: 成功加载 ${videos.length} 个视频');
+
+    } catch (e) {
+      print('❌ _VideosTab: 加载视频失败: $e');
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+        });
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+        });
+      }
+    }
+  }
+
+  // 修改：添加手动刷新方法
+  void _refreshVideos() {
+    print('🔄 _VideosTab: 手动刷新视频列表');
+    _loadVideos();
+  }
+
+  // 构建视频封面组件
+  Widget _buildVideoThumbnail(Video video) {
+    String? resolvedCoverUrl;
+
+    if (video.coverUrl != null && video.coverUrl!.isNotEmpty) {
+      resolvedCoverUrl = UrlUtils.resolveStorageUrl(video.coverUrl!, defaultDir: 'covers');
+      print('🔄 转换封面URL: ${video.coverUrl} -> $resolvedCoverUrl');
+    }
+
+    if (resolvedCoverUrl != null && resolvedCoverUrl.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          resolvedCoverUrl,
+          width: 60,
+          height: 60,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            print('❌ 封面加载失败: $resolvedCoverUrl, 错误: $error');
+            return _buildDefaultThumbnail();
+          },
+          loadingBuilder: (context, child, loadingProgress) {
+            if (loadingProgress == null) return child;
+            return _buildDefaultThumbnail();
+          },
+        ),
+      );
+    }
+    return _buildDefaultThumbnail();
+  }
+
+  Widget _buildDefaultThumbnail() {
+    return Container(
+      width: 60,
+      height: 60,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Icon(Icons.videocam, color: Colors.grey),
+    );
+  }
+
+  // 构建视频统计信息
+  Widget _buildVideoStats(Video video) {
+    final stats = <String>[];
+
+    if (video.views != null && video.views! > 0) {
+      stats.add('${video.views} 播放');
+    }
+
+    if (video.likes != null && video.likes! > 0) {
+      stats.add('${video.likes} 点赞');
+    }
+
+    if (stats.isEmpty) {
+      stats.add('暂无数据');
+    }
+
+    return Text(
+      stats.join(' · '),
+      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+        color: Theme.of(context).colorScheme.onSurfaceVariant,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(Spacing.md),
-      itemBuilder: (context, i) => ListTile(
-        leading: const Icon(Icons.video_library),
-        title: Text('视频 #$i'),
-        subtitle: const Text('视频简介…'),
-        trailing: IconButton(
-          icon: const Icon(Icons.chevron_right),
-          onPressed: () => context.push('/profile/video/$i/manage', extra: {
-            'title': '视频 #$i',
-            'tags': const ['教程'],
-            'likes': 0,
-            'favorites': 0,
-            'views': 0,
-            'coverUrl': null,
-          }),
+    final cs = Theme.of(context).colorScheme;
+
+    // 如果还没有获取到用户ID，显示加载状态
+    if (_userId == null && !_loading && _error == null) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(Spacing.lg),
+          child: CircularProgressIndicator(),
         ),
+      );
+    }
+
+    // 显示加载状态
+    if (_loading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(Spacing.lg),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    // 显示错误状态
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(Spacing.lg),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline,
+                color: cs.error,
+                size: 48,
+              ),
+              const SizedBox(height: Spacing.md),
+              Text(
+                '加载失败',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: cs.error,
+                ),
+              ),
+              const SizedBox(height: Spacing.sm),
+              Text(
+                _error!,
+                style: Theme.of(context).textTheme.bodySmall,
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: Spacing.lg),
+              ElevatedButton(
+                onPressed: _getUserIdAndLoadVideos,
+                child: const Text('重新加载'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 显示空状态
+    if (_videos.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(Spacing.lg),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.video_library_outlined,
+                color: cs.onSurfaceVariant,
+                size: 64,
+              ),
+              const SizedBox(height: Spacing.md),
+              Text(
+                '暂无视频',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: Spacing.sm),
+              Text(
+                '您还没有发布任何视频',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: Spacing.lg),
+              // 修改：刷新按钮调用新的刷新方法
+              ElevatedButton(
+                onPressed: _refreshVideos,
+                child: const Text('刷新'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 显示视频列表 - 添加刷新指示器
+    return RefreshIndicator(
+      onRefresh: () async {
+        await _loadVideos();
+      },
+      child: ListView.separated(
+        padding: const EdgeInsets.all(Spacing.md),
+        itemCount: _videos.length,
+        separatorBuilder: (_, __) => const SizedBox(height: Spacing.md),
+        itemBuilder: (context, index) {
+          final video = _videos[index];
+          return ListTile(
+            leading: _buildVideoThumbnail(video),
+            title: Text(
+              video.title ?? '未命名视频',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w500,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (video.intro != null && video.intro!.isNotEmpty) ...[
+                  Text(
+                    video.intro!,
+                    style: Theme.of(context).textTheme.bodySmall,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                ],
+                _buildVideoStats(video),
+              ],
+            ),
+            trailing: IconButton(
+              icon: Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+              onPressed: () async {
+                // 修改：使用 push 并等待返回后刷新
+                await context.push('/profile/video/${video.id}/manage', extra: {
+                  'title': video.title ?? '未命名视频',
+                  'description': video.intro ?? '',
+                  'likes': video.likes ?? 0,
+                  'views': video.views ?? 0,
+                  'coverUrl': UrlUtils.resolveStorageUrl(video.coverUrl ?? '', defaultDir: 'covers'),
+                  'videoUrl': video.videoUrl,
+                  'tags': video.tags,
+                });
+
+                // 返回后刷新视频列表
+                _refreshVideos();
+              },
+            ),
+            onTap: () async {
+              // 修改：点击视频项也使用相同的逻辑
+              await context.push('/profile/video/${video.id}/manage', extra: {
+                'title': video.title ?? '未命名视频',
+                'description': video.intro ?? '',
+                'likes': video.likes ?? 0,
+                'views': video.views ?? 0,
+                'coverUrl': UrlUtils.resolveStorageUrl(video.coverUrl ?? '', defaultDir: 'covers'),
+                'videoUrl': video.videoUrl,
+                'tags': video.tags,
+              });
+
+              // 返回后刷新视频列表
+              _refreshVideos();
+            },
+          );
+        },
       ),
-      separatorBuilder: (_, __) => const SizedBox(height: Spacing.sm),
-      itemCount: 8,
     );
   }
 }
-
