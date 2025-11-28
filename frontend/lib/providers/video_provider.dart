@@ -154,6 +154,35 @@ class VideoProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 收藏（本地更新），真实项目中应调用后端接口并做失败回滚
+  Future<void> collect(String videoId) async {
+    // TODO: 调用后端API
+    // await repo.collect(videoId);
+    void updateList(List<Video> list) {
+      final i = list.indexWhere((v) => v.id == videoId);
+      if (i >= 0) {
+        final v = list[i];
+        list[i] = Video(
+          id: v.id,
+          uid: v.uid,
+          title: v.title,
+          intro: v.intro,
+          coverUrl: v.coverUrl,
+          videoUrl: v.videoUrl,
+          stars: (v.stars ?? 0) + 1,
+          likes: v.likes,
+          views: v.views,
+          commentCount: v.commentCount,
+          tags: v.tags,
+        );
+      }
+    }
+    updateList(_follow);
+    updateList(_discover);
+    updateList(_featured);
+    notifyListeners();
+  }
+
   Future<void> visit(String videoId) async {
     await repo.visit(videoId);
     void updateList(List<Video> list) {

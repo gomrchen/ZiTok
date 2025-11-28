@@ -5,9 +5,10 @@ class Video {
   final String? intro;
   final String? coverUrl;
   final String? videoUrl;
-  final int? stars;
-  final int? likes;
-  final int? views;
+  final int? stars;       // 收藏数（保留兼容）
+  final int? likes;       // 点赞数（favoriteCount）
+  final int? views;       // 观看数（保留兼容）
+  final int? commentCount; // 评论数
   final List<String> tags;
 
   const Video({
@@ -20,6 +21,7 @@ class Video {
     this.stars,
     this.likes,
     this.views,
+    this.commentCount,
     this.tags = const [],
   });
 
@@ -39,10 +41,17 @@ class Video {
             ? j['likes'] as int
             : (j['like_count'] is int
                 ? j['like_count'] as int
-                : int.tryParse('${j['like_count'] ?? j['likes']}')),
+                : (j['favoriteCount'] is int
+                    ? j['favoriteCount'] as int
+                    : int.tryParse('${j['like_count'] ?? j['likes'] ?? j['favoriteCount']}'))),
         views: j['views'] is int
             ? j['views'] as int
             : (j['visit_count'] is int ? j['visit_count'] as int : int.tryParse('${j['visit_count'] ?? j['views']}')),
+        commentCount: j['commentCount'] is int
+            ? j['commentCount'] as int
+            : (j['comment_count'] is int
+                ? j['comment_count'] as int
+                : int.tryParse('${j['commentCount'] ?? j['comment_count']}')),
         tags: (j['tags'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
       );
 
@@ -56,6 +65,7 @@ class Video {
     int? stars,
     int? likes,
     int? views,
+    int? commentCount,
     List<String>? tags,
   }) {
     return Video(
@@ -68,6 +78,7 @@ class Video {
       stars: stars ?? this.stars,
       likes: likes ?? this.likes,
       views: views ?? this.views,
+      commentCount: commentCount ?? this.commentCount,
       tags: tags ?? this.tags,
     );
   }

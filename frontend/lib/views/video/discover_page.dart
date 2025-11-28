@@ -5,10 +5,12 @@ import '../../models/video.dart';
 import '../../providers/video_provider.dart';
 import '../../theme/theme_tokens.dart';
 import '../../services/video/video_preload_manager.dart';
+import '../../widgets/video_stats.dart';
 import 'featured_page.dart';
 import 'widgets/md_notes_sheet.dart';
 import '../../widgets/comment_sheet.dart';
-import 'package:go_router/go_router.dart';
+import 'video_detail_page.dart';
+import 'dart:async';
 
 class DiscoverPage extends StatefulWidget {
   const DiscoverPage({super.key});
@@ -252,12 +254,9 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
   bool _isBuffering = false;
   String? _error;
   bool _wasPlayingBeforePause = false;
-
-  String _fmtLocal(int c) {
-    if (c >= 1000000) return '${(c / 1000000).toStringAsFixed(1)}M';
-    if (c >= 1000) return '${(c / 1000).toStringAsFixed(1)}k';
-    return '$c';
-  }
+  bool _showControls = false;
+  Timer? _hideControlsTimer;
+  bool _isDescriptionExpanded = false;
 
   // 顶部栏：菜单展开占位
   void _onMenu() {
@@ -279,27 +278,6 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
         return MdNotesBottomSheet(videoId: widget.video.id);
       },
     );
-  }
-
-  // 分享占位：显示气泡提示（2秒消失）
-  void _onShare() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: const Text('已复制链接'),
-        duration: const Duration(milliseconds: 2000),
-        behavior: SnackBarBehavior.floating,
-        margin: const EdgeInsets.all(16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        backgroundColor: Colors.black.withValues(alpha: 0.85),
-      ),
-    );
-  }
-
-  // 跳转视频详情
-  void _openDetails() {
-    // 暂停当前视频再跳转
-    _controller.pause();
-    context.go('/video/${widget.video.id}');
   }
 
   @override
@@ -375,10 +353,59 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
 
   @override
   void dispose() {
+    _hideControlsTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _controller.removeListener(_onControllerUpdate);
     _controller.dispose();
     super.dispose();
+  }
+
+  void _togglePlayPause() {
+    setState(() {
+      if (_controller.value.isPlaying) {
+        _controller.pause();
+      } else {
+        _controller.play();
+      }
+      _showControls = true;
+    });
+    _resetHideControlsTimer();
+  }
+
+  void _resetHideControlsTimer() {
+    _hideControlsTimer?.cancel();
+    _hideControlsTimer = Timer(const Duration(seconds: 3), () {
+      if (mounted && _controller.value.isPlaying) {
+        setState(() => _showControls = false);
+      }
+    });
+  }
+
+  void _onVideoTap() {
+    setState(() {
+      _showControls = !_showControls;
+    });
+    if (_showControls) {
+      _resetHideControlsTimer();
+    }
+  }
+
+  void _openVideoDetail() {
+    // 暂停当前视频
+    _controller.pause();
+
+    // 导航到视频详情页
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => VideoDetailPage(video: widget.video),
+      ),
+    ).then((_) {
+      // 返回时恢复播放
+      if (mounted) {
+        _controller.play();
+      }
+    });
   }
 
   @override
@@ -387,11 +414,75 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
     return Stack(
       fit: StackFit.expand,
       children: [
+        // 视频播放器
         _error != null
-            ? Center(child: Text(_error!, style: const TextStyle(color: Colors.black54)))
+            ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, size: 64, color: Colors.white54),
+                    const SizedBox(height: 16),
+                    Text(_error!, style: const TextStyle(color: Colors.white70)),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _initController,
+                      child: const Text('重试'),
+                    ),
+                  ],
+                ),
+              )
             : _initialized
-                ? FittedBox(fit: BoxFit.cover, child: SizedBox(width: _controller.value.size.width, height: _controller.value.size.height, child: VideoPlayer(_controller)))
-                : const Center(child: CircularProgressIndicator()),
+                ? GestureDetector(
+                    onTap: _onVideoTap,
+                    child: Container(
+                      color: Colors.black,
+                      child: FittedBox(
+                        fit: BoxFit.cover,
+                        child: SizedBox(
+                          width: _controller.value.size.width,
+                          height: _controller.value.size.height,
+                          child: VideoPlayer(_controller),
+                        ),
+                      ),
+                    ),
+                  )
+                : Container(
+                    color: Colors.black,
+                    child: const Center(child: CircularProgressIndicator(color: Colors.white)),
+                  ),
+
+        // 缓冲指示器
+        if (_initialized && _isBuffering)
+          Container(
+            color: Colors.black26,
+            child: const Center(
+              child: CircularProgressIndicator(
+                color: Colors.white,
+                strokeWidth: 3,
+              ),
+            ),
+          ),
+
+        // 播放/暂停按钮overlay
+        if (_initialized && _showControls && !_isBuffering)
+          Center(
+            child: GestureDetector(
+              onTap: _togglePlayPause,
+              child: Container(
+                width: 80,
+                height: 80,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.black.withValues(alpha: 0.5),
+                ),
+                child: Icon(
+                  _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                  size: 50,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+          ),
         // 顶部功能栏（左：附件；右：搜索、菜单）
         Positioned(
           left: Spacing.md,
@@ -439,42 +530,143 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
         ),
         // 右侧操作栏
         Positioned(
-          right: Spacing.md,
-          top: MediaQuery.of(context).size.height * 0.25,
+          right: 12,
+          bottom: MediaQuery.of(context).size.height * 0.15,
           child: Column(
             children: [
+              // 创作者头像（带+关注）
+              _PublisherAvatar(
+                uid: widget.video.uid,
+                avatarUrl: null, // TODO: 添加头像URL字段到Video模型
+              ),
+              const SizedBox(height: 24),
+              // 点赞
               _LikeActionIcon(
                 initialCount: widget.video.likes ?? 0,
                 onTap: () => context.read<VideoProvider>().like(widget.video.id),
               ),
-              const SizedBox(height: Spacing.md),
-              _ActionIcon(icon: Icons.chat_bubble_outline, label: '1.2k', onTap: () {
-                // 打开评论弹窗
-                showCommentsSheet(context, videoId: 'v_2');
-              }),
-              const SizedBox(height: Spacing.md),
-              _ActionIcon(icon: Icons.share_outlined, label: '4.6k', onTap: _onShare),
-              const SizedBox(height: Spacing.md),
-              _ActionIcon(icon: Icons.open_in_full, label: '', onTap: _openDetails),
+              const SizedBox(height: 16),
+              // 评论
+              _ActionIcon(
+                icon: Icons.chat_bubble_outline,
+                label: formatCountCompact(widget.video.commentCount),
+                onTap: () {
+                  showCommentsSheet(context, videoId: widget.video.id);
+                },
+              ),
+              const SizedBox(height: 16),
+              // 收藏
+              _CollectActionIcon(
+                initialCount: widget.video.stars ?? 0,
+                onTap: () => context.read<VideoProvider>().collect(widget.video.id),
+              ),
+              // 注：转发按钮按需求不予实现，但保留注释说明
+              // const SizedBox(height: 16),
+              // _ActionIcon(
+              //   icon: Icons.share_outlined,
+              //   label: '',
+              //   onTap: _onShare,
+              // ),
             ],
           ),
         ),
-        // 底部文案
+        // 底部文案（添加渐变背景确保始终可见）
         Positioned(
-          left: Spacing.md,
-          right: Spacing.md,
-          bottom: Spacing.xl,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('@${widget.video.uid ?? '未知作者'}', style: theme.textTheme.bodyMedium?.copyWith(color: Colors.white)),
-              const SizedBox(height: 8),
-              Text('${widget.video.intro ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis, style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70)),
-              const SizedBox(height: 8),
-              Text('点赞 ${_fmtLocal(widget.video.likes ?? 0)} · 收藏 ${_fmtLocal(widget.video.stars ?? 0)}', style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70)),
-            ],
+          left: 0,
+          right: 80,
+          bottom: 50,
+          child: Container(
+            padding: EdgeInsets.only(
+              left: Spacing.md,
+              right: Spacing.md,
+              top: 40,
+              bottom: 16,
+            ),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.transparent,
+                  Colors.black.withValues(alpha: 0.7),
+                ],
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '@${widget.video.uid ?? '未知作者'}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isDescriptionExpanded = !_isDescriptionExpanded;
+                    });
+                  },
+                  child: Text(
+                    '${widget.video.intro ?? ''}',
+                    maxLines: _isDescriptionExpanded ? null : 2,
+                    overflow: _isDescriptionExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                VideoStatsText(
+                  commentCount: widget.video.commentCount,
+                  likeCount: widget.video.likes,
+                  isDark: true,
+                ),
+              ],
+            ),
           ),
         ),
+
+        // 查看详情按钮（底部中央）
+        if (_initialized)
+          Positioned(
+            bottom: 60,
+            left: 0,
+            right: 0,
+            child: Center(
+              child: GestureDetector(
+                onTap: _openVideoDetail,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.6),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.white, size: 20),
+                      SizedBox(width: 6),
+                      Text(
+                        '查看详情',
+                        style: TextStyle(color: Colors.white, fontSize: 14),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+        // 底部进度条
+        if (_initialized)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _VideoProgressBar(controller: _controller),
+          ),
       ],
     );
   }
@@ -506,6 +698,252 @@ class _ActionIcon extends StatelessWidget {
         ],
       ],
     );
+  }
+}
+
+/// 创作者头像组件（带+关注按钮）
+class _PublisherAvatar extends StatefulWidget {
+  final String? uid;
+  final String? avatarUrl;
+  const _PublisherAvatar({this.uid, this.avatarUrl});
+  @override
+  State<_PublisherAvatar> createState() => _PublisherAvatarState();
+}
+
+class _PublisherAvatarState extends State<_PublisherAvatar> {
+  DateTime? _lastClickTime;
+  bool _isFollowed = false;
+
+  void _handleTap() {
+    // 防抖处理：300ms内只响应一次点击
+    final now = DateTime.now();
+    if (_lastClickTime != null && now.difference(_lastClickTime!).inMilliseconds < 300) {
+      return;
+    }
+    _lastClickTime = now;
+
+    // TODO: 跳转到创作者主页 /publisher/:id
+    if (widget.uid != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('跳转到创作者主页: ${widget.uid}'),
+          duration: const Duration(milliseconds: 1500),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      // context.go('/publisher/${widget.uid}');
+    }
+  }
+
+  void _handleFollow() {
+    // 防抖处理
+    final now = DateTime.now();
+    if (_lastClickTime != null && now.difference(_lastClickTime!).inMilliseconds < 300) {
+      return;
+    }
+    _lastClickTime = now;
+
+    setState(() {
+      _isFollowed = !_isFollowed;
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(_isFollowed ? '已关注' : '已取消关注'),
+        duration: const Duration(milliseconds: 1200),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: _handleTap,
+      child: SizedBox(
+        width: 60,
+        height: 60,
+        child: Stack(
+          children: [
+            // 圆形头像
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white, width: 2),
+                color: Colors.grey.shade300,
+              ),
+              child: ClipOval(
+                child: widget.avatarUrl != null && widget.avatarUrl!.isNotEmpty
+                    ? Image.network(
+                        widget.avatarUrl!,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Icon(Icons.person, size: 30, color: Colors.grey.shade600);
+                        },
+                      )
+                    : Icon(Icons.person, size: 30, color: Colors.grey.shade600),
+              ),
+            ),
+            // 右上角+号关注按钮
+            if (!_isFollowed)
+              Positioned(
+                right: 0,
+                bottom: 0,
+                child: GestureDetector(
+                  onTap: _handleFollow,
+                  child: Container(
+                    width: 20,
+                    height: 20,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Color(0xFFFF2D55), // 抖音红色
+                    ),
+                    child: const Icon(
+                      Icons.add,
+                      color: Colors.white,
+                      size: 16,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 收藏图标（星形）带动画与计数
+class _CollectActionIcon extends StatefulWidget {
+  final int initialCount;
+  final VoidCallback? onTap;
+  const _CollectActionIcon({required this.initialCount, this.onTap});
+  @override
+  State<_CollectActionIcon> createState() => _CollectActionIconState();
+}
+
+class _CollectActionIconState extends State<_CollectActionIcon> with SingleTickerProviderStateMixin {
+  late int count;
+  bool collected = false;
+  bool loading = false;
+  late AnimationController pulse;
+
+  @override
+  void initState() {
+    super.initState();
+    count = widget.initialCount;
+    pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 220));
+  }
+
+  @override
+  void dispose() {
+    pulse.dispose();
+    super.dispose();
+  }
+
+  Future<void> _toggle() async {
+    if (loading) return;
+
+    setState(() {
+      loading = true;
+      collected = !collected;
+      count += collected ? 1 : -1;
+    });
+
+    pulse.forward(from: 0);
+
+    try {
+      if (widget.onTap != null) {
+        widget.onTap!();
+      }
+      // 模拟网络延迟
+      await Future.delayed(const Duration(milliseconds: 300));
+    } catch (e) {
+      // 失败回滚
+      if (mounted) {
+        setState(() {
+          collected = !collected;
+          count += collected ? 1 : -1;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('操作失败: $e'),
+            duration: const Duration(milliseconds: 2000),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: loading ? null : _toggle,
+          child: SizedBox(
+            width: 40,
+            height: 40,
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // 圆形半透明底
+                Container(
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0x33000000),
+                  ),
+                ),
+                // 星形图标（缩放动画）
+                if (!loading)
+                  ScaleTransition(
+                    scale: Tween<double>(begin: 1.0, end: 1.25).animate(
+                      CurvedAnimation(parent: pulse, curve: Curves.easeOut),
+                    ),
+                    child: Icon(
+                      collected ? Icons.star : Icons.star_border,
+                      color: collected ? const Color(0xFFFFD700) : Colors.white,
+                      size: 28,
+                    ),
+                  ),
+                // 加载指示器
+                if (loading)
+                  const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          _formatCount(count),
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: Colors.white.withValues(alpha: 0.7),
+                fontSize: 12,
+              ),
+        ),
+      ],
+    );
+  }
+
+  String _formatCount(int c) {
+    if (c >= 100000000) return '${(c / 100000000).toStringAsFixed(1)}亿';
+    if (c >= 10000) return '${(c / 10000).toStringAsFixed(1)}万';
+    if (c >= 1000) return '${(c / 1000).toStringAsFixed(1)}k';
+    return '$c';
   }
 }
 
@@ -611,5 +1049,185 @@ class _LikeActionIconState extends State<_LikeActionIcon> with TickerProviderSta
     if (c >= 1000000) return '${(c / 1000000).toStringAsFixed(1)}M';
     if (c >= 1000) return '${(c / 1000).toStringAsFixed(1)}k';
     return '$c';
+  }
+}
+
+/// 视频进度条组件
+class _VideoProgressBar extends StatefulWidget {
+  final VideoPlayerController controller;
+
+  const _VideoProgressBar({required this.controller});
+
+  @override
+  State<_VideoProgressBar> createState() => _VideoProgressBarState();
+}
+
+class _VideoProgressBarState extends State<_VideoProgressBar> {
+  bool _isDragging = false;
+  double _dragValue = 0.0;
+
+  @override
+  void initState() {
+    super.initState();
+    widget.controller.addListener(_onControllerUpdate);
+  }
+
+  @override
+  void dispose() {
+    widget.controller.removeListener(_onControllerUpdate);
+    super.dispose();
+  }
+
+  void _onControllerUpdate() {
+    if (!_isDragging && mounted) {
+      setState(() {});
+    }
+  }
+
+  String _formatDuration(Duration duration) {
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final position = _isDragging
+        ? Duration(milliseconds: (_dragValue * widget.controller.value.duration.inMilliseconds).toInt())
+        : widget.controller.value.position;
+    final duration = widget.controller.value.duration;
+    final progress = duration.inMilliseconds > 0
+        ? position.inMilliseconds / duration.inMilliseconds
+        : 0.0;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      // 移除背景渐变，让进度条浮在视频上方
+      decoration: const BoxDecoration(
+        color: Colors.transparent,
+      ),
+      child: Row(
+        children: [
+          // 当前时间（添加阴影提升可读性）
+          Text(
+            _formatDuration(position),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              shadows: [
+                Shadow(
+                  color: Colors.black.withValues(alpha: 0.8),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // 进度条
+          Expanded(
+            child: GestureDetector(
+              onHorizontalDragStart: (details) {
+                setState(() {
+                  _isDragging = true;
+                  _dragValue = progress.clamp(0.0, 1.0);
+                });
+              },
+              onHorizontalDragUpdate: (details) {
+                setState(() {
+                  final RenderBox box = context.findRenderObject() as RenderBox;
+                  final localPosition = box.globalToLocal(details.globalPosition);
+                  final sliderWidth = box.size.width;
+                  _dragValue = (localPosition.dx / sliderWidth).clamp(0.0, 1.0);
+                });
+              },
+              onHorizontalDragEnd: (details) {
+                final newPosition = Duration(
+                  milliseconds: (_dragValue * duration.inMilliseconds).toInt(),
+                );
+                widget.controller.seekTo(newPosition);
+                setState(() {
+                  _isDragging = false;
+                });
+              },
+              child: Container(
+                height: 3,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.25),
+                  borderRadius: BorderRadius.circular(1.5),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.3),
+                      blurRadius: 2,
+                      offset: const Offset(0, 1),
+                    ),
+                  ],
+                ),
+                child: Stack(
+                  children: [
+                    // 已播放进度
+                    FractionallySizedBox(
+                      widthFactor: _isDragging ? _dragValue : progress,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(1.5),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.4),
+                              blurRadius: 3,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    // 拖动指示器
+                    if (_isDragging)
+                      Positioned(
+                        left: (context.size?.width ?? 0) * _dragValue - 7,
+                        top: -5,
+                        child: Container(
+                          width: 13,
+                          height: 13,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withValues(alpha: 0.4),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          // 总时长（添加阴影提升可读性）
+          Text(
+            _formatDuration(duration),
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              shadows: [
+                Shadow(
+                  color: Colors.black.withValues(alpha: 0.8),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
