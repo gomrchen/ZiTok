@@ -73,7 +73,10 @@ class ZitokApp extends StatelessWidget {
           create: (_) => MessagingProvider(),
         ),
         ChangeNotifierProvider<ProfileProvider>(
-          create: (_) => ProfileProvider(repo: userRepository)..load(),
+          create: (context) {
+            print("🔄 创建ProfileProvider");
+            return ProfileProvider(repo: userRepository);
+          },
         ),
         ChangeNotifierProvider<UserProvider>(
           create: (_) => UserProvider(repo: userRepository),
