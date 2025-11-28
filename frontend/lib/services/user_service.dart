@@ -143,17 +143,18 @@ class UserService {
     }
   }
 
-
-  /// 上传头像（multipart/form-data）
-  Future<Response> uploadVideoCover({required String userId, required MultipartFile coverData}) {
+  /// 上传视频封面（multipart/form-data）- 仿照头像上传
+  Future<Response> uploadVideoCover({
+    required String videoId,
+    required MultipartFile coverData,
+  }) {
+    // 将路径中的 {video_id} 替换为实际的 videoId
+    final String path = '/video/$videoId/cover';
     final form = FormData.fromMap({
-      'avatar_data': coverData,
-      'user_id': userId,
+      'cover': coverData, // 字段名改为 'cover'
     });
-    return dio.post('/video/{video_id}/cover', data: form);
+    return dio.post(path, data: form);
   }
-
-
 
   /// 更新视频信息（包括封面）
   Future<Map<String, dynamic>> updateVideoInfo({

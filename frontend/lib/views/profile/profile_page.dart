@@ -24,6 +24,8 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   bool _initialLoadComplete = false;
+  int _videosCount = 0; // 添加视频计数状态
+  bool _loadingVideosCount = false; // 添加视频数量加载状态
 
   @override
   void initState() {
@@ -34,12 +36,128 @@ class _ProfilePageState extends State<ProfilePage> {
       print('📱 ProfilePage: 开始加载用户数据');
       try {
         await context.read<ProfileProvider>().loadFromAuthProvider(context);
+
+        // 用户数据加载完成后，立即加载视频数量
+        _loadVideosCount();
+
         setState(() {
           _initialLoadComplete = true;
         });
       } catch (e) {
         print('❌ ProfilePage: 加载用户数据失败: $e');
       }
+    });
+  }
+
+  // 独立加载视频数量
+  void _loadVideosCount() async {
+    if (mounted) {
+      setState(() {
+        _loadingVideosCount = true;
+      });
+    }
+
+    try {
+      print('🔍 ProfilePage: 开始独立加载视频数量');
+
+      // 获取用户ID
+      final String? userId = await _getUserId();
+
+      if (userId == null || userId.isEmpty) {
+        print('⚠️ ProfilePage: 无法获取用户ID，跳过加载视频数量');
+        return;
+      }
+
+      // 使用UserService获取视频列表并统计数量
+      final userService = UserService(AppBootstrap.apiClient.dio);
+      final videos = await userService.getVideos(
+        userId: userId,
+        page: 1,
+        size: 999, // 只获取1条来统计总数
+      );
+
+      if (mounted) {
+        setState(() {
+          _videosCount = videos.length;
+        });
+      }
+
+      print('✅ ProfilePage: 成功加载视频数量: ${videos.length}');
+
+    } catch (e) {
+      print('❌ ProfilePage: 加载视频数量失败: $e');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingVideosCount = false;
+        });
+      }
+    }
+  }
+
+  // 获取用户ID的独立方法
+  Future<String?> _getUserId() async {
+    print('🔍 ProfilePage: 开始获取用户ID');
+
+    // 方法1: 从 ProfileProvider 获取（主要方法）
+    final profileProvider = context.read<ProfileProvider>();
+    final profileUser = profileProvider.user;
+
+    if (profileUser != null && profileUser.id.isNotEmpty) {
+      print('✅ ProfilePage: 从ProfileProvider获取到用户ID: ${profileUser.id}');
+      return profileUser.id;
+    }
+
+    // 方法2: 从 AuthProvider 获取（备用方法）
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final authUser = authProvider.user;
+      if (authUser != null && authUser.id.isNotEmpty) {
+        print('✅ ProfilePage: 从AuthProvider获取到用户ID: ${authUser.id}');
+        return authUser.id;
+      }
+    } catch (e) {
+      print('⚠️ ProfilePage: 从AuthProvider获取用户ID失败: $e');
+    }
+
+    // 方法3: 从本地存储获取（最后备选）
+    return await _getUserIdFromStorage();
+  }
+
+  Future<String?> _getUserIdFromStorage() async {
+    try {
+      print('🔍 ProfilePage: 尝试从本地存储获取用户ID');
+
+      // 首先尝试从 Hive 获取
+      final box = await Hive.openBox('user_box');
+      final String? hiveUserId = box.get('id') as String?;
+
+      if (hiveUserId != null && hiveUserId.isNotEmpty) {
+        print('✅ ProfilePage: 从Hive获取到用户ID: $hiveUserId');
+        return hiveUserId;
+      }
+
+      // 然后尝试从 SharedPreferences 获取
+      final prefs = await SharedPreferences.getInstance();
+      final String? prefsUserId = prefs.getString('auth_user_id');
+
+      if (prefsUserId != null && prefsUserId.isNotEmpty) {
+        print('✅ ProfilePage: 从SharedPreferences获取到用户ID: $prefsUserId');
+        return prefsUserId;
+      }
+
+      print('❌ ProfilePage: 无法从任何地方获取用户ID');
+      return null;
+    } catch (e) {
+      print('❌ ProfilePage: 从本地存储获取用户ID失败: $e');
+      return null;
+    }
+  }
+
+  // 添加视频数量更新方法
+  void _updateVideosCount(int count) {
+    setState(() {
+      _videosCount = count;
     });
   }
 
@@ -60,6 +178,8 @@ class _ProfilePageState extends State<ProfilePage> {
     print('   - profileBackgroundImageUrl 长度: ${user?.profileBackgroundImageUrl?.length ?? 0}');
     print('   - _initialLoadComplete: $_initialLoadComplete');
     print('   - profile.loading: ${profile.loading}');
+    print('   - _videosCount: $_videosCount'); // 添加视频计数调试
+    print('   - _loadingVideosCount: $_loadingVideosCount'); // 添加视频数量加载状态调试
 
     // 如果初始加载未完成且不在加载状态，显示加载指示器
     if (!_initialLoadComplete && !profile.loading) {
@@ -130,10 +250,13 @@ class _ProfilePageState extends State<ProfilePage> {
                           gender: user?.gender,
                           birthday: user?.birthday,
                           onEdit: () => context.push('/profile/edit'))),
-                      const SliverToBoxAdapter(
+                      SliverToBoxAdapter(
                         child: Padding(
-                          padding: EdgeInsets.symmetric(horizontal: Spacing.md),
-                          child: _StatsRow(),
+                          padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+                          child: _StatsRow(
+                            videosCount: _videosCount,
+                            loadingVideosCount: _loadingVideosCount,
+                          ), // 传递视频数量和加载状态
                         ),
                       ),
                       SliverToBoxAdapter(
@@ -165,7 +288,7 @@ class _ProfilePageState extends State<ProfilePage> {
                           children: [
                             _FavoritesList(),
                             _NotesTab(),
-                            _VideosTab(),
+                            _VideosTab(onVideosLoaded: _updateVideosCount), // 传递回调函数
                           ],
                         ),
                       ),
@@ -184,6 +307,7 @@ class _ProfilePageState extends State<ProfilePage> {
 /// 右上角菜单入口按钮（跳转设置页）
 class _MenuActionButton extends StatelessWidget {
   const _MenuActionButton();
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -464,7 +588,13 @@ class _ProfileHeader extends StatelessWidget {
 }
 
 class _StatsRow extends StatefulWidget {
-  const _StatsRow();
+  final int videosCount; // 接收视频数量
+  final bool loadingVideosCount; // 接收视频数量加载状态
+
+  const _StatsRow({
+    required this.videosCount,
+    required this.loadingVideosCount,
+  });
 
   @override
   State<_StatsRow> createState() => _StatsRowState();
@@ -570,7 +700,7 @@ class _StatsRowState extends State<_StatsRow> {
         Text(num, style: Theme.of(context).textTheme.titleMedium?.copyWith(
           fontWeight: FontWeight.w700,
           fontSize: 18,
-          color: profile.loadingStats ? cs.onSurfaceVariant : cs.onSurface,
+          color: (profile.loadingStats || widget.loadingVideosCount) ? cs.onSurfaceVariant : cs.onSurface,
         )),
         const SizedBox(height: 4),
         Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -579,6 +709,14 @@ class _StatsRowState extends State<_StatsRow> {
       ],
     );
 
+    // 显示视频数量（处理加载状态）
+    String getVideosCountText() {
+      if (widget.loadingVideosCount) {
+        return '...';
+      }
+      return widget.videosCount.toString();
+    }
+
     // 如果没有获取到用户ID，显示加载状态
     if (_userId == null) {
       return Padding(
@@ -586,7 +724,7 @@ class _StatsRowState extends State<_StatsRow> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            cell('-', '视频'),
+            cell(getVideosCountText(), '视频'), // 使用传入的视频数量
             cell('-', '笔记'),
             cell('...', '粉丝'),
             cell('...', '关注'),
@@ -595,8 +733,6 @@ class _StatsRowState extends State<_StatsRow> {
       );
     }
 
-
-
     // 显示加载状态
     if (profile.loadingStats) {
       return Padding(
@@ -604,7 +740,7 @@ class _StatsRowState extends State<_StatsRow> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: [
-            cell('-', '视频'),
+            cell(getVideosCountText(), '视频'), // 使用传入的视频数量
             cell('-', '笔记'),
             cell('...', '粉丝'),
             cell('...', '关注'),
@@ -623,7 +759,7 @@ class _StatsRowState extends State<_StatsRow> {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
-                cell('-', '视频'),
+                cell(getVideosCountText(), '视频'), // 使用传入的视频数量
                 cell('-', '笔记'),
                 cell('0', '粉丝'),
                 cell('0', '关注'),
@@ -641,14 +777,14 @@ class _StatsRowState extends State<_StatsRow> {
       );
     }
 
-    print('✅ _StatsRow: 显示统计数据 - 粉丝: ${profile.followersCount}, 关注: ${profile.followingsCount}');
+    print('✅ _StatsRow: 显示统计数据 - 视频: ${widget.videosCount}, 粉丝: ${profile.followersCount}, 关注: ${profile.followingsCount}');
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          cell('-', '视频'),
+          cell(getVideosCountText(), '视频'), // 使用传入的视频数量
           cell('-', '笔记'),
           cell(profile.followersCount.toString(), '粉丝'),
           cell(profile.followingsCount.toString(), '关注'),
@@ -703,8 +839,11 @@ class _NotesTab extends StatelessWidget {
   }
 }
 
-
 class _VideosTab extends StatefulWidget {
+  final Function(int)? onVideosLoaded;
+
+  const _VideosTab({this.onVideosLoaded});
+
   @override
   State<_VideosTab> createState() => _VideosTabState();
 }
@@ -714,26 +853,24 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
   bool _loading = false;
   String? _error;
   String? _userId;
-  bool _needsRefresh = false; // 添加刷新标志
+  bool _needsRefresh = false;
 
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this); // 添加生命周期监听
+    WidgetsBinding.instance.addObserver(this);
     _getUserIdAndLoadVideos();
   }
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this); // 移除监听
+    WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
 
-  // 监听应用状态变化
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // 当应用从后台回到前台时，检查是否需要刷新
       if (_needsRefresh) {
         _loadVideos();
         _needsRefresh = false;
@@ -741,15 +878,12 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
     }
   }
 
-  // 修改：添加路由监听来检测页面返回
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // 监听路由变化，当页面重新可见时刷新数据
     ModalRoute? route = ModalRoute.of(context);
     if (route != null) {
       route.addScopedWillPopCallback(() {
-        // 当页面即将被弹出时（返回），设置需要刷新
         _needsRefresh = true;
         return SynchronousFuture(true);
       });
@@ -865,6 +999,11 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
         });
       }
 
+      // 新增：通知父组件视频数量更新
+      if (widget.onVideosLoaded != null) {
+        widget.onVideosLoaded!(videos.length);
+      }
+
       print('✅ _VideosTab: 成功加载 ${videos.length} 个视频');
 
     } catch (e) {
@@ -883,7 +1022,6 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
     }
   }
 
-  // 修改：添加手动刷新方法
   void _refreshVideos() {
     print('🔄 _VideosTab: 手动刷新视频列表');
     _loadVideos();
@@ -1045,7 +1183,6 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
                 ),
               ),
               const SizedBox(height: Spacing.lg),
-              // 修改：刷新按钮调用新的刷新方法
               ElevatedButton(
                 onPressed: _refreshVideos,
                 child: const Text('刷新'),
@@ -1095,7 +1232,6 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
             trailing: IconButton(
               icon: Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
               onPressed: () async {
-                // 修改：使用 push 并等待返回后刷新
                 await context.push('/profile/video/${video.id}/manage', extra: {
                   'title': video.title ?? '未命名视频',
                   'description': video.intro ?? '',
@@ -1111,7 +1247,6 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
               },
             ),
             onTap: () async {
-              // 修改：点击视频项也使用相同的逻辑
               await context.push('/profile/video/${video.id}/manage', extra: {
                 'title': video.title ?? '未命名视频',
                 'description': video.intro ?? '',
