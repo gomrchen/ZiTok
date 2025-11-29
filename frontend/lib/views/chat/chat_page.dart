@@ -2,11 +2,20 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
+import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import '../../providers/messaging_provider.dart';
+import '../../providers/user_provider.dart';
+import 'friend_search_page.dart';
 
 class ChatPage extends StatefulWidget {
   final String conversationId;
-  const ChatPage({super.key, required this.conversationId});
+  final bool isGroup; // 这里已经接收了是群还是人的标记
+
+  const ChatPage({
+    super.key,
+    required this.conversationId,
+    this.isGroup = false,
+  });
 
   @override
   State<ChatPage> createState() => _ChatPageState();
@@ -16,22 +25,47 @@ class _ChatPageState extends State<ChatPage> {
   final TextEditingController _controller = TextEditingController();
   final ScrollController _scrollController = ScrollController();
 
+  bool _emojiShowing = false;
+  final FocusNode _focusNode = FocusNode();
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<MessagingProvider>().connectToChat(
+          id: widget.conversationId,
+          isGroup: widget.isGroup
+      );
+      _scrollToBottom();
+    });
+
+    _focusNode.addListener(() {
+      if (_focusNode.hasFocus) {
+        setState(() {
+          _emojiShowing = false;
+        });
+      }
+    });
+  }
+
   @override
   void dispose() {
+    final mp = context.read<MessagingProvider>();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) return;
+      mp.connectGlobal();
+    });
     _controller.dispose();
     _scrollController.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
-  void _send() {
-    final text = _controller.text.trim();
-    if (text.isEmpty) return;
-    context.read<MessagingProvider>().sendMessage(widget.conversationId, text);
-    _controller.clear();
+  void _scrollToBottom() {
     Future.delayed(const Duration(milliseconds: 100), () {
       if (_scrollController.hasClients) {
         _scrollController.animateTo(
-          _scrollController.position.maxScrollExtent,
+          _scrollController.position.maxScrollExtent + 100,
           duration: const Duration(milliseconds: 200),
           curve: Curves.easeOut,
         );
@@ -39,88 +73,198 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
-  Future<void> _showAddFriendMenu(BuildContext context) async {
-    final selected = await showMenu<String>(
-      context: context,
-      position: const RelativeRect.fromLTRB(1000, 80, 8, 0),
-      items: const [
-        PopupMenuItem<String>(value: 'add_friend', child: ListTile(leading: Icon(Icons.person_add_outlined), title: Text('添加好友'))),
-      ],
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-    );
-    if (selected == 'add_friend' && mounted) {
-      Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FriendSearchPage()));
+  void _send() {
+    final text = _controller.text.trim();
+    if (text.isEmpty) return;
+    context.read<MessagingProvider>().sendMessage(widget.conversationId, text);
+    _controller.clear();
+    _scrollToBottom();
+  }
+
+  void _toggleEmojiPicker() {
+    if (_emojiShowing) {
+      _focusNode.requestFocus();
+    } else {
+      FocusScope.of(context).unfocus();
     }
+
+    setState(() {
+      _emojiShowing = !_emojiShowing;
+    });
+  }
+
+  _onEmojiSelected(Category? category, Emoji emoji) {
+    _controller
+      ..text += emoji.emoji
+      ..selection = TextSelection.fromPosition(
+          TextPosition(offset: _controller.text.length));
+  }
+
+  _onBackspacePressed() {
+    _controller
+      ..text = _controller.text.characters.skipLast(1).toString()
+      ..selection = TextSelection.fromPosition(
+          TextPosition(offset: _controller.text.length));
   }
 
   @override
   Widget build(BuildContext context) {
     final mp = context.watch<MessagingProvider>();
-    final friend = mp.friendById(widget.conversationId);
+
+
+    // 【关键修复】在此处传入 isGroup 参数
+    // 强制 Provider 根据 widget.isGroup 决定去查群还是查人
+    final conversation = mp.conversationById(
+        widget.conversationId,
+        isGroup: widget.isGroup
+    );
+
     final messages = mp.messagesFor(widget.conversationId);
-    return Scaffold(
-      appBar: AppBar(
-        title: Text(friend?.name ?? '聊天'),
-        leading: Navigator.of(context).canPop() ? const BackButton() : null,
-        actions: [
-          IconButton(onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FriendSearchPage())), icon: const Icon(Icons.search)),
-          IconButton(onPressed: () => _showAddFriendMenu(context), icon: const Icon(Icons.add)),
-        ],
-      ),
-      body: Column(
-        children: [
-          Expanded(
-            child: ListView.builder(
-              controller: _scrollController,
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
-              itemCount: messages.length,
-              itemBuilder: (_, i) {
-                final m = messages[i];
-                final isMine = m.senderId == 'me';
-                final timeText = DateFormat('MM/dd HH:mm').format(m.timestamp);
-                return Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  child: Column(
-                    crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.end,
-                        mainAxisAlignment: isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
-                        children: [
-                          if (!isMine)
-                            const CircleAvatar(radius: 16, child: Icon(Icons.person, size: 18)),
-                          const SizedBox(width: 8),
-                          Flexible(
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: isMine ? Theme.of(context).colorScheme.primaryContainer : Theme.of(context).colorScheme.surfaceContainerHighest,
-                                borderRadius: BorderRadius.only(
-                                  topLeft: const Radius.circular(12),
-                                  topRight: const Radius.circular(12),
-                                  bottomLeft: Radius.circular(isMine ? 12 : 2),
-                                  bottomRight: Radius.circular(isMine ? 2 : 12),
-                                ),
-                              ),
-                              child: Text(m.text, style: Theme.of(context).textTheme.bodyMedium),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          if (isMine)
-                            const CircleAvatar(radius: 16, child: Icon(Icons.person, size: 18)),
-                        ],
-                      ),
-                      const SizedBox(height: 4),
-                      Text(timeText, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Theme.of(context).textTheme.bodySmall?.color?.withOpacity(0.6))),
-                    ],
-                  ),
-                );
-              },
+
+    final myId = mp.currentUid?.toString() ?? '';
+    final currentUser = context.read<UserProvider>().currentUser;
+
+    return PopScope(
+      canPop: !_emojiShowing,
+      onPopInvokedWithResult: (bool didPop, Object? result) {
+        if (didPop) return;
+        if (_emojiShowing) {
+          setState(() {
+            _emojiShowing = false;
+          });
+        }
+      },
+      child: Scaffold(
+        appBar: AppBar(
+          // 现在这里显示的标题就是正确的了
+          title: Text(conversation?.name ?? '聊天'),
+          centerTitle: true,
+          actions: [
+            IconButton(
+                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FriendSearchPage())),
+                icon: const Icon(Icons.search)
             ),
-          ),
-          const Divider(height: 1),
-          _InputBar(controller: _controller, onSend: _send),
-        ],
+            IconButton(onPressed: () {}, icon: const Icon(Icons.more_horiz)),
+          ],
+        ),
+        body: Column(
+          children: [
+            Expanded(
+              child: messages.isEmpty
+                  ? const Center(child: Text("暂无消息", style: TextStyle(color: Colors.grey)))
+                  : ListView.builder(
+                controller: _scrollController,
+                padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 12),
+                itemCount: messages.length,
+                itemBuilder: (_, i) {
+                  final m = messages[i];
+                  final isMine = (m.senderId.toString() == myId);
+                  final date = DateTime.fromMillisecondsSinceEpoch(m.createdAt);
+                  final timeText = DateFormat('MM/dd HH:mm').format(date);
+
+                  return Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Column(
+                      crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.end,
+                          mainAxisAlignment: isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
+                          children: [
+                            if (!isMine) ...[
+                              // 这里的头像也正确了
+                              _buildAvatar(conversation?.avatarUrl),
+                              const SizedBox(width: 8),
+                            ],
+                            Flexible(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isMine
+                                      ? Theme.of(context).colorScheme.primaryContainer
+                                      : Theme.of(context).colorScheme.surfaceContainerHighest,
+                                  borderRadius: BorderRadius.only(
+                                    topLeft: const Radius.circular(12),
+                                    topRight: const Radius.circular(12),
+                                    bottomLeft: Radius.circular(isMine ? 12 : 2),
+                                    bottomRight: Radius.circular(isMine ? 2 : 12),
+                                  ),
+                                ),
+                                child: Text(m.content, style: Theme.of(context).textTheme.bodyMedium),
+                              ),
+                            ),
+                            if (isMine) ...[
+                              const SizedBox(width: 8),
+                              _buildAvatar(currentUser?.avatarUrl),
+                            ],
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                            timeText,
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.6)
+                            )
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
+            ),
+            const Divider(height: 1),
+
+            _InputBar(
+              controller: _controller,
+              focusNode: _focusNode,
+              onSend: _send,
+              onEmojiToggle: _toggleEmojiPicker,
+              isEmojiShowing: _emojiShowing,
+            ),
+
+            Offstage(
+              offstage: !_emojiShowing,
+              child: SizedBox(
+                height: 250,
+                child: EmojiPicker(
+                  onEmojiSelected: _onEmojiSelected,
+                  onBackspacePressed: _onBackspacePressed,
+                  config: Config(
+                    height: 250,
+                    checkPlatformCompatibility: true,
+                    viewOrderConfig: const ViewOrderConfig(),
+                    emojiViewConfig: const EmojiViewConfig(
+                      columns: 7,
+                      emojiSizeMax: 28,
+                    ),
+                    skinToneConfig: const SkinToneConfig(),
+                    categoryViewConfig: const CategoryViewConfig(),
+                    bottomActionBarConfig: const BottomActionBarConfig(),
+                    searchViewConfig: const SearchViewConfig(),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAvatar(String? url) {
+    return CircleAvatar(
+      radius: 16,
+      backgroundColor: Colors.grey.shade200,
+      child: ClipOval(
+        child: (url != null && url.isNotEmpty)
+            ? CachedNetworkImage(
+          imageUrl: url,
+          width: 32,
+          height: 32,
+          fit: BoxFit.cover,
+          errorWidget: (context, url, error) => const Icon(Icons.person, size: 18, color: Colors.grey),
+        )
+            : const Icon(Icons.person, size: 18, color: Colors.grey),
       ),
     );
   }
@@ -128,20 +272,38 @@ class _ChatPageState extends State<ChatPage> {
 
 class _InputBar extends StatelessWidget {
   final TextEditingController controller;
+  final FocusNode focusNode;
   final VoidCallback onSend;
-  const _InputBar({required this.controller, required this.onSend});
+  final VoidCallback onEmojiToggle;
+  final bool isEmojiShowing;
+
+  const _InputBar({
+    required this.controller,
+    required this.focusNode,
+    required this.onSend,
+    required this.onEmojiToggle,
+    required this.isEmojiShowing,
+  });
+
   @override
   Widget build(BuildContext context) {
     return SafeArea(
-      top: false,
+      bottom: !isEmojiShowing,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
         child: Row(
           children: [
-            IconButton(onPressed: () {}, icon: const Icon(Icons.photo_camera_outlined)),
+            IconButton(
+                onPressed: onEmojiToggle,
+                icon: Icon(
+                  isEmojiShowing ? Icons.keyboard : Icons.emoji_emotions_outlined,
+                  color: isEmojiShowing ? Theme.of(context).primaryColor : Colors.grey[600],
+                )
+            ),
             Expanded(
               child: TextField(
                 controller: controller,
+                focusNode: focusNode,
                 decoration: const InputDecoration(
                   hintText: '发送消息...',
                   isDense: true,
@@ -155,67 +317,6 @@ class _InputBar extends StatelessWidget {
             IconButton(onPressed: onSend, icon: const Icon(Icons.send)),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class FriendSearchPage extends StatefulWidget {
-  const FriendSearchPage({super.key});
-  @override
-  State<FriendSearchPage> createState() => _FriendSearchPageState();
-}
-
-class _FriendSearchPageState extends State<FriendSearchPage> {
-  final TextEditingController _search = TextEditingController();
-
-  @override
-  void dispose() {
-    _search.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final mp = context.watch<MessagingProvider>();
-    final results = mp.searchFriends(_search.text);
-    return Scaffold(
-      appBar: AppBar(
-        title: TextField(
-          controller: _search,
-          autofocus: true,
-          decoration: const InputDecoration(hintText: '搜索联系人、群聊或聊天记录', border: InputBorder.none),
-          onChanged: (_) => setState(() {}),
-        ),
-        actions: [TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('取消'))],
-      ),
-      body: ListView.separated(
-        itemBuilder: (_, i) {
-          final f = results[i];
-          return ListTile(
-            leading: CircleAvatar(
-              radius: 20,
-              child: ClipOval(
-                child: CachedNetworkImage(
-                  imageUrl: f.avatarUrl,
-                  width: 40,
-                  height: 40,
-                  fit: BoxFit.cover,
-                  errorWidget: (ctx, _, __) => const Icon(Icons.person),
-                ),
-              ),
-            ),
-            title: Text(f.name),
-            trailing: TextButton(
-              onPressed: () {
-                Navigator.of(context).push(MaterialPageRoute(builder: (_) => ChatPage(conversationId: f.id)));
-              },
-              child: const Text('发私信'),
-            ),
-          );
-        },
-        separatorBuilder: (_, __) => const Divider(height: 1),
-        itemCount: results.length,
       ),
     );
   }

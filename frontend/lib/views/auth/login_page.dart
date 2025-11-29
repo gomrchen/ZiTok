@@ -73,8 +73,9 @@ class _LoginPageState extends State<LoginPage> {
                             ? null
                             : () async {
                                 await context.read<AuthProvider>().login(_usernameCtrl.text.trim(), _pwdCtrl.text);
-                                if (mounted && context.read<AuthProvider>().isAuthenticated) {
-                context.go('/home');
+                                if (!context.mounted) return;
+                                if (context.read<AuthProvider>().isAuthenticated) {
+                                  context.go('/home');
                                 }
                               },
                         child: auth.loading

@@ -4,7 +4,6 @@ import '../../models/video.dart';
 
 class MockVideoService {
   final Random _rnd = Random(42);
-  final Set<String> _followedAuthors = {'作者1', '作者2', '作者3'};
   final List<Video> _db = List.generate(200, (i) {
     final id = 'v_$i';
     return Video(

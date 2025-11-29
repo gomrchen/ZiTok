@@ -21,7 +21,6 @@ class CommentService {
     return dio.post('/video/comment', data: formData);
   }
   Future<Response> deleteComment({required String videoId,required String commentId}) {
-    print('deleteComment');
     final formData = FormData.fromMap({
       'video_id': videoId,
       'comment_id': commentId,

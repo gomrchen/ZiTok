@@ -6,7 +6,7 @@ import 'package:zitok/services/api_client.dart';
 import 'package:dio/dio.dart';
 
 class FakeAuthService extends AuthService {
-  FakeAuthService(ApiClient client) : super(client);
+  FakeAuthService(super.client);
 
   @override
   Future<Response> login({required String username, required String password}) {

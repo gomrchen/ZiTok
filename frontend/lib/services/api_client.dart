@@ -126,7 +126,7 @@ class ApiClient {
       } catch (_) {
         body = '${response.data}';
       }
-      if (body.length > 600) body = body.substring(0, 600) + '...';
+      if (body.length > 600) body = '${body.substring(0, 600)}...';
       _logger.i('HTTP $status $uri resp=$body');
     } catch (_) {}
   }

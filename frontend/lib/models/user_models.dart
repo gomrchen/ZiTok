@@ -92,12 +92,10 @@ class User {
 
     if (avatar != null && avatar.isNotEmpty) {
       avatar = UrlUtils.resolveStorageUrl(avatar, defaultDir: 'avatars');
-      print('🔄 转换头像URL为: $avatar');
     }
 
     if (background != null && background.isNotEmpty) {
       background = UrlUtils.resolveStorageUrl(background, defaultDir: 'avatars');
-      print('🔄 转换背景URL为: $background');
     }
 
 

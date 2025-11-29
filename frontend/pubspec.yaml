@@ -30,6 +30,8 @@ dependencies:
   crop_your_image: ^1.0.2
   path_provider: ^2.1.2
   crypto: ^3.0.3
+  emoji_picker_flutter: ^4.4.0
+  web_socket_channel: ^2.4.0
 
 dev_dependencies:
   flutter_test:

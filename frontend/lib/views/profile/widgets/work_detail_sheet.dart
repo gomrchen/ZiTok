@@ -32,7 +32,7 @@ class WorkDetailSheet extends StatelessWidget {
               ],
             ),
             const SizedBox(height: Spacing.md),
-            Container(height: 160, decoration: BoxDecoration(color: cs.surfaceVariant, borderRadius: Radii.md)),
+            Container(height: 160, decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: Radii.md)),
             const SizedBox(height: Spacing.md),
             ListTile(title: const Text('标题'), subtitle: const Text('作品标题展示')),
             ListTile(title: const Text('发布时间'), subtitle: const Text('1970-01-01 08:00:00')),

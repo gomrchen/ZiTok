@@ -8,7 +8,6 @@ class WelcomePage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final size = MediaQuery.of(context).size;
     return Scaffold(
       body: SafeArea(
         child: LayoutBuilder(
@@ -24,7 +23,7 @@ class WelcomePage extends StatelessWidget {
                   child: CustomPaint(
                     painter: _WelcomeOrbitPainter(
                       accent: theme.colorScheme.secondary,
-                      strokeColor: theme.colorScheme.secondary.withOpacity(0.7),
+                      strokeColor: theme.colorScheme.secondary.withValues(alpha: 0.7),
                       radius: circleRadius,
                     ),
                   ),

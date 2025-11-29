@@ -87,15 +87,27 @@ class SettingsPage extends StatelessWidget {
       showDragHandle: true,
       builder: (context) {
         const langs = ['简体中文', 'English'];
-        return ListView(
-          children: langs
-              .map((e) => RadioListTile<String>(
-                    value: e,
-                    groupValue: current,
-                    title: Text(e),
-                    onChanged: (v) => Navigator.pop(context, v),
-                  ))
-              .toList(),
+        return StatefulBuilder(
+          builder: (context, setState) {
+            String selectedLang = current;
+            return RadioGroup<String>(
+              groupValue: selectedLang,
+              onChanged: (v) {
+                if (v != null) {
+                  setState(() => selectedLang = v);
+                  Navigator.pop(context, v);
+                }
+              },
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: langs.map((e) => ListTile(
+                  title: Text(e),
+                  leading: Radio<String>(value: e),
+                  onTap: () => Navigator.pop(context, e),
+                )).toList(),
+              ),
+            );
+          },
         );
       },
     );

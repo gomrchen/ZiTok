@@ -35,9 +35,8 @@ class _AdvancedVideoPlayerState extends State<AdvancedVideoPlayer> {
   VideoPlayerController? _vp;
   ChewieController? _chewie;
   late String _currentLabel;
-  double _volume = 1.0;
+  final double _volume = 1.0;
   String? _error;
-  bool _probing = false;
 
   @override
   void initState() {
@@ -63,20 +62,16 @@ class _AdvancedVideoPlayerState extends State<AdvancedVideoPlayer> {
     _error = null;
     setState(() {});
     // 探测资源可达性（Range: bytes=0-1）
-    _probing = true;
     try {
       final ok = await _probeUrl(src.url);
       debugPrint('AdvancedVideoPlayer: probe ${src.url} ok=$ok');
       if (!ok) {
         _error = '视频资源不可访问';
-        _probing = false;
         setState(() {});
         return;
       }
     } catch (e) {
       debugPrint('AdvancedVideoPlayer: probe error $e');
-    } finally {
-      _probing = false;
     }
     _vp = VideoPlayerController.networkUrl(Uri.parse(src.url));
     try {
@@ -123,16 +118,6 @@ class _AdvancedVideoPlayerState extends State<AdvancedVideoPlayer> {
     if (label == _currentLabel) return;
     _currentLabel = label;
     await _setupController(_currentSourceByLabel(label));
-  }
-
-  void _cycleVolume() {
-    // 在 0 → 0.5 → 1.0 间循环切换
-    const levels = [0.0, 0.5, 1.0];
-    final idx = levels.indexWhere((v) => (v - _volume).abs() < 0.01);
-    final next = levels[(idx + 1) % levels.length];
-    _volume = next;
-    _vp?.setVolume(_volume);
-    setState(() {});
   }
 
   @override
@@ -192,7 +177,7 @@ class _AdvancedVideoPlayerState extends State<AdvancedVideoPlayer> {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.5),
+                          color: Colors.black.withValues(alpha: 0.5),
                           shape: BoxShape.circle,
                         ),
                         alignment: Alignment.center,

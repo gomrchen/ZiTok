@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:dio/dio.dart';
 import '../models/user_models.dart';
 import '../models/video.dart';
@@ -101,7 +99,6 @@ class UserService {
         throw Exception('获取视频列表失败: ${response.data['message']}');
       }
     } catch (e) {
-      print('❌ 获取视频列表失败: $e');
       rethrow;
     }
   }
@@ -111,12 +108,9 @@ class UserService {
   /// 删除视频
   Future<Response> deleteVideo({required String videoId}) async {
     try {
-      print('🗑️ 开始删除视频，videoId: $videoId');
       final response = await dio.delete('/video/$videoId');
-      print('✅ 视频删除成功');
       return response;
     } catch (e) {
-      print('❌ 删除视频失败: $e');
       rethrow;
     }
   }
@@ -138,7 +132,6 @@ class UserService {
       );
       return response.data;
     } catch (e) {
-      print('❌ 获取评论失败: $e');
       rethrow;
     }
   }
@@ -165,8 +158,6 @@ class UserService {
     String? coverUrl,
   }) async {
     try {
-      print('🔄 开始更新视频信息，videoId: $videoId');
-
       final Map<String, dynamic> data = {};
       if (title != null) data['title'] = title;
       if (description != null) data['description'] = description;
@@ -178,11 +169,16 @@ class UserService {
         data: data,
       );
 
-      print('✅ 视频信息更新成功: ${response.statusCode}');
       return response.data;
     } catch (e) {
-      print('❌ 视频信息更新失败: $e');
       rethrow;
     }
+  }
+
+  // 根据用户名搜索远程用户
+  Future<Response> searchRemoteUsers(String keyword) {
+    return dio.post('/user/username', data: {
+      'username': keyword,
+    });
   }
 }

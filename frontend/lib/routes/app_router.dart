@@ -16,6 +16,7 @@ import '../views/profile/edit_profile_page.dart';
 import '../views/settings/settings_page.dart';
 import '../views/profile/video_manage_page.dart';
 import '../views/profile/note_manage_page.dart';
+import '../views/chat/friend_search_page.dart';
 
 class AppRouter {
   static GoRouter buildRouter(AuthProvider auth) {

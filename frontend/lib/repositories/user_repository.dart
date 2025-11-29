@@ -8,12 +8,8 @@ class UserRepository {
 
   Future<User> info({String? userId}) async {
     try {
-      print('🔍 UserRepository.info: 开始获取用户信息，userId: $userId');
-
       final resp = await api.info(userId: userId);
       final body = resp.data as Map<String, dynamic>? ?? {};
-
-      print('📦 UserRepository.info: 原始响应: $body');
 
       if (body.isEmpty) {
         throw Exception('响应数据为空');
@@ -42,22 +38,16 @@ class UserRepository {
         throw Exception('用户数据为空或格式错误');
       }
 
-      print('📦 UserRepository: 原始用户数据: $data');
-
       final user = User.fromJson(data);
-      print('✅ UserRepository: 解析后的用户: ${user.username}, id: ${user.id}');
 
       return user;
     } catch (e) {
-      print('❌ UserRepository.info 错误: $e');
       rethrow;
     }
   }
 
   Future<void> updateInfo(UserUpdateRequest req) async {
     try {
-      print('🔍 UserRepository.updateInfo: 开始更新用户信息: ${req.toQuery()}');
-
       final resp = await api.updateInfo(req);
       final body = resp.data as Map<String, dynamic>? ?? {};
 
@@ -78,9 +68,7 @@ class UserRepository {
         throw Exception(errorMsg.toString());
       }
 
-      print('✅ UserRepository.updateInfo: 更新成功');
     } catch (e) {
-      print('❌ UserRepository.updateInfo 错误: $e');
       rethrow;
     }
   }
@@ -88,12 +76,8 @@ class UserRepository {
 
   Future<int> getFollowingsCount({required String userId}) async {
     try {
-      print('🔍 UserRepository.getFollowingsCount: 开始获取关注数量，userId: $userId');
-
       final resp = await api.getFollowings(userId: userId);
       final body = resp.data as Map<String, dynamic>? ?? {};
-
-      print('📦 UserRepository.getFollowingsCount: 原始响应: $body');
 
       // 解析响应码
       final code = body['code'];
@@ -116,22 +100,16 @@ class UserRepository {
       final data = body['data'] as List<dynamic>?;
       final count = data?.length ?? 0;
 
-      print('✅ UserRepository.getFollowingsCount: 获取到关注数量: $count');
       return count;
     } catch (e) {
-      print('❌ UserRepository.getFollowingsCount 错误: $e');
       rethrow;
     }
   }
 
   Future<int> getFollowersCount({required String userId}) async {
     try {
-      print('🔍 UserRepository.getFollowersCount: 开始获取粉丝数量，userId: $userId');
-
       final resp = await api.getFollowers(userId: userId);
       final body = resp.data as Map<String, dynamic>? ?? {};
-
-      print('📦 UserRepository.getFollowersCount: 原始响应: $body');
 
       // 解析响应码
       final code = body['code'];
@@ -154,10 +132,8 @@ class UserRepository {
       final data = body['data'] as List<dynamic>?;
       final count = data?.length ?? 0;
 
-      print('✅ UserRepository.getFollowersCount: 获取到粉丝数量: $count');
       return count;
     } catch (e) {
-      print('❌ UserRepository.getFollowersCount 错误: $e');
       rethrow;
     }
   }

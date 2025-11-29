@@ -105,16 +105,17 @@ void main() {
               child: const Text('取消'),
             ),
             TextButton(
-              onPressed: () {
+              onPressed: () async {
                 Navigator.of(context).pop();
+                if (!context.mounted) return;
+
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('笔记已删除')),
                 );
-                Future.delayed(const Duration(milliseconds: 500), () {
-                  if (mounted) {
-                    context.pop();
-                  }
-                });
+                await Future.delayed(const Duration(milliseconds: 500));
+                if (context.mounted) {
+                  context.pop();
+                }
               },
               style: TextButton.styleFrom(foregroundColor: Colors.red),
               child: const Text('删除'),

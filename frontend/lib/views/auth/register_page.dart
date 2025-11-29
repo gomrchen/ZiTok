@@ -85,8 +85,9 @@ class _RegisterPageState extends State<RegisterPage> {
                                   _emailCtrl.text.trim(),
                                   _pwdCtrl.text.trim(),
                                 );
-                                if (mounted && context.read<AuthProvider>().isAuthenticated) {
-              context.go('/home');
+                                if (!context.mounted) return;
+                                if (context.read<AuthProvider>().isAuthenticated) {
+                                  context.go('/home');
                                 }
                               },
                         child: auth.loading

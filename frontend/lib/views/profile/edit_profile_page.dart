@@ -1,5 +1,4 @@
 import 'dart:typed_data';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
@@ -7,7 +6,6 @@ import 'package:crop_your_image/crop_your_image.dart';
 import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
 import 'package:hive_flutter/hive_flutter.dart';
-import 'package:http/http.dart' as http;
 
 import '../../theme/theme_tokens.dart';
 import '../../app.dart';
@@ -140,11 +138,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final user = profileProvider.user;
     final String? backdropUrl = user?.profileBackgroundImageUrl;
 
-    print('🖼️ 编辑页面背景图检查:');
-    print('   - _backdropPreview: ${_backdropPreview != null ? "有预览" : "无预览"}');
-    print('   - backdropUrl: $backdropUrl');
-    print('   - backdropUrl 是否有效: ${backdropUrl != null && backdropUrl.isNotEmpty && backdropUrl != "null"}');
-
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -208,7 +201,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
   DecorationImage? _buildBackgroundImage(String? backdropUrl) {
     // 优先显示预览图
     if (_backdropPreview != null) {
-      print('🎨 使用预览背景图');
       return DecorationImage(
         image: MemoryImage(_backdropPreview!),
         fit: BoxFit.cover,
@@ -217,17 +209,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
     // 其次显示网络背景图
     if (backdropUrl != null && backdropUrl.isNotEmpty && backdropUrl != 'null') {
-      print('🎨 使用网络背景图: $backdropUrl');
       return DecorationImage(
         image: NetworkImage(backdropUrl),
         fit: BoxFit.cover,
-        onError: (exception, stackTrace) {
-          print('❌ 网络背景图加载失败: $exception');
-        },
       );
     }
 
-    print('🎨 没有背景图，使用默认渐变');
     return null;
   }
 
@@ -236,16 +223,13 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final double radius = 42;
     return Semantics(
       label: '更换头像',
-      child: SizedBox( // 使用 SizedBox 提供明确的约束
+      child: SizedBox(
         width: radius * 2,
         height: radius * 2,
         child: InkWell(
           onTap: _uploadingAvatar ? null : _showAvatarPickerSheet,
           borderRadius: BorderRadius.circular(radius),
-          child: Container( // 添加 Container 提供明确的边界
-            width: radius * 2,
-            height: radius * 2,
-            child: Stack(
+          child: Stack(
               alignment: Alignment.center,
               children: [
                 // 头像显示：优先显示预览图，其次显示网络头像，最后显示默认图标
@@ -294,7 +278,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                   width: radius * 2,
                   height: radius * 2,
                   decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.4),
+                    color: Colors.black.withValues(alpha: 0.4),
                     shape: BoxShape.circle,
                   ),
                   child: Column(
@@ -319,7 +303,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
                 ),
               ],
             ),
-          ),
         ),
       ),
     );
@@ -335,7 +318,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             child: LinearProgressIndicator(
               value: _completion / 100,
               minHeight: 8,
-              backgroundColor: Colors.white.withOpacity(0.35),
+              backgroundColor: Colors.white.withValues(alpha: 0.35),
               color: Colors.white,
             ),
           ),
@@ -350,7 +333,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final titleStyle = Theme.of(context).textTheme.bodyMedium;
     final valueStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant);
     final highlightValueStyle = Theme.of(context).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700);
-    final disabledValueStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface.withOpacity(0.5));
+    final disabledValueStyle = Theme.of(context).textTheme.bodyMedium?.copyWith(color: cs.onSurface.withValues(alpha: 0.5));
 
     return Container(
       decoration: const BoxDecoration(
@@ -439,7 +422,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
       case Gender.female:
         return '女';
       case Gender.unknown:
-      default:
         return '选择性别，表达自我';
     }
   }
@@ -452,14 +434,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
       Gender.unknown => 3,
     };
 
-    print('🔍 编辑性别 - 当前值: $_gender, 转换为: $currentValue');
-
     final v = await GenderSelectDialog.show(context, value: currentValue);
-    print('🔍 编辑性别 - 对话框返回值: $v');
 
     // 如果用户取消选择，直接返回
     if (v == null) {
-      print('⚠️ 编辑性别 - 用户取消了选择');
       return;
     }
 
@@ -470,8 +448,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
       _ => Gender.unknown,
     };
 
-    print('🔍 编辑性别 - 转换后的新值: $newGender');
-
     setState(() {
       _gender = newGender;
     });
@@ -480,13 +456,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final box = Hive.box('user_box');
     await box.put('gender', v); // 直接使用对话框返回的值
 
-    print('💾 编辑性别 - 保存到Hive: $v');
-
     // 更新到服务器
-    context.read<ProfileProvider>().debounceUpdateInfo(gender: v);
+    if (mounted) {
+      context.read<ProfileProvider>().debounceUpdateInfo(gender: v);
+    }
 
     _recalcCompletion();
-    print('✅ 编辑性别 - 更新完成');
   }
 
   String _birthdayText() {
@@ -506,7 +481,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
       setState(() => _birthday = picked);
       Hive.box('user_box').put('birthday', picked.toIso8601String());
       final ymd = '${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}';
-      context.read<ProfileProvider>().debounceUpdateInfo(birthday: ymd);
+      if (mounted) {
+        context.read<ProfileProvider>().debounceUpdateInfo(birthday: ymd);
+      }
       _recalcCompletion();
     }
   }
@@ -516,7 +493,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
     if (v != null) {
       setState(() => _bio = v);
       Hive.box('user_box').put('bio', v);
-      context.read<ProfileProvider>().debounceUpdateInfo(signature: v);
+      if (mounted) {
+        context.read<ProfileProvider>().debounceUpdateInfo(signature: v);
+      }
       _recalcCompletion();
     }
   }
@@ -598,41 +577,27 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   Future<void> _onPickAvatar(ImageSource source) async {
     try {
-      print('🚀 开始选择头像，来源: $source');
       final xFile = await _picker.pickImage(source: source, maxWidth: 1200, maxHeight: 1200, imageQuality: 95);
       if (xFile == null) {
-        print('❌ 用户取消了头像选择');
         return;
       }
 
-      print('✅ 获取到图片文件，开始读取字节');
       final bytes = await xFile.readAsBytes();
-      print('📊 原始图片大小: ${bytes.length} bytes');
 
       // 裁剪为 1:1
-      print('✂️ 开始裁剪图片');
       final cropped = await _cropBytes(bytes, aspectRatio: 1.0);
       if (cropped == null) {
-        print('❌ 用户取消了裁剪');
         return;
       }
-      print('📊 裁剪后图片大小: ${cropped.length} bytes');
 
       // 压缩到 200x200
-      print('📐 开始压缩图片');
       final compressed = ImageUtils.resizeToJpeg(cropped, width: 200, height: 200);
-      print('📊 压缩后图片大小: ${compressed.length} bytes');
 
-      print('🎨 更新预览状态');
       setState(() => _avatarPreview = compressed);
 
-      print('⬆️ 开始上传头像');
       await _uploadAvatar(compressed);
-      print('✅ 头像处理流程完成');
 
-    } catch (e, stackTrace) {
-      print('❌ 选择头像失败：$e');
-      print('📋 堆栈跟踪：$stackTrace');
+    } catch (e) {
       if (mounted) {
         _showError('选择头像失败：$e');
       }
@@ -652,11 +617,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
       // 计算个人页面背景图的宽高比（水平填充）
       final aspectRatio = profileMaxWidth / profileHeaderHeight;
-
-      print('🎯 背景图裁剪参数:');
-      print('   - 个人页面头部高度: $profileHeaderHeight');
-      print('   - 个人页面最大宽度: $profileMaxWidth');
-      print('   - 计算宽高比: $aspectRatio');
 
       final cropped = await _cropBytes(bytes, aspectRatio: aspectRatio);
       if (cropped == null) return;
@@ -710,7 +670,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
                     ),
                   ),
                   // 裁剪区域 - 使用计算的高度
-                  Container(
+                  SizedBox(
                     width: screenWidth,
                     height: cropHeight,
                     child: Crop(
@@ -741,17 +701,19 @@ class _EditProfilePageState extends State<EditProfilePage> {
       // 更新本地缓存
       Hive.box('user_box').put('avatar', bytes);
 
+      if (!mounted) return;
+
       // 刷新 ProfileProvider - 这里可能触发父组件的重建
-      await context.read<ProfileProvider>().load(userId: _userId);
+      final profileProvider = context.read<ProfileProvider>();
+      await profileProvider.load(userId: _userId);
 
       // 这里可能已经不在 mounted 状态
       if (mounted) {
         setState(() {
-          _avatarUrl = context.read<ProfileProvider>().user?.avatarUrl;
+          _avatarUrl = profileProvider.user?.avatarUrl;
         });
+        _showToast('头像已更新');
       }
-
-      _showToast('头像已更新');
     } catch (e) {
       if (mounted) {
         _showError('头像上传失败：$e');
@@ -771,12 +733,19 @@ class _EditProfilePageState extends State<EditProfilePage> {
       // 更新本地缓存
       Hive.box('user_box').put('backdrop', bytes);
 
-      // 刷新 ProfileProvider 以获取新的背景URL
-      await context.read<ProfileProvider>().load(userId: _userId);
+      if (!mounted) return;
 
-      _showToast('封面已更新');
+      // 刷新 ProfileProvider 以获取新的背景URL
+      final profileProvider = context.read<ProfileProvider>();
+      await profileProvider.load(userId: _userId);
+
+      if (mounted) {
+        _showToast('封面已更新');
+      }
     } catch (e) {
-      _showError('封面上传失败：$e');
+      if (mounted) {
+        _showError('封面上传失败：$e');
+      }
     } finally {
       if (mounted) setState(() => _uploadingBackdrop = false);
     }

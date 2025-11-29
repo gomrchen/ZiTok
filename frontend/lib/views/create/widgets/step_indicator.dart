@@ -50,7 +50,7 @@ class _StepNode extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final bg = active ? cs.primary : (done ? cs.primary.withOpacity(0.2) : cs.surfaceContainerHighest);
+    final bg = active ? cs.primary : (done ? cs.primary.withValues(alpha: 0.2) : cs.surfaceContainerHighest);
     final fg = active ? cs.onPrimary : (done ? cs.primary : cs.onSurfaceVariant);
     return InkWell(
       onTap: onTap,
