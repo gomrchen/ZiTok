@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/theme_tokens.dart';
 import 'dart:convert';
@@ -213,14 +214,23 @@ class _AccountSwitcherPageState extends State<AccountSwitcherPage> {
                   child: ListTile(
                     title: Text(account.username),
                     subtitle: Text('密码: ${_maskPassword(account.password)}'),
-                    onTap: () {
-                      // 切换账号功能，将在后续实现
-                      _switchToAccount(context, account);
-                    },
-                    trailing: IconButton(
-                      icon: const Icon(Icons.delete_outline),
-                      onPressed: () => _deleteAccount(account.id),
-                      color: Colors.red,
+                    // 切换账号功能已移至右侧按钮
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.switch_account_outlined),
+                          onPressed: () => _switchToAccount(context, account),
+                          color: Colors.blue,
+                          tooltip: '切换到此账号',
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline),
+                          onPressed: () => _deleteAccount(account.id),
+                          color: Colors.red,
+                          tooltip: '删除账号',
+                        ),
+                      ],
                     ),
                   ),
                 );
@@ -235,14 +245,10 @@ class _AccountSwitcherPageState extends State<AccountSwitcherPage> {
   }
 
   String _maskPassword(String password) {
-    if (password.length <= 3) {
-      return '*' * password.length;
-    }
-    return password[0] +
-        '*' * (password.length - 2) +
-        password[password.length - 1];
+    return '*' * password.length;
   }
 
+  //切换到指定账号
   Future<void> _switchToAccount(
     BuildContext context,
     AccountEntry account,
@@ -293,9 +299,8 @@ class _AccountSwitcherPageState extends State<AccountSwitcherPage> {
       // 登录成功后，关闭所有页面并导航到主页
       if (context.mounted) {
         Navigator.of(context).pop(); // 关闭加载对话框
-        Navigator.of(
-          context,
-        ).pushNamedAndRemoveUntil('/home', (route) => false);
+        // 使用go_router导航，替换Navigator.pushNamedAndRemoveUntil
+        context.go('/home');
         log('账号切换成功，导航到主页');
       }
     } catch (e) {
