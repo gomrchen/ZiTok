@@ -1,13 +1,19 @@
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
+import '../services/user_session.dart';
 import '../models/user_models.dart';
 
 /// 认证仓库：调用服务并处理持久化与类型转换
 class AuthRepository {
   final AuthService authService;
   final SharedPreferences prefs;
+  final UserSession userSession;
 
-  AuthRepository({required this.authService, required this.prefs});
+  AuthRepository({
+    required this.authService,
+    required this.prefs,
+    required this.userSession,
+  });
 
   String? get accessToken => prefs.getString('access_token');
 
@@ -16,7 +22,8 @@ class AuthRepository {
     required String username,
     required String password,
   }) async {
-    final res = await authService.login(username: username, password: password);
+    final res =
+        await authService.login(username: username, password: password);
     final body = res.data as Map<String, dynamic>? ?? {};
     final base = body['base'] as Map<String, dynamic>? ?? {};
     final topCode = body['code'];
@@ -30,10 +37,10 @@ class AuthRepository {
       throw AuthException(message: msg, code: code);
     }
     final raw = (body['data'] as Map<String, dynamic>?) ?? body;
-    User  user = User.fromJson(raw);
-    // 持久化 token 与用户ID
+    User user = User.fromJson(raw);
+
+    // 持久化 token
     String? token = (raw['token'] ?? raw['access_token'])?.toString();
-    // 兼容后端将 token 放在响应头的情况
     if (token == null || token.isEmpty) {
       final headerAuth = res.headers['authorization']?.first;
       if (headerAuth != null &&
@@ -41,11 +48,21 @@ class AuthRepository {
         token = headerAuth.substring(7);
       }
     }
-    final refresh = (raw['refresh_token'] ?? raw['refreshToken'])?.toString();
-    final uid = (raw['user_id'] ?? raw['uid'] ?? user.id).toString();
-    if (token != null && token.isNotEmpty) await prefs.setString('access_token', token);
-    if (refresh != null && refresh.isNotEmpty) await prefs.setString('refresh_token', refresh);
-    await prefs.setString('auth_user_id', uid);
+    final refresh =
+        (raw['refresh_token'] ?? raw['refreshToken'])?.toString();
+    if (token != null && token.isNotEmpty) {
+      await prefs.setString('access_token', token);
+    }
+    if (refresh != null && refresh.isNotEmpty) {
+      await prefs.setString('refresh_token', refresh);
+    }
+
+    // 通过 UserSession 统一管理用户 ID
+    await userSession.setUser(user, prefs);
+
+    // 兼容旧代码：同时保存到旧的 key
+    await prefs.setString('auth_user_id', user.id);
+
     return user;
   }
 
@@ -73,6 +90,7 @@ class AuthRepository {
     if (code == 0 && (res.statusCode == 200)) {
       final raw = (body['data'] as Map<String, dynamic>?) ?? body;
       final user = User.fromJson(raw);
+      await userSession.setUser(user, prefs);
       await prefs.setString('auth_user_id', user.id);
       return user;
     }
@@ -82,6 +100,7 @@ class AuthRepository {
     }
     final raw = (body['data'] as Map<String, dynamic>?) ?? body;
     final user = User.fromJson(raw);
+    await userSession.setUser(user, prefs);
     await prefs.setString('auth_user_id', user.id);
     return user;
   }
@@ -100,6 +119,7 @@ class AuthRepository {
     if (code == 0 && (res.statusCode == 200)) {
       final raw = (body['data'] as Map<String, dynamic>?) ?? body;
       final user = User.fromJson(raw);
+      await userSession.setUser(user, prefs);
       await prefs.setString('auth_user_id', user.id);
       return user;
     }
@@ -109,6 +129,7 @@ class AuthRepository {
     }
     final raw = (body['data'] as Map<String, dynamic>?) ?? body;
     final user = User.fromJson(raw);
+    await userSession.setUser(user, prefs);
     await prefs.setString('auth_user_id', user.id);
     return user;
   }
@@ -130,8 +151,8 @@ class AuthRepository {
     final resCode = (base['code'] is int
         ? base['code'] as int
         : topCode is int
-        ? topCode
-        : int.tryParse('$topCode') ?? 0);
+            ? topCode
+            : int.tryParse('$topCode') ?? 0);
     if (resCode == 0 && (res.statusCode == 200)) {
       return;
     }
@@ -144,19 +165,21 @@ class AuthRepository {
   /// 登出，清除本地认证信息
   Future<void> logout() async {
     try {
-      // 尝试调用后端登出接口（可选）
       await authService.logout();
-    } catch (e) {
+    } catch (_) {
       // 即使后端接口调用失败，也继续清除本地数据
     } finally {
+      // 通过 UserSession 清除用户信息
+      await userSession.clear(prefs);
+
       // 清除本地存储的认证信息
       await prefs.remove('access_token');
       await prefs.remove('refresh_token');
       await prefs.remove('auth_user_id');
     }
   }
-  
-    /// 发送验证码到邮箱
+
+  /// 发送验证码到邮箱
   Future<void> sendVerificationCode({required String email}) async {
     final res = await authService.sendVerificationCode(email: email);
     final body = res.data as Map<String, dynamic>? ?? {};
@@ -165,8 +188,8 @@ class AuthRepository {
     final code = (base['code'] is int
         ? base['code'] as int
         : topCode is int
-        ? topCode
-        : int.tryParse('$topCode') ?? 0);
+            ? topCode
+            : int.tryParse('$topCode') ?? 0);
     if (code != 10000 && code != 200 && !(code == 0 && res.statusCode == 200)) {
       final msg = (base['msg'] ?? body['message'] ?? '发送验证码失败').toString();
       throw AuthException(message: msg, code: code);
@@ -174,13 +197,13 @@ class AuthRepository {
   }
 }
 
-
-
 /// 认证异常类型
 class AuthException implements Exception {
   final String message;
   final int code;
+
   AuthException({required this.message, required this.code});
+
   @override
   String toString() => 'AuthException(code=$code, message=$message)';
 }

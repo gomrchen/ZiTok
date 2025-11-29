@@ -1,23 +1,26 @@
 import 'dart:async';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user_models.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../repositories/user_repository.dart';
 import 'package:dio/dio.dart';
-import 'package:provider/provider.dart';
 import 'package:flutter/material.dart';
-
-import 'auth_provider.dart';
+import '../services/user_session.dart';
 
 class ProfileProvider extends ChangeNotifier {
   final UserRepository repo;
+  final UserSession userSession;
+
   User? _user;
   bool _loading = false;
   String? _error;
   double _avatarProgress = 0;
   double _backgroundProgress = 0;
   Timer? _debounce;
-  ProfileProvider({required this.repo});
+
+  ProfileProvider({
+    required this.repo,
+    required this.userSession,
+  });
 
   int _followersCount = 0;
   int _followingsCount = 0;
@@ -63,32 +66,22 @@ class ProfileProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadFromAuthProvider(BuildContext context) async {
-    try {
-      final authProvider = context.read<AuthProvider>();
-
-      if (authProvider.user != null && authProvider.user!.id.isNotEmpty) {
-        await load(userId: authProvider.user!.id);
-      } else {
-        await loadFromCache();
-      }
-    } catch (e) {
-      _error = '加载用户数据失败: $e';
+  /// 加载当前登录用户的资料
+  ///
+  /// 优先使用 UserSession 中的用户信息，如果没有则从服务器加载
+  Future<void> loadCurrentUser() async {
+    final userId = userSession.userId;
+    if (userId == null || userId.isEmpty) {
+      _error = '用户未登录';
       notifyListeners();
+      return;
     }
+    await load(userId: userId);
   }
 
   Future<void> load({String? userId}) async {
-    String? targetUserId = userId;
-    if (targetUserId == null) {
-      final box = Hive.box('user_box');
-      targetUserId = box.get('id') as String?;
-
-      if (targetUserId == null) {
-        final prefs = await SharedPreferences.getInstance();
-        targetUserId = prefs.getString('auth_user_id');
-      }
-    }
+    // 优先使用传入的 userId，否则从 UserSession 获取
+    final targetUserId = userId ?? userSession.userId;
 
     if (targetUserId == null || targetUserId.isEmpty) {
       _error = '无法获取用户ID，请先登录';
@@ -130,22 +123,14 @@ class ProfileProvider extends ChangeNotifier {
     }
   }
 
+  /// 从缓存或 UserSession 加载用户资料
   Future<void> loadFromCache() async {
-    final prefs = await SharedPreferences.getInstance();
-    final String? cachedUserId = prefs.getString('auth_user_id');
-
-    if (cachedUserId != null && cachedUserId.isNotEmpty) {
-      await load(userId: cachedUserId);
+    final userId = userSession.userId;
+    if (userId != null && userId.isNotEmpty) {
+      await load(userId: userId);
     } else {
-      final box = Hive.box('user_box');
-      final String? hiveUserId = box.get('id') as String?;
-
-      if (hiveUserId != null && hiveUserId.isNotEmpty) {
-        await load(userId: hiveUserId);
-      } else {
-        _error = '无法获取用户ID，请先登录';
-        notifyListeners();
-      }
+      _error = '无法获取用户ID，请先登录';
+      notifyListeners();
     }
   }
 

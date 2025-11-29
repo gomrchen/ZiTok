@@ -4,19 +4,28 @@ import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../repositories/relation_repository.dart';
 import '../services/socket_service.dart';
+import '../services/user_session.dart';
 import '../app.dart';
 import '../models/social_models.dart';
 
 class MessagingProvider extends ChangeNotifier {
   final RelationRepository? relationRepository;
+  final UserSession userSession;
   final SocketService _socketService = SocketService();
-
-  int? _currentUid;
-  int? get currentUid => _currentUid;
 
   bool _activeIsGroup = false;
 
-  MessagingProvider({this.relationRepository});
+  MessagingProvider({
+    this.relationRepository,
+    required this.userSession,
+  });
+
+  /// 当前用户 ID（int 类型，用于 API 调用）
+  int? get currentUid {
+    final userId = userSession.userId;
+    if (userId == null || userId.isEmpty) return null;
+    return int.tryParse(userId);
+  }
 
   List<Friend> _following = [];
   List<Friend> _followers = [];
@@ -110,7 +119,6 @@ class MessagingProvider extends ChangeNotifier {
 
   void logout() {
     _socketService.disconnect();
-    _currentUid = null;
     _messages.clear();
     _following = [];
     _followers = [];
@@ -118,14 +126,26 @@ class MessagingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  Future<void> init(int uid) async {
-    if (_currentUid == uid) return;
+  /// 初始化消息服务
+  ///
+  /// 使用 UserSession 中的用户 ID 初始化
+  Future<void> initFromSession() async {
+    final uid = currentUid;
+    if (uid == null) return;
 
-    if (_currentUid != null && _currentUid != uid) {
+    await _loadLocalHistory();
+    await loadRelationData(uid: uid);
+    connectGlobal();
+  }
+
+  /// 使用指定的用户 ID 初始化（用于兼容旧代码）
+  Future<void> init(int uid) async {
+    final currentId = currentUid;
+    if (currentId == uid) return;
+
+    if (currentId != null && currentId != uid) {
       logout();
     }
-
-    _currentUid = uid;
 
     await _loadLocalHistory();
     await loadRelationData(uid: uid);
@@ -147,7 +167,7 @@ class MessagingProvider extends ChangeNotifier {
   }
 
   void _connect({required String roomId, String? targetId}) {
-    if (_currentUid == null || relationRepository == null) return;
+    if (currentUid == null || relationRepository == null) return;
 
     final token = AppBootstrap.prefs.getString('access_token');
     if (token == null || token.isEmpty) return;
@@ -181,7 +201,8 @@ class MessagingProvider extends ChangeNotifier {
   }
 
   void _handleHistoryMessage(List<dynamic>? rawMessages) {
-    if (rawMessages == null || _currentUid == null) return;
+    final uid = currentUid;
+    if (rawMessages == null || uid == null) return;
     final Map<String, List<ChatMessage>> serverMsgMap = {};
 
     for (var item in rawMessages) {
@@ -191,7 +212,7 @@ class MessagingProvider extends ChangeNotifier {
         if (msg.roomId != null && msg.roomId != -1) {
           key = msg.roomId.toString();
         } else {
-          key = (msg.senderId == _currentUid)
+          key = (msg.senderId == uid)
               ? msg.receiverId.toString()
               : msg.senderId.toString();
         }
@@ -258,7 +279,8 @@ class MessagingProvider extends ChangeNotifier {
   }
 
   void sendMessage(String conversationId, String text) {
-    if (_currentUid == null) return;
+    final uid = currentUid;
+    if (uid == null) return;
 
     final int targetId = int.tryParse(conversationId) ?? 0;
 
@@ -266,7 +288,7 @@ class MessagingProvider extends ChangeNotifier {
       'content': text,
       'room_id': _activeIsGroup ? targetId : -1,
       'type': _activeIsGroup ? 'group' : 'private',
-      'from': _currentUid,
+      'from': uid,
       'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
     };
 
@@ -278,7 +300,7 @@ class MessagingProvider extends ChangeNotifier {
 
     final tempMsg = ChatMessage(
       id: DateTime.now().millisecondsSinceEpoch,
-      senderId: _currentUid!,
+      senderId: uid,
       receiverId: _activeIsGroup ? 0 : targetId,
       roomId: _activeIsGroup ? targetId : null,
       content: text,
@@ -294,14 +316,15 @@ class MessagingProvider extends ChangeNotifier {
   }
 
   Future<String> addFriendAction(String targetIdStr, String remark) async {
-    if (relationRepository == null || _currentUid == null) return "未登录";
+    final uid = currentUid;
+    if (relationRepository == null || uid == null) return "未登录";
     final targetId = int.tryParse(targetIdStr);
     if (targetId == null) return "ID无效";
 
     final result =
-        await relationRepository!.sendFriendRequest(_currentUid!, targetId, remark);
+        await relationRepository!.sendFriendRequest(uid, targetId, remark);
     if (result['success'] == true) {
-      loadRelationData(uid: _currentUid!);
+      loadRelationData(uid: uid);
       return "OK";
     } else {
       return result['message'] ?? "失败";
@@ -310,13 +333,14 @@ class MessagingProvider extends ChangeNotifier {
 
   Future<String> createGroupAction(
       String groupName, List<int> selectedUserIds) async {
-    if (relationRepository == null || _currentUid == null) return "未登录";
+    final uid = currentUid;
+    if (relationRepository == null || uid == null) return "未登录";
 
     final result = await relationRepository!
-        .createGroup(groupName, _currentUid!, selectedUserIds);
+        .createGroup(groupName, uid, selectedUserIds);
 
     if (result['success'] == true) {
-      await loadRelationData(uid: _currentUid!);
+      await loadRelationData(uid: uid);
       return "OK";
     } else {
       return result['msg'];
@@ -359,7 +383,6 @@ class MessagingProvider extends ChangeNotifier {
   }
 
   Future<void> loadRelationData({required int uid}) async {
-    _currentUid = uid;
     if (relationRepository == null) return;
     try {
       final results = await Future.wait([

@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:zitok/repositories/auth_repository.dart';
 import 'package:zitok/services/auth_service.dart';
 import 'package:zitok/services/api_client.dart';
+import 'package:zitok/services/user_session.dart';
 import 'package:dio/dio.dart';
 
 class FakeAuthService extends AuthService {
@@ -92,14 +93,21 @@ void main() {
   group('AuthRepository', () {
     late SharedPreferences prefs;
     late AuthRepository repo;
+    late UserSession userSession;
 
     setUp(() async {
       SharedPreferences.setMockInitialValues({});
       prefs = await SharedPreferences.getInstance();
+
+      // 重置并获取 UserSession 实例
+      UserSession.resetInstance();
+      userSession = UserSession.instance;
+
       final client = ApiClient(baseUrl: 'http://example', prefs: prefs);
       repo = AuthRepository(
         authService: FakeAuthService(client, prefs: prefs),
         prefs: prefs,
+        userSession: userSession,
       );
     });
 
@@ -107,6 +115,7 @@ void main() {
       final user = await repo.login(username: 'u', password: 'p');
       expect(user.username, 'u');
       expect(prefs.getString('auth_user_id'), '1');
+      expect(userSession.userId, '1');
     });
 
     test('register returns User and persists id', () async {
@@ -118,6 +127,7 @@ void main() {
       );
       expect(user.username, 'u2');
       expect(prefs.getString('auth_user_id'), '2');
+      expect(userSession.userId, '2');
     });
   });
 }

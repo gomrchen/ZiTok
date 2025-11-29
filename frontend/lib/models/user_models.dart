@@ -102,8 +102,11 @@ class User {
     final String? signature = j['signature'] as String?;
     final String? bio = (j['signature'] as String?) ?? signature;
 
+    // 兼容多种字段名：user_id, id, uid
+    final rawId = j['user_id'] ?? j['id'] ?? j['uid'] ?? '';
+
     return User(
-      id: (j['user_id'] ?? '').toString(),
+      id: rawId.toString(),
       username: (j['username'] ?? '').toString(),
       email: j['email'] as String?,
       avatarUrl: avatar,

@@ -1,33 +1,44 @@
 import 'package:flutter/foundation.dart';
 import '../repositories/auth_repository.dart';
 import '../models/user_models.dart';
+import '../services/user_session.dart';
 
 /// 认证 Provider：维护登录态与用户数据
 class AuthProvider extends ChangeNotifier {
   final AuthRepository authRepository;
+  final UserSession userSession;
 
   bool _loading = false;
   String? _error;
-  User? _user;
- User?_registeredUser;
+  User? _registeredUser;
 
-  AuthProvider({required this.authRepository});
+  AuthProvider({
+    required this.authRepository,
+    required this.userSession,
+  });
 
-  bool get isAuthenticated => _user != null;
+  bool get isAuthenticated => userSession.isLoggedIn;
   bool get isRegistered => _registeredUser != null;
   bool get loading => _loading;
   String? get error => _error;
-  User? get user => _user;
-  
+
+  /// 当前用户信息
+  User? get user => userSession.user;
+
+  /// 当前用户 ID（推荐通过 UserSession 获取）
+  String? get userId => userSession.userId;
+
   Future<void> login(String username, String password) async {
     _loading = true;
     _error = null;
     notifyListeners();
     try {
-      _user = await authRepository.login(
+      final user = await authRepository.login(
         username: username,
         password: password,
       );
+      // 用户信息已在 authRepository.login 中通过 UserSession 设置
+      userSession.updateUser(user);
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -60,8 +71,8 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-//修改密码
-  Future<void> changePassword(String email,String code, String newPassword) async {
+  Future<void> changePassword(
+      String email, String code, String newPassword) async {
     _loading = true;
     _error = null;
     notifyListeners();
@@ -79,7 +90,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
-  /// 发送验证码到邮箱
+
   Future<void> sendVerificationCode(String email) async {
     _loading = true;
     _error = null;
@@ -94,14 +105,12 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
     }
   }
-  /// 登出，清除用户状态
+
   Future<void> logout() async {
     _loading = true;
     _error = null;
     try {
       await authRepository.logout();
-      // 清除本地用户状态
-      _user = null;
     } catch (e) {
       _error = e.toString();
     } finally {
@@ -110,4 +119,3 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 }
-

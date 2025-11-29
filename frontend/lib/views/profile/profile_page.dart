@@ -31,7 +31,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       try {
-        await context.read<ProfileProvider>().loadFromAuthProvider(context);
+        await context.read<ProfileProvider>().loadCurrentUser();
 
         // 用户数据加载完成后，立即加载视频数量
         _loadVideosCount();

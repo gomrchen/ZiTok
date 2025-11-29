@@ -9,6 +9,7 @@ import 'routes/app_router.dart';
 import 'providers/theme_provider.dart';
 import 'services/api_client.dart';
 import 'services/auth_service.dart';
+import 'services/user_session.dart';
 import 'repositories/auth_repository.dart';
 import 'providers/auth_provider.dart';
 import 'repositories/video_repository.dart';
@@ -24,12 +25,13 @@ import 'providers/user_provider.dart';
 import 'repositories/comment_repository.dart';
 import 'services/comment_service.dart';
 import 'providers/comment_provider.dart';
-import 'repositories/relation_repository.dart'; // 引入 Repo
+import 'repositories/relation_repository.dart';
 import 'services/relation_service.dart';
 
 class AppBootstrap {
   static late SharedPreferences prefs;
   static late ApiClient apiClient;
+  static late UserSession userSession;
 
   static Future<void> init() async {
     await Hive.initFlutter();
@@ -40,34 +42,62 @@ class AppBootstrap {
 
     prefs = await SharedPreferences.getInstance();
     apiClient = ApiClient(baseUrl: Env.baseUrl, prefs: prefs);
+
+    // 初始化用户会话（唯一真实来源）
+    userSession = UserSession.instance;
+    await userSession.restoreSession(prefs);
+
+    // 迁移旧的 auth_user_id 到新的 user_id
+    await _migrateUserId();
+  }
+
+  /// 迁移旧的用户 ID 存储方式
+  static Future<void> _migrateUserId() async {
+    final oldUserId = prefs.getString('auth_user_id');
+    final newUserId = prefs.getString('user_id');
+
+    // 如果旧的存在但新的不存在，迁移
+    if (oldUserId != null && oldUserId.isNotEmpty && newUserId == null) {
+      await prefs.setString('user_id', oldUserId);
+      await userSession.restoreSession(prefs);
+    }
   }
 }
 
 class ZitokApp extends StatelessWidget {
   const ZitokApp({super.key});
-  
-  // 静态缓存GoRouter实例，避免主题变化时重新创建路由
+
   static GoRouter? _routerCache;
 
   @override
   Widget build(BuildContext context) {
     final authRepository = AuthRepository(
-      authService: AuthService(AppBootstrap.apiClient, prefs: AppBootstrap.prefs),
+      authService:
+          AuthService(AppBootstrap.apiClient, prefs: AppBootstrap.prefs),
       prefs: AppBootstrap.prefs,
+      userSession: AppBootstrap.userSession,
     );
     final videoRepository = VideoRepository(
       api: VideoService(AppBootstrap.apiClient.dio),
       cache: CacheManager(AppBootstrap.prefs),
-      getUserId: () => AppBootstrap.prefs.getString('auth_user_id'),
+      getUserId: () => AppBootstrap.userSession.userId,
     );
-    final userRepository = UserRepository(api: UserService(AppBootstrap.apiClient.dio));
-      // 社交模块依赖
+    final userRepository =
+        UserRepository(api: UserService(AppBootstrap.apiClient.dio));
     final relationService = RelationService(AppBootstrap.apiClient.dio);
     final relationRepository = RelationRepository(api: relationService);
+
     return MultiProvider(
       providers: [
+        // UserSession 作为全局可访问的服务
+        ChangeNotifierProvider<UserSession>.value(
+          value: AppBootstrap.userSession,
+        ),
         ChangeNotifierProvider<AuthProvider>(
-          create: (_) => AuthProvider(authRepository: authRepository),
+          create: (_) => AuthProvider(
+            authRepository: authRepository,
+            userSession: AppBootstrap.userSession,
+          ),
         ),
         ChangeNotifierProvider<ThemeProvider>(
           create: (_) => ThemeProvider(prefs: AppBootstrap.prefs),
@@ -79,12 +109,16 @@ class ZitokApp extends StatelessWidget {
           create: (_) => VideoProvider(repo: videoRepository),
         ),
         ChangeNotifierProvider<MessagingProvider>(
-          create: (_) => MessagingProvider(),
+          create: (_) => MessagingProvider(
+            relationRepository: relationRepository,
+            userSession: AppBootstrap.userSession,
+          ),
         ),
         ChangeNotifierProvider<ProfileProvider>(
-          create: (context) {
-            return ProfileProvider(repo: userRepository);
-          },
+          create: (_) => ProfileProvider(
+            repo: userRepository,
+            userSession: AppBootstrap.userSession,
+          ),
         ),
         ChangeNotifierProvider<UserProvider>(
           create: (_) => UserProvider(repo: userRepository),
@@ -97,21 +131,13 @@ class ZitokApp extends StatelessWidget {
             ),
           ),
         ),
-        // 【关键】注入 Repository 并调用 loadRelationData
-        ChangeNotifierProvider<MessagingProvider>(
-          create: (_) => MessagingProvider(relationRepository: relationRepository),
-        ),
       ],
       child: Builder(
         builder: (context) {
           final authProvider = context.read<AuthProvider>();
-          
-          // 只有当_routerCache为null时才创建新的GoRouter实例
-          // 这样主题变化时就不会重新创建路由，保持导航状态
           final router = _routerCache ??= AppRouter.buildRouter(authProvider);
-          
           final theme = context.watch<ThemeProvider>().theme;
-          
+
           return MaterialApp.router(
             title: '知音App',
             theme: theme,
