@@ -20,10 +20,9 @@ class DiscoverPage extends StatefulWidget {
 
 class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMixin, WidgetsBindingObserver {
   late TabController _tab;
-  int _currentRecommendIndex = 0;
-  final Map<String, VideoPlayerController> _controllers = {};
+  // 移除_controllers map，由_FullScreenVideoItem独立管理自己的controller
+  // 这样避免了重复创建和dispose冲突的问题
   final VideoPreloadManager _preloadManager = VideoPreloadManager.instance;
-  bool _isPageVisible = true;
 
   @override
   void initState() {
@@ -45,9 +44,6 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    for (final c in _controllers.values) {
-      c.dispose();
-    }
     _tab.removeListener(_onTabChanged);
     _tab.dispose();
     super.dispose();
@@ -58,18 +54,8 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
     // 应用进入后台时暂停所有视频
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       _pauseAllVideos();
-      _isPageVisible = false;
-    } else if (state == AppLifecycleState.resumed) {
-      _isPageVisible = true;
-      // 恢复当前视频（如果在推荐页）
-      if (_tab.index == 1 && _controllers.isNotEmpty) {
-        final vp = context.read<VideoProvider>();
-        if (_currentRecommendIndex < vp.discover.length) {
-          final v = vp.discover[_currentRecommendIndex];
-          _controllers[v.id]?.play();
-        }
-      }
     }
+    // 恢复播放由各_FullScreenVideoItem通过自己的WidgetsBindingObserver处理
   }
 
   void _onTabChanged() {
@@ -80,43 +66,13 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
   }
 
   void _pauseAllVideos() {
-    for (final c in _controllers.values) {
-      c.pause();
-    }
+    // 通过PreloadManager暂停所有视频
     _preloadManager.pauseAll();
   }
 
-  Future<void> _playIndex(List videos, int index) async {
-    if (index < 0 || index >= videos.length) return;
-    if (!_isPageVisible) return; // 页面不可见时不播放
-
-    setState(() => _currentRecommendIndex = index);
-    final v = videos[index];
-
-    // 暂停所有其他视频
-    for (final entry in _controllers.entries) {
-      if (entry.key != v.id) entry.value.pause();
-    }
-
-    // 更新预加载管理器的当前索引
+  void _onIndexChanged(int index) {
+    // 更新预加载状态，实际播放由_FullScreenVideoItem管理
     _preloadManager.updateCurrentIndex(index);
-
-    // 当前控制器
-    var ctrl = _controllers[v.id];
-    if (ctrl == null) {
-      // 尝试从预加载管理器获取
-      ctrl = _preloadManager.getPreloadedController(v.id);
-      if (ctrl != null) {
-        _controllers[v.id] = ctrl;
-        debugPrint('DiscoverPage: using preloaded controller for ${v.id}');
-      } else {
-        ctrl = VideoPlayerController.networkUrl(Uri.parse(v.videoUrl));
-        _controllers[v.id] = ctrl;
-        await ctrl.initialize();
-      }
-    }
-    ctrl.setLooping(true);
-    await ctrl.play();
   }
 
   @override
@@ -152,7 +108,7 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
             videos: vp.discover,
             isLoading: vp.loadingDiscover,
             onRetry: () => vp.refreshDiscover(),
-            onIndexChanged: (i) => _playIndex(vp.discover, i),
+            onIndexChanged: _onIndexChanged,
           ),
         ],
       ),
@@ -248,8 +204,8 @@ class _FullScreenVideoItem extends StatefulWidget {
   State<_FullScreenVideoItem> createState() => _FullScreenVideoItemState();
 }
 
-class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with WidgetsBindingObserver {
-  late VideoPlayerController _controller;
+class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with WidgetsBindingObserver, SingleTickerProviderStateMixin {
+  VideoPlayerController? _controller;
   bool _initialized = false;
   bool _isBuffering = false;
   String? _error;
@@ -257,6 +213,12 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
   bool _showControls = false;
   Timer? _hideControlsTimer;
   bool _isDescriptionExpanded = false;
+  bool _isPreloadedController = false; // 标记是否使用预加载的controller
+  bool _isDisposed = false; // 标记是否已dispose
+
+  // 淡入动画控制器
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
 
   // 顶部栏：菜单展开占位
   void _onMenu() {
@@ -284,13 +246,26 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    // 初始化淡入动画
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _fadeAnimation = CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeOut,
+    );
+
     _initController();
   }
 
   Future<void> _initController() async {
+    if (_isDisposed) return;
+
     final url = widget.video.videoUrl ?? '';
     if (url.isEmpty) {
-      setState(() => _error = '视频地址为空');
+      if (mounted) setState(() => _error = '视频地址为空');
       return;
     }
 
@@ -298,12 +273,16 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
     final preloadManager = VideoPreloadManager.instance;
     final preloaded = preloadManager.getPreloadedController(widget.video.id);
 
-    if (preloaded != null) {
+    if (preloaded != null && preloaded.value.isInitialized) {
       _controller = preloaded;
-      if (mounted) {
+      _isPreloadedController = true;
+      if (mounted && !_isDisposed) {
         setState(() => _initialized = true);
-        _controller.setLooping(true);
-        _controller.play();
+        _controller!.setLooping(true);
+        _controller!.addListener(_onControllerUpdate);
+        _controller!.play();
+        // 启动淡入动画
+        _fadeController.forward();
         context.read<VideoProvider>().visit(widget.video.id);
       }
       debugPrint('_FullScreenVideoItem: using preloaded controller');
@@ -311,28 +290,36 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
     }
 
     // 创建新控制器
-    _controller = VideoPlayerController.networkUrl(Uri.parse(url));
-    _controller.addListener(_onControllerUpdate);
+    final newController = VideoPlayerController.networkUrl(Uri.parse(url));
+    _controller = newController;
+    _isPreloadedController = false;
+    _controller!.addListener(_onControllerUpdate);
 
     try {
-      await _controller.initialize();
-      if (mounted) {
+      await newController.initialize();
+      // 初始化完成后再次检查状态
+      if (mounted && !_isDisposed && _controller == newController) {
         setState(() => _initialized = true);
-        _controller.setLooping(true);
-        _controller.play();
+        _controller!.setLooping(true);
+        _controller!.play();
+        // 启动淡入动画
+        _fadeController.forward();
         context.read<VideoProvider>().visit(widget.video.id);
+      } else if (_controller != newController) {
+        // controller已被替换，dispose旧的
+        newController.dispose();
       }
     } catch (e) {
       debugPrint('FullScreenVideoItem: initialize error $e');
-      if (mounted) setState(() => _error = '视频加载失败');
+      if (mounted && !_isDisposed) setState(() => _error = '视频加载失败');
     }
   }
 
   void _onControllerUpdate() {
-    if (!mounted) return;
+    if (!mounted || _isDisposed || _controller == null) return;
 
     final wasBuffering = _isBuffering;
-    final isBufferingNow = _controller.value.isBuffering;
+    final isBufferingNow = _controller!.value.isBuffering;
 
     if (wasBuffering != isBufferingNow) {
       setState(() => _isBuffering = isBufferingNow);
@@ -341,31 +328,44 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (_controller == null || _isDisposed) return;
+
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
-      _wasPlayingBeforePause = _controller.value.isPlaying;
-      _controller.pause();
+      _wasPlayingBeforePause = _controller!.value.isPlaying;
+      _controller!.pause();
     } else if (state == AppLifecycleState.resumed) {
       if (_wasPlayingBeforePause) {
-        _controller.play();
+        _controller!.play();
       }
     }
   }
 
   @override
   void dispose() {
+    _isDisposed = true;
     _hideControlsTimer?.cancel();
+    _fadeController.dispose();
     WidgetsBinding.instance.removeObserver(this);
-    _controller.removeListener(_onControllerUpdate);
-    _controller.dispose();
+
+    if (_controller != null) {
+      _controller!.removeListener(_onControllerUpdate);
+      // 只有非预加载的controller才需要dispose
+      // 预加载的controller由PreloadManager管理
+      if (!_isPreloadedController) {
+        _controller!.dispose();
+      }
+    }
     super.dispose();
   }
 
   void _togglePlayPause() {
+    if (_controller == null || _isDisposed) return;
+
     setState(() {
-      if (_controller.value.isPlaying) {
-        _controller.pause();
+      if (_controller!.value.isPlaying) {
+        _controller!.pause();
       } else {
-        _controller.play();
+        _controller!.play();
       }
       _showControls = true;
     });
@@ -375,7 +375,7 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
   void _resetHideControlsTimer() {
     _hideControlsTimer?.cancel();
     _hideControlsTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted && _controller.value.isPlaying) {
+      if (mounted && !_isDisposed && _controller != null && _controller!.value.isPlaying) {
         setState(() => _showControls = false);
       }
     });
@@ -392,7 +392,7 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
 
   void _openVideoDetail() {
     // 暂停当前视频
-    _controller.pause();
+    _controller?.pause();
 
     // 导航到视频详情页
     Navigator.push(
@@ -402,8 +402,8 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
       ),
     ).then((_) {
       // 返回时恢复播放
-      if (mounted) {
-        _controller.play();
+      if (mounted && !_isDisposed && _controller != null) {
+        _controller!.play();
       }
     });
   }
@@ -431,17 +431,20 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
                   ],
                 ),
               )
-            : _initialized
-                ? GestureDetector(
-                    onTap: _onVideoTap,
-                    child: Container(
-                      color: Colors.black,
-                      child: FittedBox(
-                        fit: BoxFit.cover,
-                        child: SizedBox(
-                          width: _controller.value.size.width,
-                          height: _controller.value.size.height,
-                          child: VideoPlayer(_controller),
+            : _initialized && _controller != null
+                ? FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: GestureDetector(
+                      onTap: _onVideoTap,
+                      child: Container(
+                        color: Colors.black,
+                        child: FittedBox(
+                          fit: BoxFit.cover,
+                          child: SizedBox(
+                            width: _controller!.value.size.width,
+                            height: _controller!.value.size.height,
+                            child: VideoPlayer(_controller!),
+                          ),
                         ),
                       ),
                     ),
@@ -464,7 +467,7 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
           ),
 
         // 播放/暂停按钮overlay
-        if (_initialized && _showControls && !_isBuffering)
+        if (_initialized && _showControls && !_isBuffering && _controller != null)
           Center(
             child: GestureDetector(
               onTap: _togglePlayPause,
@@ -476,7 +479,7 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
                   color: Colors.black.withValues(alpha: 0.5),
                 ),
                 child: Icon(
-                  _controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                  _controller!.value.isPlaying ? Icons.pause : Icons.play_arrow,
                   size: 50,
                   color: Colors.white,
                 ),
@@ -660,12 +663,12 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
           ),
 
         // 底部进度条
-        if (_initialized)
+        if (_initialized && _controller != null)
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: _VideoProgressBar(controller: _controller),
+            child: _VideoProgressBar(controller: _controller!),
           ),
       ],
     );
@@ -1100,132 +1103,136 @@ class _VideoProgressBarState extends State<_VideoProgressBar> {
         ? position.inMilliseconds / duration.inMilliseconds
         : 0.0;
 
+    // 进度条直接浮在视频上方，无背景，与视频一体化
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      // 移除背景渐变，让进度条浮在视频上方
-      decoration: const BoxDecoration(
-        color: Colors.transparent,
+      // 底部安全区域内边距
+      padding: EdgeInsets.only(
+        left: 12,
+        right: 12,
+        bottom: MediaQuery.of(context).padding.bottom + 8,
       ),
-      child: Row(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          // 当前时间（添加阴影提升可读性）
-          Text(
-            _formatDuration(position),
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              shadows: [
-                Shadow(
-                  color: Colors.black.withValues(alpha: 0.8),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          // 进度条
-          Expanded(
-            child: GestureDetector(
-              onHorizontalDragStart: (details) {
-                setState(() {
-                  _isDragging = true;
-                  _dragValue = progress.clamp(0.0, 1.0);
-                });
-              },
-              onHorizontalDragUpdate: (details) {
-                setState(() {
-                  final RenderBox box = context.findRenderObject() as RenderBox;
-                  final localPosition = box.globalToLocal(details.globalPosition);
-                  final sliderWidth = box.size.width;
-                  _dragValue = (localPosition.dx / sliderWidth).clamp(0.0, 1.0);
-                });
-              },
-              onHorizontalDragEnd: (details) {
-                final newPosition = Duration(
-                  milliseconds: (_dragValue * duration.inMilliseconds).toInt(),
-                );
-                widget.controller.seekTo(newPosition);
-                setState(() {
-                  _isDragging = false;
-                });
-              },
-              child: Container(
-                height: 3,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.25),
-                  borderRadius: BorderRadius.circular(1.5),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.3),
-                      blurRadius: 2,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-                child: Stack(
-                  children: [
-                    // 已播放进度
-                    FractionallySizedBox(
-                      widthFactor: _isDragging ? _dragValue : progress,
-                      child: Container(
+          // 进度条主体
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final sliderWidth = constraints.maxWidth;
+              return GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onHorizontalDragStart: (details) {
+                  setState(() {
+                    _isDragging = true;
+                    _dragValue = progress.clamp(0.0, 1.0);
+                  });
+                },
+                onHorizontalDragUpdate: (details) {
+                  if (!mounted) return;
+                  setState(() {
+                    final localX = details.localPosition.dx;
+                    _dragValue = (localX / sliderWidth).clamp(0.0, 1.0);
+                  });
+                },
+                onHorizontalDragEnd: (details) {
+                  if (!mounted) return;
+                  final newPosition = Duration(
+                    milliseconds: (_dragValue * duration.inMilliseconds).toInt(),
+                  );
+                  widget.controller.seekTo(newPosition);
+                  setState(() {
+                    _isDragging = false;
+                  });
+                },
+                child: Container(
+                  height: 24, // 触摸区域高度
+                  alignment: Alignment.center,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    alignment: Alignment.centerLeft,
+                    children: [
+                      // 进度条背景轨道（半透明白色）
+                      Container(
+                        height: _isDragging ? 4 : 2, // 拖动时变粗
                         decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(1.5),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.4),
-                              blurRadius: 3,
-                              offset: const Offset(0, 1),
-                            ),
-                          ],
+                          color: Colors.white.withValues(alpha: 0.3),
+                          borderRadius: BorderRadius.circular(2),
                         ),
                       ),
-                    ),
-                    // 拖动指示器
-                    if (_isDragging)
-                      Positioned(
-                        left: (context.size?.width ?? 0) * _dragValue - 7,
-                        top: -5,
+                      // 已播放进度（白色）
+                      FractionallySizedBox(
+                        widthFactor: _isDragging ? _dragValue : progress,
                         child: Container(
-                          width: 13,
-                          height: 13,
+                          height: _isDragging ? 4 : 2,
                           decoration: BoxDecoration(
-                            shape: BoxShape.circle,
                             color: Colors.white,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.4),
-                                blurRadius: 4,
-                                offset: const Offset(0, 2),
-                              ),
-                            ],
+                            borderRadius: BorderRadius.circular(2),
                           ),
                         ),
                       ),
-                  ],
+                      // 拖动指示器
+                      if (_isDragging)
+                        Positioned(
+                          left: sliderWidth * _dragValue - 8,
+                          child: Container(
+                            width: 16,
+                            height: 16,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withValues(alpha: 0.3),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
+              );
+            },
+          ),
+          // 时间显示（仅在拖动时显示）
+          if (_isDragging)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    _formatDuration(position),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
+                  Text(
+                    _formatDuration(duration),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.8),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      shadows: [
+                        Shadow(
+                          color: Colors.black.withValues(alpha: 0.6),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
-          const SizedBox(width: 8),
-          // 总时长（添加阴影提升可读性）
-          Text(
-            _formatDuration(duration),
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 12,
-              fontWeight: FontWeight.w500,
-              shadows: [
-                Shadow(
-                  color: Colors.black.withValues(alpha: 0.8),
-                  blurRadius: 4,
-                  offset: const Offset(0, 1),
-                ),
-              ],
-            ),
-          ),
         ],
       ),
     );
