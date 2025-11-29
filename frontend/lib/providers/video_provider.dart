@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../repositories/video_repository.dart';
 import '../models/video.dart';
+import '../models/video_publish.dart';
 
 class VideoProvider extends ChangeNotifier {
   final VideoRepository repo;
@@ -26,6 +27,9 @@ class VideoProvider extends ChangeNotifier {
   double _followScrollOffset = 0.0;
   int? _recommendStartIndexInFollow;
   
+  // 投稿相关状态
+  PublishProgress _publishProgress = PublishProgress.idle();
+
   // 搜索状态
   List<Video> _searchResults = [];
   bool _loadingSearch = false;
@@ -55,6 +59,9 @@ class VideoProvider extends ChangeNotifier {
   bool get loadingSearch => _loadingSearch;
   bool get searchHasMore => _searchHasMore;
   String? get searchKeyword => _searchKeyword;
+
+  // 投稿相关getter
+  PublishProgress get publishProgress => _publishProgress;
 
   Future<void> refreshDiscover({String? keyword, List<String>? tags}) async {
     debugPrint('VideoProvider.refreshDiscover: start keyword=$keyword');
@@ -160,6 +167,35 @@ class VideoProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 收藏（本地更新），真实项目中应调用后端接口并做失败回滚
+  Future<void> collect(String videoId) async {
+    // TODO: 调用后端API
+    // await repo.collect(videoId);
+    void updateList(List<Video> list) {
+      final i = list.indexWhere((v) => v.id == videoId);
+      if (i >= 0) {
+        final v = list[i];
+        list[i] = Video(
+          id: v.id,
+          uid: v.uid,
+          title: v.title,
+          intro: v.intro,
+          coverUrl: v.coverUrl,
+          videoUrl: v.videoUrl,
+          stars: (v.stars ?? 0) + 1,
+          likes: v.likes,
+          views: v.views,
+          commentCount: v.commentCount,
+          tags: v.tags,
+        );
+      }
+    }
+    updateList(_follow);
+    updateList(_discover);
+    updateList(_featured);
+    notifyListeners();
+  }
+
   Future<void> visit(String videoId) async {
     await repo.visit(videoId);
     void updateList(List<Video> list) {
@@ -241,5 +277,73 @@ class VideoProvider extends ChangeNotifier {
       notifyListeners();
       debugPrint('VideoProvider.loadMoreSearch: page=$_searchPage items_now=${_searchResults.length} hasMore=$_searchHasMore');
     }
+  }
+
+  /// 发布视频
+  ///
+  /// [filePath] 本地视频文件路径
+  /// [title] 视频标题
+  /// [description] 视频描述
+  /// [userId] 用户ID
+  /// [tags] 标签列表（可选）
+  Future<bool> publishVideo({
+    required String filePath,
+    required String title,
+    required String description,
+    required String userId,
+    List<String> tags = const [],
+  }) async {
+    if (_publishProgress.isInProgress) {
+      debugPrint('VideoProvider.publishVideo: already in progress, skipping');
+      return false;
+    }
+
+    debugPrint('VideoProvider.publishVideo: start filePath=$filePath');
+    _publishProgress = PublishProgress.uploading(0);
+    notifyListeners();
+
+    try {
+      final request = VideoPublishRequest(
+        filePath: filePath,
+        title: title,
+        description: description,
+        userId: userId,
+        tags: tags,
+      );
+
+      final response = await repo.publish(
+        request,
+        onProgress: (progress) {
+          _publishProgress = PublishProgress.uploading(progress);
+          notifyListeners();
+        },
+      );
+
+      if (response.isSuccess) {
+        _publishProgress = PublishProgress.success();
+        notifyListeners();
+        debugPrint('VideoProvider.publishVideo: success');
+        // 发布成功后刷新发现页
+        await refreshDiscover();
+        return true;
+      } else {
+        _publishProgress = PublishProgress.failed(response.message);
+        notifyListeners();
+        debugPrint('VideoProvider.publishVideo: failed message=${response.message}');
+        return false;
+      }
+    } catch (e) {
+      final errorMsg = e.toString();
+      _publishProgress = PublishProgress.failed(errorMsg);
+      notifyListeners();
+      debugPrint('VideoProvider.publishVideo: error=$errorMsg');
+      return false;
+    }
+  }
+
+  /// 重置发布状态
+  void resetPublishProgress() {
+    _publishProgress = PublishProgress.idle();
+    notifyListeners();
   }
 }

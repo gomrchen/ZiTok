@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 *.sh text eol=lf
 *.go text eol=lf
 *.yaml text eol=lf
@@ -5,3 +6,12 @@
 *.thrift text eol=lf
 *.proto text eol=lf
 Makefile text eol=lf
+=======
+*.sh text eol=lf
+*.go text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.thrift text eol=lf
+*.proto text eol=lf
+Makefile text eol=lf
+>>>>>>> aaa4da01b9747b50aad04275356db124e0cdca7d

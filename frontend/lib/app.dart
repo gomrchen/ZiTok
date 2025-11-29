@@ -56,6 +56,7 @@ class ZitokApp extends StatelessWidget {
     final videoRepository = VideoRepository(
       api: VideoService(AppBootstrap.apiClient.dio),
       cache: CacheManager(AppBootstrap.prefs),
+      getUserId: () => AppBootstrap.prefs.getString('auth_user_id'),
     );
     final userRepository = UserRepository(api: UserService(AppBootstrap.apiClient.dio));
 
@@ -77,7 +78,10 @@ class ZitokApp extends StatelessWidget {
           create: (_) => MessagingProvider(),
         ),
         ChangeNotifierProvider<ProfileProvider>(
-          create: (_) => ProfileProvider(repo: userRepository),
+          create: (context) {
+            print("🔄 创建ProfileProvider");
+            return ProfileProvider(repo: userRepository);
+          },
         ),
         ChangeNotifierProvider<UserProvider>(
           create: (_) => UserProvider(repo: userRepository),

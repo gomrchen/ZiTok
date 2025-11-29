@@ -3,16 +3,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:zitok/widgets/comment_sheet.dart';
 
 void main() {
-  testWidgets('Comment sheet shows tabs and collapsible replies', (tester) async {
+  testWidgets(
+      'Comment sheet shows tabs and collapsible replies', (tester) async {
     final app = MaterialApp(
       home: Scaffold(
         body: Builder(
-          builder: (ctx) => Center(
-            child: ElevatedButton(
-              onPressed: () => showCommentsSheet(ctx, videoId: 'vid123'),
-              child: const Text('open'),
-            ),
-          ),
+          builder: (ctx) =>
+              Center(
+                child: ElevatedButton(
+                  onPressed: () => showCommentsSheet(ctx, videoId: 'vid123'),
+                  child: const Text('open'),
+                ),
+              ),
         ),
       ),
     );
@@ -39,7 +41,9 @@ void main() {
     expect(find.text('写下你的评论...'), findsOneWidget);
 
     // Like button tap increases count visually
-    final likeBtn = find.byIcon(Icons.favorite_border).first;
+    final likeBtn = find
+        .byIcon(Icons.favorite_border)
+        .first;
     await tester.tap(likeBtn);
     await tester.pump();
     expect(find.byIcon(Icons.favorite), findsWidgets);

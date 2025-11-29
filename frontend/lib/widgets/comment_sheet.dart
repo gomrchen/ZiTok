@@ -66,6 +66,10 @@ class _CommentsPaneState extends State<CommentsPane> with AutomaticKeepAliveClie
   final TextEditingController _text = TextEditingController();
   late CommentProvider commentProvider; // 在initState或build中初始化
 
+  // 内部回复状态（当 showInput 为 true 时使用）
+  CommentItem? _replyingTo;
+  final FocusNode _focusNode = FocusNode();
+
   @override
   void initState() {
     super.initState();
@@ -77,14 +81,22 @@ class _CommentsPaneState extends State<CommentsPane> with AutomaticKeepAliveClie
       }
     });
 
-    widget.controller?._sendHook = _receiveExternalSend;
+    // 只有当 showInput 为 true 时，才在内部设置 _sendHook
+    // 当 showInput 为 false 时，由外部（如 _CommentSheetContentState）设置 hook
+    if (widget.showInput) {
+      widget.controller?._sendHook = _receiveExternalSend;
+    }
   }
 
   @override
   void dispose() {
-    widget.controller?._sendHook = null;
+    // 只有当 showInput 为 true 时，才清理 _sendHook（因为只有这时是内部设置的）
+    if (widget.showInput) {
+      widget.controller?._sendHook = null;
+    }
     _sort.dispose();
     _text.dispose();
+    _focusNode.dispose();
     super.dispose();
   }
 
@@ -116,12 +128,30 @@ class _CommentsPaneState extends State<CommentsPane> with AutomaticKeepAliveClie
     }
   }
 
+  /// 内部回复处理（当 showInput 为 true 时使用）
+  void _handleInternalReply(CommentItem comment) {
+    setState(() {
+      _replyingTo = comment;
+    });
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _focusNode.canRequestFocus) {
+        _focusNode.requestFocus();
+      }
+    });
+  }
+
   void _send() {
     final t = _text.text.trim();
     if (t.isEmpty) return;
     widget.onSend?.call(t);
-    _receiveExternalSend(t, null);
+    _receiveExternalSend(t, _replyingTo?.id);
     _text.clear();
+    // 清除回复状态
+    if (_replyingTo != null) {
+      setState(() {
+        _replyingTo = null;
+      });
+    }
   }
 
   /// 【新增】处理删除逻辑的方法
@@ -216,7 +246,8 @@ class _CommentsPaneState extends State<CommentsPane> with AutomaticKeepAliveClie
                         }
                       });
                     },
-                    onReply: widget.onReply,
+                    // 当 showInput 为 true 时使用内部回复处理，否则使用外部回调
+                    onReply: widget.showInput ? _handleInternalReply : widget.onReply,
                     onDelete: () => _handleDelete(commentItem),
                     onDeleteReply: (replyItem) => _handleDelete(replyItem),
                   );
@@ -235,10 +266,24 @@ class _CommentsPaneState extends State<CommentsPane> with AutomaticKeepAliveClie
                   Expanded(
                     child: TextField(
                       controller: _text,
-                      decoration: const InputDecoration(
-                        hintText: '写下你的评论...',
-                        border: OutlineInputBorder(),
+                      focusNode: _focusNode,
+                      decoration: InputDecoration(
+                        hintText: _replyingTo == null
+                            ? '写下你的评论...'
+                            : '回复 @${_replyingTo!.author}',
+                        border: const OutlineInputBorder(),
                         isDense: true,
+                        // 显示取消回复按钮
+                        suffixIcon: _replyingTo != null
+                            ? IconButton(
+                                icon: const Icon(Icons.close, size: 18),
+                                onPressed: () {
+                                  setState(() {
+                                    _replyingTo = null;
+                                  });
+                                },
+                              )
+                            : null,
                       ),
                     ),
                   ),
@@ -285,11 +330,25 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
   void initState() {
     super.initState();
     _tab = TabController(length: 2, vsync: this);
+
+    // 设置回复 hook：当子组件触发回复时，更新 _replyingTo 状态
     _paneController._startReplyHook = (commentToReply) {
       setState(() {
         _replyingTo = commentToReply;
       });
       _focusNode.requestFocus();
+    };
+
+    // 【关键修复】设置发送 hook：当调用 _paneController.send() 时，实际执行发送逻辑
+    _paneController._sendHook = (text, parentId) {
+      if (text.trim().isEmpty) return;
+      if (mounted) {
+        context.read<CommentProvider>().addComment(
+          videoId: widget.videoId,
+          content: text.trim(),
+          parentId: parentId,
+        );
+      }
     };
   }
 
@@ -298,7 +357,9 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
     _tab.dispose();
     _text.dispose();
     _focusNode.dispose();
+    // 清理所有 hooks，防止内存泄漏
     _paneController._startReplyHook = null;
+    _paneController._sendHook = null;
     super.dispose();
   }
 
@@ -426,7 +487,12 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
         setState(() {
           _replyingTo = commentToReply;
         });
-        _focusNode.requestFocus();
+        // 使用 addPostFrameCallback 确保在 UI 更新后再请求焦点
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted && _focusNode.canRequestFocus) {
+            _focusNode.requestFocus();
+          }
+        });
       },
     );
   }
@@ -482,13 +548,26 @@ class _CommentTile extends StatelessWidget {
                       children: [
                         Text(_fmt(item.time), style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
                         const SizedBox(width: 16),
-                        InkWell(
-                          onTap: () => onReply?.call(item),
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 4.0),
-                            child: Text(
-                              '回复',
-                              style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: Colors.grey.shade600),
+                        Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(4),
+                            onTap: () {
+                              onReply?.call(item);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 10.0),
+                              decoration: BoxDecoration(
+                                border: Border.all(color: Colors.grey.shade400, width: 0.8),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                '回复',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.grey.shade700,
+                                ),
+                              ),
                             ),
                           ),
                         ),
@@ -608,13 +687,26 @@ class _ReplyTile extends StatelessWidget {
                   children: [
                     Text(_fmt(item.time), style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
                     const SizedBox(width: 16),
-                    InkWell(
-                      onTap: () => onReply?.call(item), // 点击时，调用onReply回调
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 4.0),
-                        child: Text(
-                          '回复',
-                          style: theme.textTheme.bodySmall?.copyWith(fontWeight: FontWeight.w600, color: Colors.grey.shade600),
+                    Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(4),
+                        onTap: () {
+                          onReply?.call(item);
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 10.0),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: Colors.grey.shade400, width: 0.8),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '回复',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: Colors.grey.shade700,
+                            ),
+                          ),
                         ),
                       ),
                     ),

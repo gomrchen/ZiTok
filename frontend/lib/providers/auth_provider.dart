@@ -18,7 +18,7 @@ class AuthProvider extends ChangeNotifier {
   bool get loading => _loading;
   String? get error => _error;
   User? get user => _user;
-
+  
   Future<void> login(String username, String password) async {
     _loading = true;
     _error = null;
@@ -110,3 +110,4 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 }
+

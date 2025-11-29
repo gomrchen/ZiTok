@@ -30,7 +30,7 @@ class AuthRepository {
       throw AuthException(message: msg, code: code);
     }
     final raw = (body['data'] as Map<String, dynamic>?) ?? body;
-    final user = User.fromJson(raw);
+    User  user = User.fromJson(raw);
     // 持久化 token 与用户ID
     String? token = (raw['token'] ?? raw['access_token'])?.toString();
     // 兼容后端将 token 放在响应头的情况
@@ -43,6 +43,10 @@ class AuthRepository {
     }
     final refresh = (raw['refresh_token'] ?? raw['refreshToken'])?.toString();
     final uid = (raw['user_id'] ?? raw['uid'] ?? user.id).toString();
+    print("在这里！！！！！！！"+uid);
+    print(raw.toString());
+    print("!!!!!!!!!!!!!!!!!!!!!!!!");
+    print(body.toString());
     if (token != null && token.isNotEmpty)
       await prefs.setString('access_token', token);
     if (refresh != null && refresh.isNotEmpty)
