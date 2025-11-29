@@ -10,6 +10,7 @@ class Video {
   final int? views;       // 观看数（保留兼容）
   final int? commentCount; // 评论数
   final List<String> tags;
+  final int? comments;
 
   const Video({
     required this.id,
