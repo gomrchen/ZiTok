@@ -2,128 +2,252 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/messaging_provider.dart';
+import '../../models/social_models.dart'; // 确保引入了模型文件以识别 Friend/Conversation
 import '../chat/chat_page.dart';
+import '../chat/friend_search_page.dart';
+import '../chat/global_search_page.dart'; // 全网搜索（添加好友）
+import '../chat/create_group_page.dart'; // 【新增】新建群聊页面
 
-/// 消息页（独立路由）：包含顶部栏与列表内容
 class MessagesPage extends StatelessWidget {
   const MessagesPage({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final mp = context.watch<MessagingProvider>();
+
+    // 1. 准备好友数据 (关注 + 粉丝 并集去重)
+    final Map<String, Friend> uniqueContacts = {};
+    for (var f in mp.following) {
+      uniqueContacts[f.id] = f;
+    }
+    for (var f in mp.followers) {
+      uniqueContacts[f.id] = f;
+    }
+
+    // 2. 准备总列表：先放群聊，再放好友
+    final List<Conversation> allConversations = [];
+    allConversations.addAll(mp.chatRooms);
+    allConversations.addAll(uniqueContacts.values);
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(icon: const Icon(Icons.menu), onPressed: () {}),
         centerTitle: true,
         title: const Text('消息'),
         actions: [
+          // 🔍 搜索按钮：跳转到【本地搜索】（搜已关注好友/聊天记录）
           IconButton(
             tooltip: '搜索',
             icon: const Icon(Icons.search),
             onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FriendSearchPage())),
           ),
+
+          // ➕ 添加按钮：弹出菜单
           IconButton(
             tooltip: '添加',
             icon: const Icon(Icons.add_circle_outline),
             onPressed: () async {
+              final screenWidth = MediaQuery.of(context).size.width;
+              final topOffset = MediaQuery.of(context).padding.top + kToolbarHeight;
+
               final selected = await showMenu<String>(
                 context: context,
-                position: RelativeRect.fromLTRB(
-                  MediaQuery.of(context).size.width - 200,
-                  kToolbarHeight + MediaQuery.of(context).padding.top,
-                  8,
-                  0,
-                ),
-                items: const [
-                  PopupMenuItem<String>(
-                    value: 'add',
-                    child: ListTile(leading: Icon(Icons.person_add_outlined), title: Text('添加好友')),
+                position: RelativeRect.fromLTRB(screenWidth, topOffset + 1, 0, 0),
+                elevation: 3,
+                constraints: const BoxConstraints(minWidth: 120, maxWidth: 160),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                items: [
+                  // 选项 1: 添加好友
+                  const PopupMenuItem<String>(
+                    value: 'add_friend',
+                    height: 40,
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      children: [
+                        Icon(Icons.person_add_outlined, size: 20, color: Colors.black87),
+                        SizedBox(width: 10),
+                        Text('添加好友', style: TextStyle(fontSize: 14)),
+                      ],
+                    ),
+                  ),
+                  // 选项 2: 新建群聊
+                  const PopupMenuItem<String>(
+                    value: 'create_group',
+                    height: 40,
+                    padding: EdgeInsets.symmetric(horizontal: 12),
+                    child: Row(
+                      children: [
+                        Icon(Icons.chat_bubble_outline, size: 20, color: Colors.black87),
+                        SizedBox(width: 10),
+                        Text('新建群聊', style: TextStyle(fontSize: 14)),
+                      ],
+                    ),
                   ),
                 ],
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
               );
-              if (selected == 'add') {
-                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FriendSearchPage()));
+
+              if (!context.mounted) return;
+
+              // 处理菜单点击跳转
+              if (selected == 'add_friend') {
+                // 跳转到全网搜索页
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const GlobalSearchPage()));
+              } else if (selected == 'create_group') {
+                // 【新增】跳转到新建群聊页
+                Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CreateGroupPage()));
               }
             },
           ),
         ],
       ),
-      body: const MessagesBody(),
+      body: allConversations.isEmpty
+          ? const Center(child: Text("暂无消息", style: TextStyle(color: Colors.grey)))
+          : CustomScrollView(
+        slivers: [
+          // --- 顶部横向快捷头像栏 (只显示互关好友) ---
+          if (mp.mutualFriends.isNotEmpty)
+            SliverToBoxAdapter(
+              child: _QuickAccessBar(
+                friends: mp.mutualFriends,
+                onTapFriend: (f) => _toChat(context, f),
+              ),
+            ),
+
+          // --- 下方消息列表 (显示 群聊 + 所有好友) ---
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+                  (context, i) {
+                final c = allConversations[i];
+
+                final msgs = mp.messagesFor(c.id);
+                final lastMsg = msgs.isNotEmpty ? msgs.last : null;
+                final previewText = lastMsg != null ? lastMsg.content : '';
+
+                // 处理头像 URL
+                final fullAvatarUrl = (c.avatarUrl.isNotEmpty && c.avatarUrl != 'null')
+                    ? c.avatarUrl
+                    : null;
+
+                final defaultIcon = c.isGroup ? Icons.group : Icons.person;
+
+                return ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  leading: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      CircleAvatar(
+                        radius: 24,
+                        backgroundColor: Colors.grey.shade200,
+                        backgroundImage: fullAvatarUrl != null
+                            ? CachedNetworkImageProvider(fullAvatarUrl)
+                            : null,
+                        child: fullAvatarUrl == null
+                            ? Icon(defaultIcon, color: Colors.grey)
+                            : null,
+                      ),
+                      // 仅好友显示在线状态 (群聊不显示)
+                      if (!c.isGroup && (c as Friend).online)
+                        Positioned(
+                          right: -2,
+                          bottom: -2,
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 2),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  title: Text(
+                      c.name,
+                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)
+                  ),
+                  subtitle: previewText.isNotEmpty
+                      ? Text(
+                    previewText,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(color: Colors.grey, fontSize: 13),
+                  )
+                      : null,
+                  trailing: const Icon(Icons.chevron_right, color: Colors.grey, size: 18),
+                  onTap: () => _toChat(context, c),
+                );
+              },
+              childCount: allConversations.length,
+            ),
+          ),
+        ],
+      ),
     );
+  }
+
+  void _toChat(BuildContext context, Conversation c) {
+    Navigator.of(context).push(MaterialPageRoute(builder: (_) => ChatPage(
+      conversationId: c.id,
+      isGroup: c.isGroup,
+    )));
   }
 }
 
-/// 顶部快速访问头像条（公开以供 Shell 复用）
-class QuickAccessBar extends StatelessWidget {
+// --- 顶部横向快捷栏组件 ---
+class _QuickAccessBar extends StatelessWidget {
   final List<Friend> friends;
   final void Function(Friend) onTapFriend;
-  const QuickAccessBar({super.key, required this.friends, required this.onTapFriend});
+
+  const _QuickAccessBar({
+    required this.friends,
+    required this.onTapFriend,
+  });
+
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 96,
+      height: 125,
       child: ListView.builder(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
         scrollDirection: Axis.horizontal,
         itemCount: friends.length,
-        cacheExtent: 400,
         itemBuilder: (context, i) {
           final f = friends[i];
+          final fullAvatarUrl = (f.avatarUrl.isNotEmpty && f.avatarUrl != 'null')
+              ? f.avatarUrl
+              : null;
+
           return Padding(
-            padding: const EdgeInsets.only(right: 16),
+            padding: const EdgeInsets.only(right: 20),
             child: InkWell(
               onTap: () => onTapFriend(f),
               borderRadius: BorderRadius.circular(40),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      ClipOval(
-                        child: CachedNetworkImage(
-                          imageUrl: f.avatarUrl,
-                          width: 56,
-                          height: 56,
-                          fit: BoxFit.cover,
-                          placeholder: (ctx, _) => Container(
-                            width: 56,
-                            height: 56,
-                            color: Colors.grey.shade200,
-                            child: const Icon(Icons.person, color: Colors.grey),
-                          ),
-                          errorWidget: (ctx, _, __) => Container(
-                            width: 56,
-                            height: 56,
-                            color: Colors.grey.shade200,
-                            child: const Icon(Icons.person, color: Colors.grey),
-                          ),
-                        ),
-                      ),
-                      Positioned(
-                        right: -2,
-                        bottom: -2,
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: friends[i].online ? Colors.green : Colors.grey,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Theme.of(context).scaffoldBackgroundColor, width: 2),
-                          ),
-                        ),
-                      ),
-                    ],
+                  CircleAvatar(
+                    radius: 28,
+                    backgroundColor: Colors.blue.shade50,
+                    backgroundImage: fullAvatarUrl != null
+                        ? CachedNetworkImageProvider(fullAvatarUrl)
+                        : null,
+                    child: fullAvatarUrl == null
+                        ? const Icon(Icons.person, color: Colors.blueGrey)
+                        : null,
                   ),
-                  const SizedBox(height: 6),
+                  const SizedBox(height: 8),
                   SizedBox(
-                    width: 56,
+                    width: 60,
                     child: Text(
                       f.name,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       textAlign: TextAlign.center,
-                      style: Theme.of(context).textTheme.bodySmall,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: Colors.black54,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ],
@@ -132,51 +256,6 @@ class QuickAccessBar extends StatelessWidget {
           );
         },
       ),
-    );
-  }
-}
-
-/// 仅包含消息列表内容的主体，供 HomeShell 与独立路由复用
-class MessagesBody extends StatelessWidget {
-  const MessagesBody({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    final mp = context.watch<MessagingProvider>();
-    return CustomScrollView(
-      slivers: [
-        SliverToBoxAdapter(
-          child: QuickAccessBar(
-            friends: mp.friends,
-            onTapFriend: (f) => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ChatPage(conversationId: f.id))),
-          ),
-        ),
-        SliverList(
-          delegate: SliverChildBuilderDelegate(
-            (context, i) {
-              final f = mp.friends[i % mp.friends.length];
-              return ListTile(
-                leading: CircleAvatar(
-                  radius: 20,
-                  child: ClipOval(
-                    child: CachedNetworkImage(
-                      imageUrl: f.avatarUrl,
-                      width: 40,
-                      height: 40,
-                      fit: BoxFit.cover,
-                      errorWidget: (ctx, _, __) => const Icon(Icons.person),
-                    ),
-                  ),
-                ),
-                title: Text(f.name),
-                subtitle: const Text('最后一条消息预览'),
-                onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => ChatPage(conversationId: f.id))),
-              );
-            },
-            childCount: mp.friends.length,
-          ),
-        ),
-      ],
     );
   }
 }

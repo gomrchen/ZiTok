@@ -162,6 +162,7 @@ class _CreatePageState extends State<CreatePage> {
       }
     } else {
       // Fallback: 允许粘贴文本
+      if (!mounted) return;
       final text = await _askForText(context, title: '粘贴 Markdown 文本', hint: '# 标题\n内容...');
       if (text != null) {
         setState(() {
@@ -201,7 +202,7 @@ class _CreatePageState extends State<CreatePage> {
     final ctl = TextEditingController();
     return showDialog<String>(
       context: context,
-      builder: (_) {
+      builder: (dialogContext) {
         return AlertDialog(
           title: Text(title),
           content: TextField(
@@ -210,8 +211,8 @@ class _CreatePageState extends State<CreatePage> {
             decoration: InputDecoration(hintText: hint ?? ''),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-            ElevatedButton(onPressed: () => Navigator.pop(context, ctl.text), child: const Text('确定')),
+            TextButton(onPressed: () => Navigator.pop(dialogContext), child: const Text('取消')),
+            ElevatedButton(onPressed: () => Navigator.pop(dialogContext, ctl.text), child: const Text('确定')),
           ],
         );
       },

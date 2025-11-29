@@ -596,7 +596,7 @@ class _CommentTile extends StatelessWidget {
             Container(
               padding: const EdgeInsets.only(left: 16, top: 8, bottom: 8, right: 8),
               margin: const EdgeInsets.only(left: 24),
-              decoration: BoxDecoration(color: Colors.grey.withOpacity(0.05), borderRadius: BorderRadius.circular(8)),
+              decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.05), borderRadius: BorderRadius.circular(8)),
               child: Column(
                 children: [
                   ...visibleChildren.map((reply) => _ReplyTile(

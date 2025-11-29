@@ -7,10 +7,7 @@ class VideoProvider extends ChangeNotifier {
   final VideoRepository repo;
   List<Video> _discover = [];
   List<Video> _featured = [];
-  // 关注流
   List<Video> _follow = [];
-  // 简单本地点赞状态，避免死代码并用于切换逻辑
-  final Set<String> _likedVideoIds = {};
   bool _loadingDiscover = false;
   bool _loadingFeatured = false;
   bool _loadingFollow = false;
@@ -22,7 +19,6 @@ class VideoProvider extends ChangeNotifier {
   int _followPage = 1;
   String? _keyword;
   List<String>? _filters;
-  // 关注页状态
   String? _followError;
   double _followScrollOffset = 0.0;
   int? _recommendStartIndexInFollow;
@@ -64,83 +60,69 @@ class VideoProvider extends ChangeNotifier {
   PublishProgress get publishProgress => _publishProgress;
 
   Future<void> refreshDiscover({String? keyword, List<String>? tags}) async {
-    debugPrint('VideoProvider.refreshDiscover: start keyword=$keyword');
     _discoverPage = 1;
     _keyword = keyword;
     _filters = tags;
     _discover = [];
     _discoverHasMore = true;
     await loadMoreDiscover();
-    debugPrint('VideoProvider.refreshDiscover: done items=${_discover.length}');
   }
 
   Future<void> loadMoreDiscover() async {
     if (_loadingDiscover || !_discoverHasMore) return;
-    debugPrint('VideoProvider.loadMoreDiscover: page=$_discoverPage');
     _loadingDiscover = true;
     notifyListeners();
-    final res = await repo.fetchDiscover(VideoQuery(page: _discoverPage, pageSize: 20, keyword: _keyword, tags: _filters));
+    final res = await repo.fetchDiscover(
+        VideoQuery(page: _discoverPage, pageSize: 20, keyword: _keyword, tags: _filters));
     _discover.addAll(res.items);
-    print('discoverppppppppppppp: ');print(_discover);
     _discoverHasMore = res.hasMore;
     _discoverPage += 1;
     _loadingDiscover = false;
     notifyListeners();
-    debugPrint('VideoProvider.loadMoreDiscover: page=$_discoverPage items_now=${_discover.length} hasMore=$_discoverHasMore');
   }
 
-  /// 刷新关注流：当关注内容不足时，自动拼接精选推荐
   Future<void> refreshFollow() async {
-    debugPrint('VideoProvider.refreshFollow: start');
     _followPage = 1;
     _follow = [];
     _followHasMore = true;
     _followError = null;
     _recommendStartIndexInFollow = null;
     await loadMoreFollow();
-    debugPrint('VideoProvider.refreshFollow: done items=${_follow.length}');
   }
 
   Future<void> loadMoreFollow() async {
     if (_loadingFollow || !_followHasMore) return;
-    debugPrint('VideoProvider.loadMoreFollow: page=$_followPage');
     _loadingFollow = true;
     notifyListeners();
     try {
-      final res = await repo.fetchFollow(VideoQuery(page: _followPage, pageSize: 20, keyword: _keyword, tags: _filters));
+      final res = await repo.fetchFollow(
+          VideoQuery(page: _followPage, pageSize: 20, keyword: _keyword, tags: _filters));
       final startLen = _follow.length;
       _follow.addAll(res.items);
       _followHasMore = res.hasMore;
       _followPage += 1;
 
-      // 当关注内容不足（首屏很少或已无更多），拼接精选推荐以保证滚动体验
       if (!_followHasMore && _follow.length < 10) {
         final rec = await repo.fetchFeatured(const VideoQuery(page: 1, pageSize: 20));
         _recommendStartIndexInFollow = _follow.length;
         _follow.addAll(rec.items);
-        // 推荐内容视为“更多”已耗尽，仅供展示
         _followHasMore = rec.hasMore;
       }
-      // 如果本次加载未获取到任何新内容，标记为无更多
       if (_follow.length == startLen) {
         _followHasMore = false;
       }
     } catch (e) {
       _followError = e.toString();
-      debugPrint('VideoProvider.loadMoreFollow: error=$_followError');
     } finally {
       _loadingFollow = false;
       notifyListeners();
-      debugPrint('VideoProvider.loadMoreFollow: page=$_followPage items_now=${_follow.length} hasMore=$_followHasMore');
     }
   }
 
-  /// 更新关注页的滚动位置，以便返回时恢复
   void setFollowScrollOffset(double offset) {
     _followScrollOffset = offset;
   }
 
-  /// 点赞（本地更新），真实项目中应调用后端接口并做失败回滚
   Future<void> like(String videoId) async {
     await repo.like(videoId);
     void updateList(List<Video> list) {
@@ -161,16 +143,14 @@ class VideoProvider extends ChangeNotifier {
         );
       }
     }
+
     updateList(_follow);
     updateList(_discover);
     updateList(_featured);
     notifyListeners();
   }
 
-  /// 收藏（本地更新），真实项目中应调用后端接口并做失败回滚
   Future<void> collect(String videoId) async {
-    // TODO: 调用后端API
-    // await repo.collect(videoId);
     void updateList(List<Video> list) {
       final i = list.indexWhere((v) => v.id == videoId);
       if (i >= 0) {
@@ -190,6 +170,7 @@ class VideoProvider extends ChangeNotifier {
         );
       }
     }
+
     updateList(_follow);
     updateList(_discover);
     updateList(_featured);
@@ -216,6 +197,7 @@ class VideoProvider extends ChangeNotifier {
         );
       }
     }
+
     updateList(_follow);
     updateList(_discover);
     updateList(_featured);
@@ -223,22 +205,20 @@ class VideoProvider extends ChangeNotifier {
   }
 
   Future<void> refreshFeatured({String? keyword, List<String>? tags}) async {
-    debugPrint('VideoProvider.refreshFeatured: start');
     _featuredPage = 1;
     _keyword = keyword;
     _filters = tags;
     _featured = [];
     _featuredHasMore = true;
     await loadMoreFeatured();
-    debugPrint('VideoProvider.refreshFeatured: done items=${_featured.length}');
   }
 
   Future<void> loadMoreFeatured() async {
     if (_loadingFeatured || !_featuredHasMore) return;
-    debugPrint('VideoProvider.loadMoreFeatured: page=$_featuredPage');
     _loadingFeatured = true;
     notifyListeners();
-    final res = await repo.fetchFeatured(VideoQuery(page: _featuredPage, pageSize: 10, keyword: _keyword, tags: _filters));
+    final res = await repo.fetchFeatured(
+        VideoQuery(page: _featuredPage, pageSize: 20, keyword: _keyword, tags: _filters));
     _featured.addAll(res.items);
     _featuredHasMore = res.hasMore;
     _featuredPage += 1;
@@ -294,11 +274,9 @@ class VideoProvider extends ChangeNotifier {
     List<String> tags = const [],
   }) async {
     if (_publishProgress.isInProgress) {
-      debugPrint('VideoProvider.publishVideo: already in progress, skipping');
       return false;
     }
 
-    debugPrint('VideoProvider.publishVideo: start filePath=$filePath');
     _publishProgress = PublishProgress.uploading(0);
     notifyListeners();
 
@@ -322,26 +300,21 @@ class VideoProvider extends ChangeNotifier {
       if (response.isSuccess) {
         _publishProgress = PublishProgress.success();
         notifyListeners();
-        debugPrint('VideoProvider.publishVideo: success');
-        // 发布成功后刷新发现页
         await refreshDiscover();
         return true;
       } else {
         _publishProgress = PublishProgress.failed(response.message);
         notifyListeners();
-        debugPrint('VideoProvider.publishVideo: failed message=${response.message}');
         return false;
       }
     } catch (e) {
       final errorMsg = e.toString();
       _publishProgress = PublishProgress.failed(errorMsg);
       notifyListeners();
-      debugPrint('VideoProvider.publishVideo: error=$errorMsg');
       return false;
     }
   }
 
-  /// 重置发布状态
   void resetPublishProgress() {
     _publishProgress = PublishProgress.idle();
     notifyListeners();

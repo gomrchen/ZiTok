@@ -23,8 +23,8 @@ class AuthRepository {
     final code = (base['code'] is int
         ? base['code'] as int
         : topCode is int
-        ? topCode
-        : int.tryParse('${topCode}') ?? 0);
+            ? topCode
+            : int.tryParse('$topCode') ?? 0);
     if (code != 10000 && code != 200 && !(code == 0 && res.statusCode == 200)) {
       final msg = (base['msg'] ?? body['message'] ?? '登录失败').toString();
       throw AuthException(message: msg, code: code);
@@ -43,14 +43,8 @@ class AuthRepository {
     }
     final refresh = (raw['refresh_token'] ?? raw['refreshToken'])?.toString();
     final uid = (raw['user_id'] ?? raw['uid'] ?? user.id).toString();
-    print("在这里！！！！！！！"+uid);
-    print(raw.toString());
-    print("!!!!!!!!!!!!!!!!!!!!!!!!");
-    print(body.toString());
-    if (token != null && token.isNotEmpty)
-      await prefs.setString('access_token', token);
-    if (refresh != null && refresh.isNotEmpty)
-      await prefs.setString('refresh_token', refresh);
+    if (token != null && token.isNotEmpty) await prefs.setString('access_token', token);
+    if (refresh != null && refresh.isNotEmpty) await prefs.setString('refresh_token', refresh);
     await prefs.setString('auth_user_id', uid);
     return user;
   }
@@ -74,8 +68,8 @@ class AuthRepository {
     final code = (base['code'] is int
         ? base['code'] as int
         : topCode is int
-        ? topCode
-        : int.tryParse('${topCode}') ?? 0);
+            ? topCode
+            : int.tryParse('$topCode') ?? 0);
     if (code == 0 && (res.statusCode == 200)) {
       final raw = (body['data'] as Map<String, dynamic>?) ?? body;
       final user = User.fromJson(raw);
@@ -101,8 +95,8 @@ class AuthRepository {
     final code = (base['code'] is int
         ? base['code'] as int
         : topCode is int
-        ? topCode
-        : int.tryParse('${topCode}') ?? 0);
+            ? topCode
+            : int.tryParse('$topCode') ?? 0);
     if (code == 0 && (res.statusCode == 200)) {
       final raw = (body['data'] as Map<String, dynamic>?) ?? body;
       final user = User.fromJson(raw);

@@ -150,15 +150,6 @@ class _IntroSection extends StatelessWidget {
   }
 }
 
-class _CommentsPreview extends StatelessWidget {
-  final String videoId;
-  const _CommentsPreview({required this.videoId});
-  @override
-  Widget build(BuildContext context) {
-    // 预览组件已废弃，保持占位避免布局跳动
-    return const SizedBox.shrink();
-  }
-}
 
 class _CommentsSkeleton extends StatelessWidget {
   const _CommentsSkeleton();
@@ -190,7 +181,7 @@ class _SkeletonLine extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       height: 16,
-      decoration: BoxDecoration(color: Colors.grey.withOpacity(0.2), borderRadius: Radii.sm),
+      decoration: BoxDecoration(color: Colors.grey.withValues(alpha: 0.2), borderRadius: Radii.sm),
     );
   }
 }
@@ -225,7 +216,7 @@ class _NotesBlock extends StatelessWidget {
                   margin: const EdgeInsets.symmetric(vertical: 6),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: accent.withOpacity(0.08),
+                    color: accent.withValues(alpha: 0.08),
                     borderRadius: Radii.md,
                   ),
                   child: Column(
@@ -310,7 +301,7 @@ class _UserNotesBlockState extends State<_UserNotesBlock> with AutomaticKeepAliv
         if (_editingNew)
           Container(
             padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.orange.withOpacity(0.08), borderRadius: Radii.md),
+            decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.08), borderRadius: Radii.md),
             child: Column(
               children: [
                 TextField(controller: _title, decoration: const InputDecoration(labelText: '标题')),
@@ -336,7 +327,7 @@ class _UserNotesBlockState extends State<_UserNotesBlock> with AutomaticKeepAliv
                   width: double.infinity,
                   margin: const EdgeInsets.symmetric(vertical: 6),
                   padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.orange.withOpacity(0.08), borderRadius: Radii.md),
+                  decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.08), borderRadius: Radii.md),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

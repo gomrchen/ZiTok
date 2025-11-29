@@ -24,6 +24,8 @@ import 'providers/user_provider.dart';
 import 'repositories/comment_repository.dart';
 import 'services/comment_service.dart';
 import 'providers/comment_provider.dart';
+import 'repositories/relation_repository.dart'; // 引入 Repo
+import 'services/relation_service.dart';
 
 class AppBootstrap {
   static late SharedPreferences prefs;
@@ -59,7 +61,9 @@ class ZitokApp extends StatelessWidget {
       getUserId: () => AppBootstrap.prefs.getString('auth_user_id'),
     );
     final userRepository = UserRepository(api: UserService(AppBootstrap.apiClient.dio));
-
+      // 社交模块依赖
+    final relationService = RelationService(AppBootstrap.apiClient.dio);
+    final relationRepository = RelationRepository(api: relationService);
     return MultiProvider(
       providers: [
         ChangeNotifierProvider<AuthProvider>(
@@ -79,7 +83,6 @@ class ZitokApp extends StatelessWidget {
         ),
         ChangeNotifierProvider<ProfileProvider>(
           create: (context) {
-            print("🔄 创建ProfileProvider");
             return ProfileProvider(repo: userRepository);
           },
         ),
@@ -93,6 +96,10 @@ class ZitokApp extends StatelessWidget {
               userProvider: context.read<UserProvider>(),
             ),
           ),
+        ),
+        // 【关键】注入 Repository 并调用 loadRelationData
+        ChangeNotifierProvider<MessagingProvider>(
+          create: (_) => MessagingProvider(relationRepository: relationRepository),
         ),
       ],
       child: Builder(

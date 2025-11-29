@@ -7,13 +7,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../app.dart';
 import '../../models/video.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/messaging_provider.dart';
 import '../../services/user_service.dart';
 import '../../theme/theme_tokens.dart';
 import '../../providers/profile_provider.dart';
 import '../../models/user_models.dart';
 import '../../utils/url_utils.dart';
-import 'package:flutter/foundation.dart';
 
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
@@ -30,10 +28,8 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
-    print('🚀 ProfilePage: initState 调用');
 
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      print('📱 ProfilePage: 开始加载用户数据');
       try {
         await context.read<ProfileProvider>().loadFromAuthProvider(context);
 
@@ -44,7 +40,7 @@ class _ProfilePageState extends State<ProfilePage> {
           _initialLoadComplete = true;
         });
       } catch (e) {
-        print('❌ ProfilePage: 加载用户数据失败: $e');
+        // Error loading user data
       }
     });
   }
@@ -58,13 +54,10 @@ class _ProfilePageState extends State<ProfilePage> {
     }
 
     try {
-      print('🔍 ProfilePage: 开始独立加载视频数量');
-
       // 获取用户ID
       final String? userId = await _getUserId();
 
       if (userId == null || userId.isEmpty) {
-        print('⚠️ ProfilePage: 无法获取用户ID，跳过加载视频数量');
         return;
       }
 
@@ -82,10 +75,8 @@ class _ProfilePageState extends State<ProfilePage> {
         });
       }
 
-      print('✅ ProfilePage: 成功加载视频数量: ${videos.length}');
-
     } catch (e) {
-      print('❌ ProfilePage: 加载视频数量失败: $e');
+      // Error loading videos count
     } finally {
       if (mounted) {
         setState(() {
@@ -97,14 +88,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
   // 获取用户ID的独立方法
   Future<String?> _getUserId() async {
-    print('🔍 ProfilePage: 开始获取用户ID');
-
     // 方法1: 从 ProfileProvider 获取（主要方法）
     final profileProvider = context.read<ProfileProvider>();
     final profileUser = profileProvider.user;
 
     if (profileUser != null && profileUser.id.isNotEmpty) {
-      print('✅ ProfilePage: 从ProfileProvider获取到用户ID: ${profileUser.id}');
       return profileUser.id;
     }
 
@@ -113,11 +101,10 @@ class _ProfilePageState extends State<ProfilePage> {
       final authProvider = context.read<AuthProvider>();
       final authUser = authProvider.user;
       if (authUser != null && authUser.id.isNotEmpty) {
-        print('✅ ProfilePage: 从AuthProvider获取到用户ID: ${authUser.id}');
         return authUser.id;
       }
     } catch (e) {
-      print('⚠️ ProfilePage: 从AuthProvider获取用户ID失败: $e');
+      // Error getting user ID from AuthProvider
     }
 
     // 方法3: 从本地存储获取（最后备选）
@@ -126,14 +113,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
   Future<String?> _getUserIdFromStorage() async {
     try {
-      print('🔍 ProfilePage: 尝试从本地存储获取用户ID');
-
       // 首先尝试从 Hive 获取
       final box = await Hive.openBox('user_box');
       final String? hiveUserId = box.get('id') as String?;
 
       if (hiveUserId != null && hiveUserId.isNotEmpty) {
-        print('✅ ProfilePage: 从Hive获取到用户ID: $hiveUserId');
         return hiveUserId;
       }
 
@@ -142,14 +126,11 @@ class _ProfilePageState extends State<ProfilePage> {
       final String? prefsUserId = prefs.getString('auth_user_id');
 
       if (prefsUserId != null && prefsUserId.isNotEmpty) {
-        print('✅ ProfilePage: 从SharedPreferences获取到用户ID: $prefsUserId');
         return prefsUserId;
       }
 
-      print('❌ ProfilePage: 无法从任何地方获取用户ID');
       return null;
     } catch (e) {
-      print('❌ ProfilePage: 从本地存储获取用户ID失败: $e');
       return null;
     }
   }
@@ -166,24 +147,8 @@ class _ProfilePageState extends State<ProfilePage> {
     final profile = context.watch<ProfileProvider>();
     final user = profile.user;
 
-    // 添加详细的用户数据调试信息
-    print('🔍 ProfilePage 用户数据检查:');
-    print('   - user对象: ${user != null ? "非空" : "空"}');
-    print('   - username: ${user?.username ?? "null"}');
-    print('   - id: ${user?.id ?? "null"}');
-    print('   - avatarUrl: ${user?.avatarUrl ?? "null"}');
-    print('   - bio: ${user?.bio ?? "null"}');
-    print('   - profileBackgroundImageUrl: ${user?.profileBackgroundImageUrl ?? "null"}');
-    print('   - profileBackgroundImageUrl 类型: ${user?.profileBackgroundImageUrl.runtimeType}');
-    print('   - profileBackgroundImageUrl 长度: ${user?.profileBackgroundImageUrl?.length ?? 0}');
-    print('   - _initialLoadComplete: $_initialLoadComplete');
-    print('   - profile.loading: ${profile.loading}');
-    print('   - _videosCount: $_videosCount'); // 添加视频计数调试
-    print('   - _loadingVideosCount: $_loadingVideosCount'); // 添加视频数量加载状态调试
-
     // 如果初始加载未完成且不在加载状态，显示加载指示器
     if (!_initialLoadComplete && !profile.loading) {
-      print('⏳ ProfilePage: 显示初始加载状态');
       return const Scaffold(
         body: Center(
           child: CircularProgressIndicator(),
@@ -193,7 +158,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
     // 显示加载状态
     if (profile.loading) {
-      print('⏳ ProfilePage: 显示加载状态');
       return const Scaffold(
         body: Center(
           child: CircularProgressIndicator(),
@@ -203,7 +167,6 @@ class _ProfilePageState extends State<ProfilePage> {
 
     // 显示错误信息
     if (profile.error != null) {
-      print('❌ ProfilePage: 显示错误: ${profile.error}');
       return Scaffold(
         body: Center(
           child: Column(
@@ -225,8 +188,6 @@ class _ProfilePageState extends State<ProfilePage> {
         ),
       );
     }
-
-    print('✅ ProfilePage: 显示用户数据 - username: ${user?.username ?? "null"}');
 
     return Scaffold(
       body: SafeArea(
@@ -371,12 +332,6 @@ class _ProfileHeader extends StatelessWidget {
     const double headerHeight = 176;
     const double avatarRadius = 36;
 
-    // 添加背景图调试信息
-    print('🖼️ ProfileHeader 背景图信息:');
-    print('   - backgroundUrl: $backgroundUrl');
-    print('   - backgroundUrl 是否为空: ${backgroundUrl == null}');
-    print('   - backgroundUrl 是否为空字符串: ${backgroundUrl?.isEmpty ?? true}');
-
     return Semantics(
       label: '个人资料头部',
       child: Column(
@@ -388,7 +343,7 @@ class _ProfileHeader extends StatelessWidget {
               _buildBackground(headerHeight, backgroundUrl),
 
               // 内容层
-              Container(
+              SizedBox(
                 height: headerHeight,
                 width: double.infinity,
                 child: Padding(
@@ -502,11 +457,8 @@ class _ProfileHeader extends StatelessWidget {
   // 重构背景构建方法 - 添加上到下透明度渐变和横向缩放
 // 在 profile_page.dart 中确保 _buildBackground 方法使用正确的 fit
   Widget _buildBackground(double headerHeight, String? backgroundUrl) {
-    print('🎨 构建背景 - URL: $backgroundUrl');
-
     // 如果有有效的背景图URL，显示网络图片
     if (backgroundUrl != null && backgroundUrl.isNotEmpty && backgroundUrl != 'null') {
-      print('✅ 使用网络背景图: $backgroundUrl');
       return SizedBox(
         height: headerHeight,
         width: double.infinity,
@@ -519,7 +471,6 @@ class _ProfileHeader extends StatelessWidget {
               width: double.infinity,
               height: headerHeight,
               errorBuilder: (context, error, stackTrace) {
-                print('❌ 背景图加载失败: $error');
                 return _buildGradientBackground(headerHeight);
               },
               loadingBuilder: (context, child, loadingProgress) {
@@ -556,10 +507,7 @@ class _ProfileHeader extends StatelessWidget {
 
   // 头像构建方法
   Widget _buildAvatar(ColorScheme cs, double avatarRadius) {
-    print('🖼️ 头像URL: $avatarUrl');
-
     if (avatarUrl == null || avatarUrl!.isEmpty || avatarUrl == 'null') {
-      print('⚠️ 头像URL为空，显示默认图标');
       return CircleAvatar(
         radius: avatarRadius,
         backgroundColor: const Color(0xFF2BD2C4),
@@ -576,7 +524,7 @@ class _ProfileHeader extends StatelessWidget {
       backgroundColor: const Color(0xFF2BD2C4),
       backgroundImage: NetworkImage(avatarUrl!),
       onBackgroundImageError: (exception, stackTrace) {
-        print('❌ 头像图片加载失败: $exception');
+        // Error loading avatar image
       },
       child: avatarUrl == null ? Icon(
           Icons.person,
@@ -611,14 +559,11 @@ class _StatsRowState extends State<_StatsRow> {
   }
 
   void _getUserIdAndLoadStats() {
-    print('🔍 _StatsRow: 开始获取用户ID');
-
     // 方法1: 从 ProfileProvider 获取（主要方法）
     final profileProvider = context.read<ProfileProvider>();
     final profileUser = profileProvider.user;
 
     if (profileUser != null && profileUser.id.isNotEmpty) {
-      print('✅ _StatsRow: 从ProfileProvider获取到用户ID: ${profileUser.id}');
       _userId = profileUser.id;
       _loadStats();
       return;
@@ -629,13 +574,12 @@ class _StatsRowState extends State<_StatsRow> {
       final authProvider = context.read<AuthProvider>();
       final authUser = authProvider.user;
       if (authUser != null && authUser.id.isNotEmpty) {
-        print('✅ _StatsRow: 从AuthProvider获取到用户ID: ${authUser.id}');
         _userId = authUser.id;
         _loadStats();
         return;
       }
     } catch (e) {
-      print('⚠️ _StatsRow: 从AuthProvider获取用户ID失败: $e');
+      // Error getting user ID from AuthProvider
     }
 
     // 方法3: 从本地存储获取（最后备选）
@@ -644,14 +588,11 @@ class _StatsRowState extends State<_StatsRow> {
 
   void _getUserIdFromStorage() async {
     try {
-      print('🔍 _StatsRow: 尝试从本地存储获取用户ID');
-
       // 首先尝试从 Hive 获取
       final box = await Hive.openBox('user_box');
       final String? hiveUserId = box.get('id') as String?;
 
       if (hiveUserId != null && hiveUserId.isNotEmpty) {
-        print('✅ _StatsRow: 从Hive获取到用户ID: $hiveUserId');
         setState(() {
           _userId = hiveUserId;
         });
@@ -664,7 +605,6 @@ class _StatsRowState extends State<_StatsRow> {
       final String? prefsUserId = prefs.getString('auth_user_id');
 
       if (prefsUserId != null && prefsUserId.isNotEmpty) {
-        print('✅ _StatsRow: 从SharedPreferences获取到用户ID: $prefsUserId');
         setState(() {
           _userId = prefsUserId;
         });
@@ -672,20 +612,17 @@ class _StatsRowState extends State<_StatsRow> {
         return;
       }
 
-      print('❌ _StatsRow: 无法从任何地方获取用户ID');
     } catch (e) {
-      print('❌ _StatsRow: 从本地存储获取用户ID失败: $e');
+      // Error getting user ID from storage
     }
   }
 
   void _loadStats() {
     if (_userId == null || _userId!.isEmpty) {
-      print('⚠️ _StatsRow: 用户ID为空，无法加载统计数据');
       return;
     }
 
     final profileProvider = context.read<ProfileProvider>();
-    print('🔍 _StatsRow: 开始加载用户统计数据，userId: $_userId');
     profileProvider.loadUserStats(userId: _userId!);
   }
 
@@ -751,7 +688,6 @@ class _StatsRowState extends State<_StatsRow> {
 
     // 显示错误状态
     if (profile.statsError != null) {
-      print('❌ _StatsRow: 统计数据加载错误: ${profile.statsError}');
       return Padding(
         padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
         child: Column(
@@ -776,8 +712,6 @@ class _StatsRowState extends State<_StatsRow> {
         ),
       );
     }
-
-    print('✅ _StatsRow: 显示统计数据 - 视频: ${widget.videosCount}, 粉丝: ${profile.followersCount}, 关注: ${profile.followingsCount}');
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
@@ -881,6 +815,10 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    // Note: addScopedWillPopCallback is deprecated in newer Flutter versions
+    // Consider using PopScope widget instead if needed
+    // Commenting out deprecated code for now
+    /*
     ModalRoute? route = ModalRoute.of(context);
     if (route != null) {
       route.addScopedWillPopCallback(() {
@@ -888,17 +826,15 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
         return SynchronousFuture(true);
       });
     }
+    */
   }
 
   void _getUserIdAndLoadVideos() {
-    print('🔍 _VideosTab: 开始获取用户ID');
-
     // 方法1: 从 ProfileProvider 获取（主要方法）
     final profileProvider = context.read<ProfileProvider>();
     final profileUser = profileProvider.user;
 
     if (profileUser != null && profileUser.id.isNotEmpty) {
-      print('✅ _VideosTab: 从ProfileProvider获取到用户ID: ${profileUser.id}');
       _userId = profileUser.id;
       _loadVideos();
       return;
@@ -909,13 +845,12 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
       final authProvider = context.read<AuthProvider>();
       final authUser = authProvider.user;
       if (authUser != null && authUser.id.isNotEmpty) {
-        print('✅ _VideosTab: 从AuthProvider获取到用户ID: ${authUser.id}');
         _userId = authUser.id;
         _loadVideos();
         return;
       }
     } catch (e) {
-      print('⚠️ _VideosTab: 从AuthProvider获取用户ID失败: $e');
+      // Error getting user ID from AuthProvider
     }
 
     // 方法3: 从本地存储获取（最后备选）
@@ -924,14 +859,11 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
 
   void _getUserIdFromStorage() async {
     try {
-      print('🔍 _VideosTab: 尝试从本地存储获取用户ID');
-
       // 首先尝试从 Hive 获取
       final box = await Hive.openBox('user_box');
       final String? hiveUserId = box.get('id') as String?;
 
       if (hiveUserId != null && hiveUserId.isNotEmpty) {
-        print('✅ _VideosTab: 从Hive获取到用户ID: $hiveUserId');
         setState(() {
           _userId = hiveUserId;
         });
@@ -944,7 +876,6 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
       final String? prefsUserId = prefs.getString('auth_user_id');
 
       if (prefsUserId != null && prefsUserId.isNotEmpty) {
-        print('✅ _VideosTab: 从SharedPreferences获取到用户ID: $prefsUserId');
         setState(() {
           _userId = prefsUserId;
         });
@@ -952,13 +883,11 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
         return;
       }
 
-      print('❌ _VideosTab: 无法从任何地方获取用户ID');
       setState(() {
         _error = '无法获取用户ID，请重新登录';
         _loading = false;
       });
     } catch (e) {
-      print('❌ _VideosTab: 从本地存储获取用户ID失败: $e');
       setState(() {
         _error = '获取用户信息失败: $e';
         _loading = false;
@@ -968,7 +897,6 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
 
   Future<void> _loadVideos() async {
     if (_userId == null || _userId!.isEmpty) {
-      print('⚠️ _VideosTab: 用户ID为空，无法加载视频');
       setState(() {
         _error = '用户ID为空，无法加载视频';
         _loading = false;
@@ -984,8 +912,6 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
     }
 
     try {
-      print('🔍 _VideosTab: 开始加载用户视频，userId: $_userId');
-
       final userService = UserService(AppBootstrap.apiClient.dio);
       final videos = await userService.getVideos(
         userId: _userId!,
@@ -1004,10 +930,7 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
         widget.onVideosLoaded!(videos.length);
       }
 
-      print('✅ _VideosTab: 成功加载 ${videos.length} 个视频');
-
     } catch (e) {
-      print('❌ _VideosTab: 加载视频失败: $e');
       if (mounted) {
         setState(() {
           _error = e.toString();
@@ -1023,7 +946,6 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
   }
 
   void _refreshVideos() {
-    print('🔄 _VideosTab: 手动刷新视频列表');
     _loadVideos();
   }
 
@@ -1033,7 +955,6 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
 
     if (video.coverUrl != null && video.coverUrl!.isNotEmpty) {
       resolvedCoverUrl = UrlUtils.resolveStorageUrl(video.coverUrl!, defaultDir: 'covers');
-      print('🔄 转换封面URL: ${video.coverUrl} -> $resolvedCoverUrl');
     }
 
     if (resolvedCoverUrl != null && resolvedCoverUrl.isNotEmpty) {
@@ -1045,7 +966,6 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
           height: 60,
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) {
-            print('❌ 封面加载失败: $resolvedCoverUrl, 错误: $error');
             return _buildDefaultThumbnail();
           },
           loadingBuilder: (context, child, loadingProgress) {

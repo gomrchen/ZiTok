@@ -1,6 +1,5 @@
 import 'package:dio/dio.dart';
 import 'package:zitok/providers/user_provider.dart';
-import 'package:zitok/repositories/user_repository.dart';
 import '../models/comment.dart'; // 引入您项目中的 comment.dart
 import '../services/comment_service.dart'; // 引入 CommentService
 
@@ -123,15 +122,12 @@ class CommentRepository {
         }
       }
       // 如果以上任何一个检查失败，说明响应格式不符合预期
-      print('Comment API response format is incorrect for videoId: $videoId. Response: ${response.data}');
       return [];
-    } on DioException catch (e) {
+    } on DioException {
       // 捕获并处理网络请求相关的异常
-      print('Failed to get comment list for videoId: $videoId. Error: $e');
       return []; // 发生错误时返回空列表
-    } catch (e) {
+    } catch (_) {
       // 捕获其他所有可能的异常
-      print('An unknown error occurred while parsing comments for videoId: $videoId. Error: $e');
       return [];
     }
   }
@@ -139,11 +135,8 @@ class CommentRepository {
   Future<void> addComment({required int videoId, required int parentId, required String content}) async {
     try {
       await _api.addComment(videoId: videoId, parentId: parentId, content: content);
-      print('Comment added successfully.');
-    } on DioException catch (e) {
-      print('Failed to add comment. Error: $e');
-    } catch (e) {
-      print('An unknown error occurred while adding comment. Error: $e');
+    } catch (_) {
+      // 捕获并处理所有异常
     }
   }
   Future<void> deleteComment({required String videoId,required String commentId}) async {
@@ -155,11 +148,8 @@ class CommentRepository {
     }
     try {
       await _api.deleteComment(videoId: parsedVideoId??'', commentId: commentId);
-      print('Comment deleted successfully.');
-    } on DioException catch (e) {
-      print('Failed to delete comment. Error: $e');
-    } catch (e) {
-      print('An unknown error occurred while deleting comment. Error: $e');
+    } catch (_) {
+      // 捕获并处理所有异常
     }
   }
 }

@@ -25,7 +25,7 @@ class AppTheme {
       navigationBarTheme: NavigationBarThemeData(
         height: 64,
         backgroundColor: colors.surface,
-        indicatorColor: colors.primary.withOpacity(0.12),
+        indicatorColor: colors.primary.withValues(alpha: 0.12),
         labelTextStyle: WidgetStateProperty.all(TypographyTokens.caption.copyWith(color: colors.textSecondary)),
         iconTheme: WidgetStateProperty.all(IconThemeData(color: colors.textSecondary)),
       ),
@@ -70,7 +70,7 @@ class AppTheme {
           padding: WidgetStateProperty.all(const EdgeInsets.symmetric(horizontal: 16)),
           backgroundColor: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.disabled)) {
-              return colors.primary.withOpacity(0.5);
+              return colors.primary.withValues(alpha: 0.5);
             }
             return colors.primary;
           }),

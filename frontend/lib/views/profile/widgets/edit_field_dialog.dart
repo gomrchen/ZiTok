@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../theme/theme_tokens.dart';
 
 class EditTextDialog extends StatelessWidget {
   final String title;
@@ -59,28 +58,33 @@ class GenderSelectDialog extends StatelessWidget {
     int? current = value;
     return AlertDialog(
       title: const Text('选择性别'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          RadioListTile<int>(
-              title: const Text('男'),
-              value: 1, // 改为1
-              groupValue: current,
-              onChanged: (v) => Navigator.pop(context, v)
-          ),
-          RadioListTile<int>(
-              title: const Text('女'),
-              value: 2, // 改为2
-              groupValue: current,
-              onChanged: (v) => Navigator.pop(context, v)
-          ),
-          RadioListTile<int>(
-              title: const Text('不显示'),
-              value: 3,
-              groupValue: current ?? 0,
-              onChanged: (v) => Navigator.pop(context, v) // 直接返回v，不是null
-          ),
-        ],
+      content: StatefulBuilder(
+        builder: (context, setState) {
+          return RadioGroup<int>(
+            groupValue: current,
+            onChanged: (v) {
+              setState(() => current = v);
+              Navigator.pop(context, v);
+            },
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                RadioListTile<int>(
+                  title: const Text('男'),
+                  value: 1,
+                ),
+                RadioListTile<int>(
+                  title: const Text('女'),
+                  value: 2,
+                ),
+                RadioListTile<int>(
+                  title: const Text('不显示'),
+                  value: 3,
+                ),
+              ],
+            ),
+          );
+        },
       ),
       actions: [
         TextButton(

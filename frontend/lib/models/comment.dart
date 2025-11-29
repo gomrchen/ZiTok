@@ -20,7 +20,7 @@ class CommentItem {
     this.avatar='',
     this.parent,
     List<CommentItem>? replies,
-  }): this.replies = replies ?? [];
+  }): replies = replies ?? [];
 
 
   factory CommentItem.fromJson(Map<String, dynamic> j) => CommentItem(

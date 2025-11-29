@@ -1,13 +1,11 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:provider/provider.dart';
 
 import '../../services/user_service.dart';
 import '../../app.dart';
-import 'package:dio/src/multipart_file.dart';
+import 'package:dio/dio.dart';
 import '../../utils/url_utils.dart'; // 添加导入
 
 
@@ -56,7 +54,6 @@ class _VideoManagePageState extends State<VideoManagePage> {
   late String _description;
   late List<String> _tags;
   String? _coverUrl;
-  XFile? _selectedCoverFile;
   Uint8List? _selectedCoverBytes;
   bool _deleting = false;
   int _commentsCount = 0;
@@ -104,8 +101,6 @@ class _VideoManagePageState extends State<VideoManagePage> {
     });
 
     try {
-      print('🔍 开始获取视频 ${widget.id} 的评论数');
-
       final response = await _userService.getComments(
         videoId: widget.id,
         page: 1,
@@ -117,15 +112,12 @@ class _VideoManagePageState extends State<VideoManagePage> {
         setState(() {
           _commentsCount = comments.length;
         });
-        print('✅ 成功获取评论数: $_commentsCount');
       } else {
-        print('❌ 获取评论数失败: ${response['message']}');
         setState(() {
           _commentsCount = 0;
         });
       }
     } catch (e) {
-      print('❌ 获取评论数异常: $e');
       setState(() {
         _commentsCount = 0;
       });
@@ -150,7 +142,6 @@ class _VideoManagePageState extends State<VideoManagePage> {
         // 读取文件字节用于预览
         final bytes = await pickedFile.readAsBytes(); // 移除类型声明
         setState(() {
-          _selectedCoverFile = pickedFile;
           _selectedCoverBytes = bytes;
         });
 
@@ -158,7 +149,6 @@ class _VideoManagePageState extends State<VideoManagePage> {
         await _uploadCoverImage(pickedFile);
       }
     } catch (e) {
-      print('❌ 选择图片失败: $e');
       _showError('选择图片失败: ${e.toString()}');
     }
   }
@@ -175,8 +165,6 @@ class _VideoManagePageState extends State<VideoManagePage> {
     });
 
     try {
-      print('🔼 开始上传视频封面，videoId: ${widget.id}');
-
       // 读取文件字节
       final fileBytes = await coverFile.readAsBytes(); // 移除类型声明
 
@@ -209,10 +197,8 @@ class _VideoManagePageState extends State<VideoManagePage> {
             // 确保使用 setState 更新状态
             setState(() {
               _coverUrl = newCoverUrl;
-              _selectedCoverFile = null;
               _selectedCoverBytes = null;
             });
-            print('✅ 封面上传成功: $newCoverUrl');
             _showSuccess('封面上传成功');
 
             // 立即保存更改，确保封面URL更新到服务器
@@ -220,7 +206,6 @@ class _VideoManagePageState extends State<VideoManagePage> {
           } else {
             // 如果服务器没有返回封面URL，显示成功但保留本地图片预览
             _showSuccess('封面上传成功，但未获取到新封面URL');
-            print('⚠️ 封面上传成功，但服务器未返回封面URL');
           }
         } else {
           throw Exception('上传失败: ${responseData['message'] ?? '未知错误'}');
@@ -230,7 +215,6 @@ class _VideoManagePageState extends State<VideoManagePage> {
       }
 
     } catch (e) {
-      print('❌ 封面上传失败: $e');
       _showError('封面上传失败: ${e.toString()}');
     } finally {
       setState(() {
@@ -241,8 +225,6 @@ class _VideoManagePageState extends State<VideoManagePage> {
 
   // 修改：增强封面URL解析方法
   String? _parseCoverUrlFromResponse(Map<String, dynamic> response) {
-    print('🔍 解析封面URL响应: $response');
-
     // 尝试从不同的可能字段中获取封面URL
     final dynamic data = response['data'];
 
@@ -259,13 +241,10 @@ class _VideoManagePageState extends State<VideoManagePage> {
       // 如果URL是相对路径，转换为完整URL
       if (!coverUrl.startsWith('http')) {
         coverUrl = UrlUtils.resolveStorageUrl(coverUrl, defaultDir: 'covers');
-        print('🔄 转换相对路径为完整URL: $coverUrl');
       }
-      print('✅ 最终封面URL: $coverUrl');
       return coverUrl;
     }
 
-    print('❌ 未能在响应中找到封面URL');
     return null;
   }
 
@@ -313,12 +292,9 @@ class _VideoManagePageState extends State<VideoManagePage> {
     });
 
     try {
-      print('🗑️ 开始删除视频，videoId: ${widget.id}');
-
       final response = await _userService.deleteVideo(videoId: widget.id);
 
       if (response.statusCode == 200) {
-        print('✅ 视频删除成功');
         _showSuccess('视频已删除');
 
         Future.delayed(const Duration(milliseconds: 500), () {
@@ -331,7 +307,6 @@ class _VideoManagePageState extends State<VideoManagePage> {
       }
 
     } catch (e) {
-      print('❌ 删除视频失败: $e');
       _showError('删除失败: ${e.toString()}');
     } finally {
       if (mounted) {
@@ -368,9 +343,6 @@ class _VideoManagePageState extends State<VideoManagePage> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
-
-    // 添加调试信息
-    print('🎨 构建页面 - 封面URL: $_coverUrl, 选中文件: ${_selectedCoverFile != null}, 上传中: $_uploadingCover');
 
     return Scaffold(
       appBar: AppBar(
@@ -489,11 +461,8 @@ class _VideoManagePageState extends State<VideoManagePage> {
 
   // 构建封面图片装饰 - 确保正确显示最新封面
   DecorationImage? _getCoverImageDecoration() {
-    print('🖼️ 构建封面装饰 - 选中字节: ${_selectedCoverBytes != null}, 封面URL: $_coverUrl');
-
     // 优先显示新选择的封面（上传中或上传失败时的本地预览）
     if (_selectedCoverBytes != null) {
-      print('📱 显示本地选择的封面预览');
       return DecorationImage(
         image: MemoryImage(_selectedCoverBytes!),
         fit: BoxFit.cover,
@@ -501,7 +470,6 @@ class _VideoManagePageState extends State<VideoManagePage> {
     }
     // 其次显示服务器上的最新封面URL
     else if (_coverUrl != null && _coverUrl!.isNotEmpty) {
-      print('🌐 显示服务器封面URL: $_coverUrl');
       return DecorationImage(
         image: NetworkImage(_coverUrl!),
         fit: BoxFit.cover,
@@ -509,14 +477,12 @@ class _VideoManagePageState extends State<VideoManagePage> {
     }
     // 最后显示初始封面URL
     else if (widget.coverUrl != null && widget.coverUrl!.isNotEmpty) {
-      print('📺 显示初始封面URL: ${widget.coverUrl}');
       return DecorationImage(
         image: NetworkImage(widget.coverUrl!),
         fit: BoxFit.cover,
       );
     }
 
-    print('❓ 没有可用的封面图片');
     return null;
   }
 
@@ -589,7 +555,7 @@ class _VideoManagePageState extends State<VideoManagePage> {
           style: TextStyle(
             color: enabled
                 ? colorScheme.onSurface
-                : colorScheme.onSurface.withOpacity(0.6),
+                : colorScheme.onSurface.withValues(alpha: 0.6),
           ),
           decoration: InputDecoration(
             hintText: hintText,

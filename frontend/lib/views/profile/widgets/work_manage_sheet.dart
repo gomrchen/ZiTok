@@ -44,7 +44,7 @@ class WorkManageSheet extends StatelessWidget {
                 return Card(
                   elevation: 0,
                   child: ListTile(
-                    leading: Container(width: 48, height: 36, color: cs.surfaceVariant),
+                    leading: Container(width: 48, height: 36, color: cs.surfaceContainerHighest),
                     title: Text(type == WorkType.video ? '视频作品 #$i' : '笔记作品 #$i'),
                     subtitle: const Text('发布时间：1970-01-01 08:00:00'),
                     trailing: Row(
@@ -68,14 +68,16 @@ class WorkManageSheet extends StatelessWidget {
                                 ],
                               ),
                             );
-                            if (ok == true) {
+                            if (ok == true && ctx.mounted) {
                               if (type == WorkType.video) {
                                 await VideoService(AppBootstrap.apiClient.dio).delete(videoId: '$i');
                               } else {
                                 await NotesService(AppBootstrap.apiClient.dio).delete(noteId: '$i');
                               }
-                              Navigator.pop(context);
-                              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('已删除')));
+                              if (ctx.mounted) {
+                                Navigator.pop(ctx);
+                                ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('已删除')));
+                              }
                             }
                           },
                         ),

@@ -84,7 +84,7 @@ class _VideoSheetState extends State<VideoSheet> {
                         Container(
                           width: 96,
                           height: 64,
-                          decoration: BoxDecoration(color: cs.surfaceVariant, borderRadius: Radii.sm),
+                          decoration: BoxDecoration(color: cs.surfaceContainerHighest, borderRadius: Radii.sm),
                           clipBehavior: Clip.hardEdge,
                           child: _coverLocal != null
                               ? Image.file(File(_coverLocal!), fit: BoxFit.cover)

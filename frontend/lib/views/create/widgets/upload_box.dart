@@ -24,7 +24,7 @@ class UploadBox extends StatelessWidget {
             decoration: BoxDecoration(
               color: cs.surface,
               borderRadius: Radii.md,
-              border: Border.all(color: cs.primary.withOpacity(0.6), width: 2),
+              border: Border.all(color: cs.primary.withValues(alpha: 0.6), width: 2),
             ),
             alignment: Alignment.center,
             child: Column(

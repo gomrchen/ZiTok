@@ -33,19 +33,18 @@ class CommentProvider with ChangeNotifier {
 
     // 3. 将获取到的数据存入 Map 中
     _commentsMap[videoId] = comments;
-    print('Fetched comments for videoId: $videoId');
-    print(comments);
+
     // 4. 加载完成，设置加载状态为 false，并再次通知UI更新以显示数据
     _loadingStatus[videoId] = false;
     notifyListeners();
   }
 
-  /// 向指定视频添加一条新评论（采用“请求-刷新”模式）
+  /// 向指定视频添加一条新评论（采用"请求-刷新"模式）
   ///
-  /// [videoId] 是当前视频的ID.
-  /// [content] 是评论的内容.
-  /// [parentId] 是可选的，如果这是一个回复，则为被回复评论的ID.
-  /// 返回一个 Future<bool>，true表示成功，false表示失败。
+  /// - [videoId] 是当前视频的ID.
+  /// - [content] 是评论的内容.
+  /// - [parentId] 是可选的，如果这是一个回复，则为被回复评论的ID.
+  /// 返回一个 Future，true表示成功，false表示失败。
   Future<bool> addComment({
     required String videoId,
     required String content,
@@ -66,7 +65,6 @@ class CommentProvider with ChangeNotifier {
         parsedVideoId = int.tryParse(videoId);
       }
       if (parsedVideoId == null) {
-        print('添加评论失败: 无效的videoId格式');
         return false;
       }
 
@@ -84,22 +82,20 @@ class CommentProvider with ChangeNotifier {
       // 这将自动更新UI并保证数据是最新且完全正确的
       await fetchComments(videoId);
 
-      print('评论添加成功，并已刷新列表。');
       return true; // 表示成功
 
     } catch (e) {
-      // 3. --- API调用失败，打印错误 ---
-      print('添加评论失败: $e');
+      // 3. --- API调用失败 ---
       // 在这种模式下，因为我们没有预先修改UI，所以失败时什么都不用做。
       // UI上根本没有发生过变化。
       return false; // 表示失败
     }
   }
-  /// 删除指定视频的评论（采用“请求-刷新”模式）
+  /// 删除指定视频的评论（采用"请求-刷新"模式）
   ///
-  /// [videoId] 是当前视频的ID.
-  /// [commentId] 是要删除的评论的ID.
-  /// 返回一个 Future<void>，表示操作完成。
+  /// - [videoId] 是当前视频的ID.
+  /// - [commentToDelete] 是要删除的评论项.
+  /// 返回一个 Future，表示操作完成。
   Future<void> deleteCommentAndChildren({
     required String videoId,
     required CommentItem commentToDelete,
@@ -126,7 +122,6 @@ class CommentProvider with ChangeNotifier {
       await fetchComments(videoId);
 
     } catch (e) {
-      print('删除评论失败: $e');
       notifyListeners();
       // 推荐做法：即使删除失败，也刷新一次列表以同步最新状态
       await fetchComments(videoId);
