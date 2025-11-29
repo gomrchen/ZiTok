@@ -185,11 +185,9 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                   try {
                     // 过滤并转换有效的Video对象
                     videoList = videoProvider.searchResults
-                        .where((item) => item is Video)
-                        .cast<Video>()
+                        .whereType<Video>()
                         .toList();
                   } catch (e) {
-                    print('Error converting search results to Video list: $e');
                     videoList = [];
                   }
 
@@ -222,10 +220,6 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                                         delegate: SliverChildBuilderDelegate(
                                           (context, i) {
                                             if (i < videoList.length) {
-                                              print(
-                                                'videoList.length=${videoList.length}',
-                                              );
-                                              print('i=$i');
                                               final v = videoList[i];
                                               return _FeaturedListItem(
                                                 video: v,

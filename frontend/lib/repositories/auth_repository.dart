@@ -125,14 +125,13 @@ class AuthRepository {
       newPassword: newPassword,
     );
     final body = res.data as Map<String, dynamic>? ?? {};
-    print(body);
     final base = body['base'] as Map<String, dynamic>? ?? {};
     final topCode = body['code'];
     final resCode = (base['code'] is int
         ? base['code'] as int
         : topCode is int
         ? topCode
-        : int.tryParse('${topCode}') ?? 0);
+        : int.tryParse('$topCode') ?? 0);
     if (resCode == 0 && (res.statusCode == 200)) {
       return;
     }
@@ -167,7 +166,7 @@ class AuthRepository {
         ? base['code'] as int
         : topCode is int
         ? topCode
-        : int.tryParse('${topCode}') ?? 0);
+        : int.tryParse('$topCode') ?? 0);
     if (code != 10000 && code != 200 && !(code == 0 && res.statusCode == 200)) {
       final msg = (base['msg'] ?? body['message'] ?? '发送验证码失败').toString();
       throw AuthException(message: msg, code: code);

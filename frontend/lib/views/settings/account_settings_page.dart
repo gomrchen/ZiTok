@@ -54,8 +54,8 @@ class AccountSettingsPage extends StatelessWidget {
               Navigator.pop(context);
               _logout(context);
             },
-            child: const Text('确定'),
             style: TextButton.styleFrom(foregroundColor: Colors.red),
+            child: const Text('确定'),
           ),
         ],
       ),
@@ -74,10 +74,12 @@ class AccountSettingsPage extends StatelessWidget {
     authProvider
         .logout()
         .then((_) {
+          if (!context.mounted) return;
           // 清除所有路由栈并跳转到欢迎界面
           context.go('/welcome');
         })
         .catchError((error) {
+          if (!context.mounted) return;
           Navigator.pop(context); // 关闭加载对话框
           ScaffoldMessenger.of(
             context,

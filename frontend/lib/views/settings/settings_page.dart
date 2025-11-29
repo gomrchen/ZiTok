@@ -4,7 +4,6 @@ import 'package:provider/provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../../theme/theme_tokens.dart';
-import '../../providers/auth_provider.dart';
 
 class SettingsPage extends StatelessWidget {
   const SettingsPage({super.key});
@@ -101,68 +100,24 @@ class SettingsPage extends StatelessWidget {
       showDragHandle: true,
       builder: (context) {
         const langs = ['简体中文', 'English'];
-        return ListView(
-          children: langs
-              .map(
-                (e) => RadioListTile<String>(
-                  value: e,
-                  groupValue: current,
-                  title: Text(e),
-                  onChanged: (v) => Navigator.pop(context, v),
-                ),
-              )
-              .toList(),
+        return RadioGroup<String>(
+          groupValue: current,
+          onChanged: (v) => Navigator.pop(context, v),
+          child: ListView(
+            children: langs
+                .map(
+                  (e) => RadioListTile<String>(
+                    value: e,
+                    title: Text(e),
+                  ),
+                )
+                .toList(),
+          ),
         );
       },
     );
   }
 
-  void _confirmLogout(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('退出登录'),
-        content: const Text('确定要退出当前账号吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _logout(context);
-            },
-            child: const Text('确定'),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _logout(BuildContext context) {
-    final authProvider = context.read<AuthProvider>();
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
-
-    // 执行登出操作
-    authProvider
-        .logout()
-        .then((_) {
-          // 清除所有路由栈并跳转到欢迎界面
-          context.go('/welcome');
-        })
-        .catchError((error) {
-          Navigator.pop(context); // 关闭加载对话框
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('登出失败: $error')));
-        });
-  }
 }
 
 class _Section extends StatelessWidget {

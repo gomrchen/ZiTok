@@ -79,10 +79,10 @@ class _LoginPageState extends State<LoginPage> {
                                   _usernameCtrl.text.trim(),
                                   _pwdCtrl.text,
                                 );
-                                if (mounted &&
-                                    context
-                                        .read<AuthProvider>()
-                                        .isAuthenticated) {
+                                if (!context.mounted) return;
+                                if (context
+                                    .read<AuthProvider>()
+                                    .isAuthenticated) {
                                   context.go('/home');
                                 }
                               },

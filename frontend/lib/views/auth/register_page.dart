@@ -245,10 +245,10 @@ class _RegisterPageState extends State<RegisterPage> {
                                   _codeCtrl.text.trim(),
                                 );
 
-                                if (mounted &&
-                                    context
-                                        .read<AuthProvider>()
-                                        .isRegistered) {
+                                if (!context.mounted) return;
+                                if (context
+                                    .read<AuthProvider>()
+                                    .isRegistered) {
                                   // 注册成功后跳转到登录页，让用户手动登录
                                   context.go('/auth/login');
                                 }

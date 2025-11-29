@@ -75,9 +75,14 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
     _preloadManager.updateCurrentIndex(index);
   }
 
+  void _onSearchTap() {
+    Navigator.pushNamed(context, '/search');
+  }
+
   @override
   Widget build(BuildContext context) {
     final vp = context.watch<VideoProvider>();
+    final cs = Theme.of(context).colorScheme;
 
     // 更新预加载列表
     if (vp.discover.isNotEmpty) {
@@ -90,7 +95,7 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
     }
 
     return Scaffold(
-      backgroundColor: cs.background,
+      backgroundColor: cs.surface,
       appBar: AppBar(
         toolbarHeight: 0,
         automaticallyImplyLeading: false,
