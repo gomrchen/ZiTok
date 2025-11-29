@@ -6,6 +6,7 @@ import '../../providers/video_provider.dart';
 import '../../models/video.dart';
 import '../../theme/theme_tokens.dart';
 import '../../widgets/comment_sheet.dart';
+import '../../widgets/video_stats.dart';
 
 class FollowPage extends StatefulWidget {
   const FollowPage({super.key});
@@ -143,7 +144,7 @@ class _FollowListItem extends StatelessWidget {
           const SizedBox(height: Spacing.sm),
           // 文案（标签模拟）
           if (video.tags.isNotEmpty)
-            Text('#${video.tags.take(3).join(' #')}', style: theme.textTheme.bodySmall?.copyWith(color: theme.textTheme.bodySmall?.color?.withOpacity(0.7))),
+            Text('#${video.tags.take(3).join(' #')}', style: theme.textTheme.bodySmall?.copyWith(color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7))),
           const SizedBox(height: Spacing.sm),
           // 封面图
           GestureDetector(
@@ -153,9 +154,20 @@ class _FollowListItem extends StatelessWidget {
               child: ClipRRect(
                 borderRadius: Radii.md,
                 child: CachedNetworkImage(
-                  imageUrl: video.coverUrl ?? 'https://picsum.photos/seed/${video.id}/640/360',
+                  imageUrl: video.coverUrl ?? '',
                   fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(color: Colors.grey.shade200, child: const Center(child: Icon(Icons.play_circle_outline, size: 48, color: Colors.grey))),
+                  placeholder: (_, __) => Container(
+                    color: const Color(0xFFF5F5F5),
+                    child: const Center(
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    ),
+                  ),
+                  errorWidget: (_, __, ___) => Container(
+                    color: const Color(0xFFF5F5F5),
+                    child: Center(
+                      child: Icon(Icons.videocam_outlined, size: 40, color: Colors.grey.shade400),
+                    ),
+                  ),
                 ),
               ),
             ),
@@ -168,12 +180,16 @@ class _FollowListItem extends StatelessWidget {
               const Spacer(),
               _IconAction(icon: Icons.share_outlined, onPressed: () {}),
               const SizedBox(width: Spacing.md),
-              _IconAction(icon: Icons.chat_bubble_outline, onPressed: onComment),
+              Row(children: [
+                _IconAction(icon: Icons.chat_bubble_outline, onPressed: onComment),
+                const SizedBox(width: 4),
+                Text(formatCount(video.commentCount), style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600)),
+              ]),
               const SizedBox(width: Spacing.md),
               Row(children: [
                 _IconAction(icon: Icons.favorite_border, onPressed: onLike),
                 const SizedBox(width: 4),
-                Text('${video.likes ?? 0}', style: theme.textTheme.bodySmall),
+                Text(formatCount(video.likes), style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600)),
               ]),
             ],
           ),

@@ -28,4 +28,8 @@ class CacheManager {
     } catch (_) {}
     return null;
   }
+
+  Future<bool> remove(String key) async {
+    return prefs.remove(key);
+  }
 }
