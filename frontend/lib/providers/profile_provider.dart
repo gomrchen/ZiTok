@@ -17,10 +17,39 @@ class ProfileProvider extends ChangeNotifier {
   double _backgroundProgress = 0;
   Timer? _debounce;
 
+  /// 上一次的用户 ID，用于检测用户切换
+  String? _lastUserId;
+
   ProfileProvider({
     required this.repo,
     required this.userSession,
-  });
+  }) {
+    // 监听 UserSession 变化，当用户 ID 变化时自动重新加载
+    userSession.addListener(_onUserSessionChanged);
+    _lastUserId = userSession.userId;
+  }
+
+  /// 当 UserSession 变化时调用
+  void _onUserSessionChanged() {
+    final currentUserId = userSession.userId;
+
+    // 检测用户 ID 是否变化
+    if (currentUserId != _lastUserId) {
+      _lastUserId = currentUserId;
+
+      // 清空当前数据
+      _user = null;
+      _error = null;
+      _followersCount = 0;
+      _followingsCount = 0;
+      notifyListeners();
+
+      // 如果有新用户，重新加载数据
+      if (currentUserId != null && currentUserId.isNotEmpty) {
+        loadCurrentUser();
+      }
+    }
+  }
 
   int _followersCount = 0;
   int _followingsCount = 0;
@@ -232,6 +261,7 @@ class ProfileProvider extends ChangeNotifier {
   @override
   void dispose() {
     _debounce?.cancel();
+    userSession.removeListener(_onUserSessionChanged);
     super.dispose();
   }
 }

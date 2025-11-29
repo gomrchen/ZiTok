@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -7,6 +8,7 @@ import '../../models/video.dart';
 import '../../theme/theme_tokens.dart';
 import '../../widgets/comment_sheet.dart';
 import '../../widgets/video_stats.dart';
+import '../../utils/url_utils.dart';
 
 class FollowPage extends StatefulWidget {
   const FollowPage({super.key});
@@ -81,8 +83,21 @@ class _FollowPageState extends State<FollowPage> with AutomaticKeepAliveClientMi
             onTap: () => context.go('/video/${video.id}'),
             onLike: () => vp.like(video.id),
             onComment: () => showCommentsSheet(context, videoId: video.id),
+            onShare: () => _copyVideoId(context, video.id),
           );
         },
+      ),
+    );
+  }
+
+  /// 复制视频ID到剪贴板
+  void _copyVideoId(BuildContext context, String videoId) {
+    Clipboard.setData(ClipboardData(text: videoId));
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('视频ID已复制: $videoId'),
+        duration: const Duration(seconds: 2),
+        behavior: SnackBarBehavior.floating,
       ),
     );
   }
@@ -113,11 +128,33 @@ class _FollowListItem extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback onLike;
   final VoidCallback onComment;
-  const _FollowListItem({required this.video, required this.isRecommended, required this.onTap, required this.onLike, required this.onComment});
+  final VoidCallback onShare;
+  const _FollowListItem({
+    required this.video,
+    required this.isRecommended,
+    required this.onTap,
+    required this.onLike,
+    required this.onComment,
+    required this.onShare,
+  });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    // 作者名称：优先使用uid，没有则用title的第一部分
+    final authorName = video.uid ?? '用户${video.id.substring(0, 4)}';
+    final authorInitial = authorName.isNotEmpty ? authorName.substring(0, 1).toUpperCase() : '?';
+
+    // 视频标题
+    final videoTitle = video.title ?? '未命名视频';
+
+    // 处理封面URL
+    final coverUrl = video.coverUrl != null && video.coverUrl!.isNotEmpty
+        ? UrlUtils.resolveStorageUrl(video.coverUrl, defaultDir: 'covers')
+        : null;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
       child: Column(
@@ -126,26 +163,87 @@ class _FollowListItem extends StatelessWidget {
           // 头部：作者信息与推荐标记
           Row(
             children: [
+              // 作者头像
               CircleAvatar(
-                child: Text((video.title ?? video.uid ?? '视频').isNotEmpty
-                    ? (video.title ?? video.uid ?? '视频').substring(0, 1)
-                    : '?'),
+                radius: 18,
+                backgroundColor: cs.primaryContainer,
+                child: Text(
+                  authorInitial,
+                  style: TextStyle(
+                    color: cs.onPrimaryContainer,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
               ),
               const SizedBox(width: Spacing.sm),
-              Expanded(child: Text(video.title ?? (video.uid ?? '未知'), style: theme.textTheme.titleSmall)),
+              // 作者名和视频标题
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      authorName,
+                      style: theme.textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (video.intro != null && video.intro!.isNotEmpty)
+                      Text(
+                        video.intro!,
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                  ],
+                ),
+              ),
+              // 推荐标记
               if (isRecommended)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: theme.colorScheme.secondaryContainer, borderRadius: Radii.sm),
-                  child: Text('相关推荐', style: theme.textTheme.labelSmall),
+                  decoration: BoxDecoration(
+                    color: cs.secondaryContainer,
+                    borderRadius: Radii.sm,
+                  ),
+                  child: Text(
+                    '相关推荐',
+                    style: theme.textTheme.labelSmall?.copyWith(
+                      color: cs.onSecondaryContainer,
+                    ),
+                  ),
                 ),
             ],
           ),
           const SizedBox(height: Spacing.sm),
-          // 文案（标签模拟）
+
+          // 视频标题
+          Text(
+            videoTitle,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              fontWeight: FontWeight.w500,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: Spacing.xs),
+
+          // 标签
           if (video.tags.isNotEmpty)
-            Text('#${video.tags.take(3).join(' #')}', style: theme.textTheme.bodySmall?.copyWith(color: theme.textTheme.bodySmall?.color?.withValues(alpha: 0.7))),
+            Wrap(
+              spacing: Spacing.xs,
+              children: video.tags.take(3).map((tag) => Text(
+                '#$tag',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: cs.primary,
+                ),
+              )).toList(),
+            ),
           const SizedBox(height: Spacing.sm),
+
           // 封面图
           GestureDetector(
             onTap: onTap,
@@ -153,47 +251,91 @@ class _FollowListItem extends StatelessWidget {
               aspectRatio: 16 / 9,
               child: ClipRRect(
                 borderRadius: Radii.md,
-                child: CachedNetworkImage(
-                  imageUrl: video.coverUrl ?? '',
-                  fit: BoxFit.cover,
-                  placeholder: (_, __) => Container(
-                    color: const Color(0xFFF5F5F5),
-                    child: const Center(
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    ),
-                  ),
-                  errorWidget: (_, __, ___) => Container(
-                    color: const Color(0xFFF5F5F5),
-                    child: Center(
-                      child: Icon(Icons.videocam_outlined, size: 40, color: Colors.grey.shade400),
-                    ),
-                  ),
-                ),
+                child: coverUrl != null
+                    ? CachedNetworkImage(
+                        imageUrl: coverUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (_, __) => _buildPlaceholder(),
+                        errorWidget: (_, __, ___) => _buildErrorPlaceholder(),
+                      )
+                    : _buildErrorPlaceholder(),
               ),
             ),
           ),
           const SizedBox(height: Spacing.sm),
+
           // 操作栏
           Row(
             children: [
-              Text('10-9', style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+              // 播放量
+              if (video.views != null && video.views! > 0)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.play_arrow, size: 16, color: Colors.grey.shade600),
+                    const SizedBox(width: 2),
+                    Text(
+                      formatCount(video.views),
+                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                    ),
+                    const SizedBox(width: Spacing.md),
+                  ],
+                ),
               const Spacer(),
-              _IconAction(icon: Icons.share_outlined, onPressed: () {}),
+              // 分享按钮
+              _IconAction(
+                icon: Icons.share_outlined,
+                onPressed: onShare,
+                tooltip: '复制视频ID',
+              ),
               const SizedBox(width: Spacing.md),
-              Row(children: [
-                _IconAction(icon: Icons.chat_bubble_outline, onPressed: onComment),
-                const SizedBox(width: 4),
-                Text(formatCount(video.commentCount), style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600)),
-              ]),
+              // 评论
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _IconAction(icon: Icons.chat_bubble_outline, onPressed: onComment),
+                  const SizedBox(width: 4),
+                  Text(
+                    formatCount(video.commentCount ?? video.comments ?? 0),
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
               const SizedBox(width: Spacing.md),
-              Row(children: [
-                _IconAction(icon: Icons.favorite_border, onPressed: onLike),
-                const SizedBox(width: 4),
-                Text(formatCount(video.likes), style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600)),
-              ]),
+              // 点赞
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  _IconAction(icon: Icons.favorite_border, onPressed: onLike),
+                  const SizedBox(width: 4),
+                  Text(
+                    formatCount(video.likes ?? 0),
+                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
+                  ),
+                ],
+              ),
             ],
           ),
+          const Divider(height: Spacing.lg),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPlaceholder() {
+    return Container(
+      color: const Color(0xFFF5F5F5),
+      child: const Center(
+        child: CircularProgressIndicator(strokeWidth: 2),
+      ),
+    );
+  }
+
+  Widget _buildErrorPlaceholder() {
+    return Container(
+      color: const Color(0xFFF5F5F5),
+      child: Center(
+        child: Icon(Icons.videocam_outlined, size: 40, color: Colors.grey.shade400),
       ),
     );
   }
@@ -202,13 +344,22 @@ class _FollowListItem extends StatelessWidget {
 class _IconAction extends StatelessWidget {
   final IconData icon;
   final VoidCallback onPressed;
-  const _IconAction({required this.icon, required this.onPressed});
+  final String? tooltip;
+  const _IconAction({required this.icon, required this.onPressed, this.tooltip});
   @override
   Widget build(BuildContext context) {
-    return InkResponse(
+    final child = InkResponse(
       onTap: onPressed,
       radius: 24,
-      child: Icon(icon, color: Theme.of(context).iconTheme.color),
+      child: Icon(icon, size: 22, color: Theme.of(context).iconTheme.color),
     );
+
+    if (tooltip != null) {
+      return Tooltip(
+        message: tooltip!,
+        child: child,
+      );
+    }
+    return child;
   }
 }

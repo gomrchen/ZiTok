@@ -15,10 +15,40 @@ class MessagingProvider extends ChangeNotifier {
 
   bool _activeIsGroup = false;
 
+  /// 上一次的用户 ID，用于检测用户切换
+  String? _lastUserId;
+
   MessagingProvider({
     this.relationRepository,
     required this.userSession,
-  });
+  }) {
+    // 监听 UserSession 变化，当用户 ID 变化时重置消息数据
+    userSession.addListener(_onUserSessionChanged);
+    _lastUserId = userSession.userId;
+  }
+
+  /// 当 UserSession 变化时调用
+  void _onUserSessionChanged() {
+    final currentUserId = userSession.userId;
+
+    // 检测用户 ID 是否变化
+    if (currentUserId != _lastUserId) {
+      _lastUserId = currentUserId;
+
+      // 清空当前数据
+      _following = [];
+      _followers = [];
+      _chatRooms = [];
+      _messages.clear();
+      notifyListeners();
+
+      // 如果有新用户，重新加载数据
+      final uid = currentUid;
+      if (uid != null) {
+        loadRelationData(uid: uid);
+      }
+    }
+  }
 
   /// 当前用户 ID（int 类型，用于 API 调用）
   int? get currentUid {
@@ -397,5 +427,11 @@ class MessagingProvider extends ChangeNotifier {
     } catch (_) {
       // Load error, ignore
     }
+  }
+
+  @override
+  void dispose() {
+    userSession.removeListener(_onUserSessionChanged);
+    super.dispose();
   }
 }

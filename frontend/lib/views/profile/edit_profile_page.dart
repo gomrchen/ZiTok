@@ -48,6 +48,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
   String _email = '';
   String? _avatarUrl;
 
+  // 用于检测用户切换
+  String? _lastUserId;
+
   // 便捷：当前用户 ID
   String get _userId => context.read<AuthProvider>().user?.id ?? '0';
 
@@ -56,8 +59,22 @@ class _EditProfilePageState extends State<EditProfilePage> {
   @override
   void initState() {
     super.initState();
-    // 初始化时从 ProfileProvider 获取用户数据
-    _loadUserData();
+    // 监听 ProfileProvider 变化
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadUserData();
+      context.read<ProfileProvider>().addListener(_onProfileChanged);
+    });
+  }
+
+  /// 当 ProfileProvider 数据变化时检查是否需要重新加载
+  void _onProfileChanged() {
+    final profileProvider = context.read<ProfileProvider>();
+    final currentUserId = profileProvider.user?.id;
+
+    // 检测用户 ID 是否变化
+    if (currentUserId != null && currentUserId != _lastUserId) {
+      _loadUserData();
+    }
   }
 
   void _loadUserData() {
@@ -65,6 +82,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
     final user = profileProvider.user;
 
     if (user != null) {
+      // 记录当前用户 ID
+      _lastUserId = user.id;
+
       setState(() {
         _nickname = user.username;
         _email = user.email ?? '未设置邮箱';
@@ -72,24 +92,18 @@ class _EditProfilePageState extends State<EditProfilePage> {
         _avatarUrl = user.avatarUrl;
         _gender = user.gender; // 直接使用 Gender 枚举
 
+        // 清空预览图（切换账号时需要重置）
+        _avatarPreview = null;
+        _backdropPreview = null;
+
         // 从 Hive 加载其他字段（如果存在）
         final box = Hive.box('user_box');
         final birthdayStr = box.get('birthday') as String?;
         if (birthdayStr != null) {
           _birthday = DateTime.tryParse(birthdayStr);
+        } else {
+          _birthday = null;
         }
-
-        // 如果 Hive 中有缓存的头像数据，使用缓存的
-        final cachedAvatar = box.get('avatar') as Uint8List?;
-        if (cachedAvatar != null) {
-          _avatarPreview = cachedAvatar;
-        }
-
-        final cachedBackdrop = box.get('backdrop') as Uint8List?;
-        if (cachedBackdrop != null) {
-          _backdropPreview = cachedBackdrop;
-        }
-
       });
       _recalcCompletion();
     }
@@ -97,6 +111,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   @override
   void dispose() {
+    // 移除监听器
+    context.read<ProfileProvider>().removeListener(_onProfileChanged);
     super.dispose();
   }
 

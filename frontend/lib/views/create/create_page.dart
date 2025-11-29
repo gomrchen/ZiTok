@@ -1,20 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:flutter_markdown/flutter_markdown.dart';
 import 'package:video_player/video_player.dart';
 import 'package:provider/provider.dart';
 import 'dart:convert';
 import '../../theme/theme_tokens.dart';
 import '../../utils/content_validator.dart';
 import '../../providers/video_provider.dart';
-import '../../providers/auth_provider.dart';
+import '../../services/user_session.dart';
 import '../../models/video_publish.dart';
 import 'widgets/step_indicator.dart';
 import 'widgets/upload_box.dart';
 import 'video_controller.dart';
+import 'markdown_preview_page.dart';
 
-enum CreateStep { prepare, edit, publish }
+enum CreateStep { modeSelect, prepare, edit, publish }
+
+enum PublishMode { mixed, noteOnly }
 
 class CreatePage extends StatefulWidget {
   const CreatePage({super.key});
@@ -24,7 +26,8 @@ class CreatePage extends StatefulWidget {
 }
 
 class _CreatePageState extends State<CreatePage> {
-  CreateStep step = CreateStep.prepare;
+  CreateStep step = CreateStep.modeSelect;
+  PublishMode? publishMode;
 
   // 素材准备
   String? videoName;
@@ -54,7 +57,82 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   void _goTo(CreateStep s) => setState(() => step = s);
+
+  /// 检查是否可以进入发布阶段
+  String? _canEnterPublishStep() {
+    final isNoteOnly = publishMode == PublishMode.noteOnly;
+
+    // 混合模式：必须有视频
+    if (!isNoteOnly && (videoSource == null || videoSource!.isEmpty)) {
+      return '请先选择要发布的视频';
+    }
+    // 笔记模式：必须有 Markdown 内容
+    if (isNoteOnly && mdContent.isEmpty) {
+      return '请先添加 Markdown 笔记内容';
+    }
+    // 必须有标题
+    if (_titleCtl.text.trim().isEmpty) {
+      return isNoteOnly ? '请输入笔记标题' : '请输入视频标题';
+    }
+    return null; // 可以进入
+  }
+
+  /// 检查是否有已填写的数据
+  bool _hasFilledData() {
+    return videoSource != null ||
+        mdContent.isNotEmpty ||
+        _titleCtl.text.isNotEmpty ||
+        _descCtl.text.isNotEmpty ||
+        _tags.isNotEmpty;
+  }
+
+  /// 显示重新选择模式的确认弹窗
+  Future<bool> _showResetModeConfirmDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final cs = Theme.of(context).colorScheme;
+        return AlertDialog(
+          title: const Text('重新选择模式'),
+          content: const Text('重新选择发布模式将清空已填写的所有数据，确定要继续吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: cs.error,
+                foregroundColor: cs.onError,
+              ),
+              child: const Text('确定清空'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
   Future<void> _animateToStep(CreateStep s) async {
+    // 返回模式选择阶段：如果已有数据，需要确认
+    if (s == CreateStep.modeSelect && publishMode != null && _hasFilledData()) {
+      final confirmed = await _showResetModeConfirmDialog();
+      if (!confirmed) return;
+      // 用户确认，清空数据
+      _resetForm();
+    }
+
+    // 进入发布阶段前检查条件
+    if (s == CreateStep.publish) {
+      final error = _canEnterPublishStep();
+      if (error != null) {
+        _showBoundaryHint(error);
+        return;
+      }
+    }
+
     final target = CreateStep.values.indexOf(s);
     await _pageController.animateToPage(target, duration: const Duration(milliseconds: 380), curve: Curves.easeOut);
     _goTo(s);
@@ -83,17 +161,23 @@ class _CreatePageState extends State<CreatePage> {
       return;
     }
 
-    // 第一阶段右滑：返回主界面
+    // 第一阶段（模式选择）右滑：返回主界面
     if (idx == 0 && isRight) {
       Navigator.of(context).maybePop();
       return;
     }
+
+    // 最后阶段左滑：提示已在最后
     if (idx == CreateStep.values.length - 1 && isLeft) {
       _showBoundaryHint('已在最后阶段');
       return;
     }
 
-   
+    // 模式选择页面左滑：必须先选择模式
+    if (step == CreateStep.modeSelect && isLeft && publishMode == null) {
+      _showBoundaryHint('请先选择发布模式');
+      return;
+    }
 
     final nextIdx = isLeft ? (idx + 1) : (idx - 1);
     final nextStep = CreateStep.values[nextIdx];
@@ -106,13 +190,95 @@ class _CreatePageState extends State<CreatePage> {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(text), duration: const Duration(milliseconds: 600)));
   }
 
-  Widget _pageWrapper(Widget child) {
-    return SingleChildScrollView(padding: const EdgeInsets.all(Spacing.lg), child: child);
-  }
-
   double _containerWidth(BoxConstraints c) {
     final w = c.maxWidth;
     return w * 0.85; // 约 85% 宽度
+  }
+
+  // 根据发布模式获取有效步骤列表
+  List<CreateStep> get _effectiveSteps {
+    if (publishMode == null) {
+      return [CreateStep.modeSelect];
+    }
+    return [CreateStep.modeSelect, CreateStep.prepare, CreateStep.edit, CreateStep.publish];
+  }
+
+  int _currentStepIndex() {
+    final steps = _effectiveSteps;
+    final idx = steps.indexOf(step);
+    return idx >= 0 ? idx : 0;
+  }
+
+  List<StepMeta> _buildStepMetas() {
+    if (publishMode == null) {
+      return const [
+        StepMeta(icon: Icons.play_lesson, label: '发布模式'),
+      ];
+    }
+    final isNoteOnly = publishMode == PublishMode.noteOnly;
+    return [
+      const StepMeta(icon: Icons.play_lesson, label: '发布模式'),
+      StepMeta(
+        icon: Icons.inventory_2_outlined,
+        label: isNoteOnly ? '素材准备' : '素材准备',
+      ),
+      const StepMeta(icon: Icons.edit_note, label: '内容编辑'),
+      const StepMeta(icon: Icons.rocket_launch, label: '发布'),
+    ];
+  }
+
+  void _onStepTap(int index) {
+    final steps = _effectiveSteps;
+    if (index >= 0 && index < steps.length) {
+      _animateToStep(steps[index]);
+    }
+  }
+
+  Widget _buildModeSelect(double width) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Text(
+          '选择发布模式',
+          style: Theme.of(context).textTheme.headlineSmall,
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: Spacing.sm),
+        Text(
+          '请选择您想要发布的内容类型',
+          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: cs.onSurfaceVariant,
+              ),
+          textAlign: TextAlign.center,
+        ),
+        const SizedBox(height: Spacing.xl),
+        _ModeCard(
+          icon: Icons.video_library,
+          title: '视频笔记混合发布',
+          description: '同时发布视频和配套的 Markdown 笔记，视频为主，笔记为辅',
+          isSelected: publishMode == PublishMode.mixed,
+          onTap: () => setState(() => publishMode = PublishMode.mixed),
+        ),
+        const SizedBox(height: Spacing.lg),
+        _ModeCard(
+          icon: Icons.article,
+          title: '笔记单独发布',
+          description: '仅发布 Markdown 笔记内容，无需视频素材',
+          isSelected: publishMode == PublishMode.noteOnly,
+          onTap: () => setState(() => publishMode = PublishMode.noteOnly),
+        ),
+        const SizedBox(height: Spacing.xl),
+        Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton(
+            onPressed: publishMode != null ? () => _animateToStep(CreateStep.prepare) : null,
+            child: const Text('下一步 · 素材准备'),
+          ),
+        ),
+      ],
+    );
   }
 
   Future<void> _pickVideo() async {
@@ -153,9 +319,7 @@ class _CreatePageState extends State<CreatePage> {
         mdFileName = f.name;
         mdContent = content;
       });
-      if (_descCtl.text.trim().isEmpty) {
-        _descCtl.text = ContentValidator.summarize(content, maxLen: 100);
-      }
+      // 从MD中提取标签
       final tags = ContentValidator.extractTags(content);
       for (final t in tags) {
         if (!_tags.contains(t)) _tags.add(t);
@@ -169,9 +333,7 @@ class _CreatePageState extends State<CreatePage> {
           mdContent = text;
           mdFileName = 'note_${DateTime.now().millisecondsSinceEpoch}.md';
         });
-        if (_descCtl.text.trim().isEmpty) {
-          _descCtl.text = ContentValidator.summarize(text, maxLen: 100);
-        }
+        // 从MD中提取标签
         final tags = ContentValidator.extractTags(text);
         for (final t in tags) {
           if (!_tags.contains(t)) _tags.add(t);
@@ -231,16 +393,22 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   String? _validateBeforePublish() {
-    // 视频必须存在
-    if (videoSource == null || videoSource!.isEmpty) {
+    final isNoteOnly = publishMode == PublishMode.noteOnly;
+
+    // 视频必须存在（仅混合模式）
+    if (!isNoteOnly && (videoSource == null || videoSource!.isEmpty)) {
       return '请先选择要发布的视频';
+    }
+    // 笔记内容必须存在（仅笔记模式）
+    if (isNoteOnly && mdContent.isEmpty) {
+      return '请先添加 Markdown 笔记内容';
     }
     // 标题必须存在
     if (_titleCtl.text.trim().isEmpty) {
-      return '请输入视频标题';
+      return isNoteOnly ? '请输入笔记标题' : '请输入视频标题';
     }
     // 文件格式校验
-    if (videoName != null && !ContentValidator.isSupportedVideo(videoName!)) {
+    if (!isNoteOnly && videoName != null && !ContentValidator.isSupportedVideo(videoName!)) {
       return '不支持的视频格式（仅支持 mp4/mov/avi/mkv）';
     }
     if (mdFileName != null && !ContentValidator.isSupportedMarkdown(mdFileName!)) {
@@ -259,17 +427,29 @@ class _CreatePageState extends State<CreatePage> {
       return;
     }
 
-    // 获取用户ID
-    final authProvider = context.read<AuthProvider>();
-    final userId = authProvider.user?.id;
-    if (userId == null) {
+    final isNoteOnly = publishMode == PublishMode.noteOnly;
+
+    // 使用 UserSession 获取用户ID（统一的登录状态判断）
+    final userSession = context.read<UserSession>();
+    if (!userSession.isLoggedIn) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先登录后再发布视频')),
+        SnackBar(content: Text(isNoteOnly ? '请先登录后再发布笔记' : '请先登录后再发布视频')),
+      );
+      return;
+    }
+    final userId = userSession.userId!;
+
+    // 笔记单独发布
+    if (isNoteOnly) {
+      // TODO: 实现笔记单独发布的 API 调用
+      // 目前模拟成功
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('笔记发布功能开发中...')),
       );
       return;
     }
 
-    // Web平台暂不支持
+    // Web平台暂不支持视频上传
     if (kIsWeb) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Web平台暂不支持视频上传，请使用移动端或桌面端')),
@@ -277,7 +457,7 @@ class _CreatePageState extends State<CreatePage> {
       return;
     }
 
-    // 开始发布
+    // 开始发布视频
     final videoProvider = context.read<VideoProvider>();
     final success = await videoProvider.publishVideo(
       filePath: videoSource!,
@@ -295,13 +475,16 @@ class _CreatePageState extends State<CreatePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // 移除顶部标题栏：全屏手势区域
       appBar: null,
       body: LayoutBuilder(
         builder: (context, constraints) {
           final width = _containerWidth(constraints);
-          final minPreviewHeight = constraints.maxHeight * 0.4; // Markdown 预览最少占屏幕 40%
+          final minPreviewHeight = constraints.maxHeight * 0.4;
           final isWide = constraints.maxWidth >= 900;
+          // 计算水平边距以实现居中效果
+          final horizontalPadding = (constraints.maxWidth - width) / 2;
+          final effectivePadding = horizontalPadding > 0 ? horizontalPadding : 0.0;
+
           return GestureDetector(
             behavior: HitTestBehavior.opaque,
             onHorizontalDragStart: _onDragStart,
@@ -310,37 +493,35 @@ class _CreatePageState extends State<CreatePage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                // 步骤指示器
                 Padding(
-                  padding: const EdgeInsets.all(Spacing.lg),
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: width),
-                      child: StepIndicator(
-                        steps: const [
-                          StepMeta(icon: Icons.inventory_2_outlined, label: '素材准备'),
-                          StepMeta(icon: Icons.edit_note, label: '内容编辑'),
-                          StepMeta(icon: Icons.rocket_launch, label: '发布'),
-                        ],
-                        currentIndex: CreateStep.values.indexOf(step),
-                        onTap: (i) => _animateToStep(CreateStep.values[i]),
-                      ),
-                    ),
+                  padding: EdgeInsets.fromLTRB(
+                    effectivePadding + Spacing.lg,
+                    Spacing.lg,
+                    effectivePadding + Spacing.lg,
+                    Spacing.lg,
+                  ),
+                  child: StepIndicator(
+                    steps: _buildStepMetas(),
+                    currentIndex: _currentStepIndex(),
+                    onTap: _onStepTap,
                   ),
                 ),
+                // 页面内容
                 Expanded(
-                  child: Center(
-                    child: ConstrainedBox(
-                      constraints: BoxConstraints(maxWidth: width),
-                      child: PageView(
-                        controller: _pageController,
-                        physics: const NeverScrollableScrollPhysics(),
-                        children: [
-                          _pageWrapper(_buildPrepare(width)),
-                          _pageWrapper(_buildEdit(width, minPreviewHeight, isWide)),
-                          _pageWrapper(_buildPublish(width)),
-                        ],
-                      ),
-                    ),
+                  child: PageView.builder(
+                    controller: _pageController,
+                    physics: const NeverScrollableScrollPhysics(),
+                    itemCount: 4,
+                    itemBuilder: (context, index) {
+                      return _buildPageContent(
+                        index,
+                        width,
+                        minPreviewHeight,
+                        isWide,
+                        effectivePadding,
+                      );
+                    },
                   ),
                 ),
               ],
@@ -351,16 +532,112 @@ class _CreatePageState extends State<CreatePage> {
     );
   }
 
-  Widget _buildPrepare(double width) {
+  Widget _buildPageContent(
+    int index,
+    double width,
+    double minPreviewHeight,
+    bool isWide,
+    double horizontalPadding,
+  ) {
+    Widget content;
+    switch (index) {
+      case 0:
+        content = _buildModeSelect(width);
+        break;
+      case 1:
+        content = _buildPrepare(width);
+        break;
+      case 2:
+        content = _buildEdit(width, minPreviewHeight, isWide);
+        break;
+      case 3:
+        // 发布阶段：检查条件是否满足
+        final error = _canEnterPublishStep();
+        if (error != null) {
+          content = _buildPublishPlaceholder(error);
+        } else {
+          content = _buildPublish(width);
+        }
+        break;
+      default:
+        content = const SizedBox.shrink();
+    }
+
+    // 使用 ListView 替代 SingleChildScrollView，更稳定
+    return ListView(
+      padding: EdgeInsets.fromLTRB(
+        horizontalPadding + Spacing.lg,
+        Spacing.lg,
+        horizontalPadding + Spacing.lg,
+        Spacing.lg,
+      ),
+      children: [content],
+    );
+  }
+
+  /// 发布阶段占位符（条件不满足时显示）
+  Widget _buildPublishPlaceholder(String message) {
+    final cs = Theme.of(context).colorScheme;
     return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        UploadBox(
-          title: '从本地导入视频',
-          hint: videoName == null ? 'Select file' : videoName!,
-          icon: Icons.video_file,
-          onTap: _pickVideo,
+        Container(
+          padding: const EdgeInsets.all(Spacing.xl),
+          decoration: BoxDecoration(
+            color: cs.surfaceContainerHighest,
+            borderRadius: Radii.md,
+            border: Border.all(color: cs.outlineVariant),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.warning_amber_rounded,
+                size: 64,
+                color: cs.onSurfaceVariant,
+              ),
+              const SizedBox(height: Spacing.md),
+              Text(
+                '无法进入发布阶段',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: Spacing.sm),
+              Text(
+                message,
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: Spacing.lg),
+              FilledButton.icon(
+                onPressed: () => _animateToStep(CreateStep.edit),
+                icon: const Icon(Icons.arrow_back),
+                label: const Text('返回编辑'),
+              ),
+            ],
+          ),
         ),
-        const SizedBox(height: Spacing.lg),
+      ],
+    );
+  }
+
+  Widget _buildPrepare(double width) {
+    final isNoteOnly = publishMode == PublishMode.noteOnly;
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 视频上传（仅混合模式显示）
+        if (!isNoteOnly) ...[
+          UploadBox(
+            title: '从本地导入视频',
+            hint: videoName == null ? 'Select file' : videoName!,
+            icon: Icons.video_file,
+            onTap: _pickVideo,
+          ),
+          const SizedBox(height: Spacing.lg),
+        ],
         // Markdown 上传/编辑切换
         Align(
           alignment: Alignment.centerLeft,
@@ -377,7 +654,7 @@ class _CreatePageState extends State<CreatePage> {
         const SizedBox(height: Spacing.md),
         if (!markdownEditMode)
           UploadBox(
-            title: '导入 Markdown 笔记',
+            title: isNoteOnly ? '导入 Markdown 笔记（必需）' : '导入 Markdown 笔记',
             hint: mdFileName == null ? '粘贴文本或选择文件（简化）' : mdFileName!,
             icon: Icons.note_add,
             onTap: _pickMarkdown,
@@ -400,369 +677,273 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   Widget _buildEdit(double width, double minPreviewHeight, bool isWide) {
-    return Consumer<VideoProvider>(
-      builder: (context, videoProvider, child) {
-        final progress = videoProvider.publishProgress;
-        final isUploading = progress.isInProgress;
+    final cs = Theme.of(context).colorScheme;
+    final isNoteOnly = publishMode == PublishMode.noteOnly;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            // 视频标题输入（必填）
-            _CardContainer(
-              label: '视频标题 *',
-              child: TextField(
-                controller: _titleCtl,
-                enabled: !isUploading,
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 标题输入（必填）
+        _CardContainer(
+          label: isNoteOnly ? '笔记标题 *' : '视频标题 *',
+          child: TextField(
+            controller: _titleCtl,
+            decoration: InputDecoration(
+              hintText: isNoteOnly ? '请输入笔记标题（必填）' : '请输入视频标题（必填）',
+              border: InputBorder.none,
+            ),
+            maxLines: 1,
+          ),
+        ),
+        const SizedBox(height: Spacing.lg),
+
+        // 作品描述
+        _CardContainer(
+          label: '作品简介',
+          child: TextField(
+            controller: _descCtl,
+            decoration: InputDecoration(
+              hintText: isNoteOnly ? '为笔记添加简介（支持emoji表情）' : '为视频添加简介（支持emoji表情）',
+              border: InputBorder.none,
+            ),
+            minLines: 3,
+            maxLines: 6,
+            keyboardType: TextInputType.multiline,
+          ),
+        ),
+        const SizedBox(height: Spacing.lg),
+
+        // 标签
+        _CardContainer(
+          label: isNoteOnly ? '笔记标签' : '视频标签',
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              TextField(
+                controller: _tagCtl,
                 decoration: const InputDecoration(
-                  hintText: '请输入视频标题（必填）',
+                  hintText: '输入后按回车或逗号添加',
                   border: InputBorder.none,
                 ),
-                maxLines: 1,
+                onSubmitted: (_) => _addTagFromInput(),
               ),
-            ),
-            const SizedBox(height: Spacing.lg),
-            if (!isWide) ...[
-              // 纵向：Markdown 预览 -> 视频预览
-              _CardContainer(
-                label: 'Markdown 预览',
-                child: ConstrainedBox(
-                  constraints: BoxConstraints(minHeight: minPreviewHeight),
-                  child: Padding(
-                    padding: const EdgeInsets.all(Spacing.md),
-                    child: Markdown(
-                      data: mdContent.isEmpty ? '（暂无内容）' : mdContent,
-                      shrinkWrap: true,
-                      physics: const NeverScrollableScrollPhysics(),
-                    ),
-                  ),
+              if (_tags.isNotEmpty) ...[
+                const SizedBox(height: Spacing.sm),
+                Wrap(
+                  spacing: Spacing.sm,
+                  runSpacing: Spacing.sm,
+                  children: _tags
+                      .map((t) => Chip(
+                            label: Text(t),
+                            onDeleted: () => setState(() => _tags.remove(t)),
+                          ))
+                      .toList(),
                 ),
-              ),
-              const SizedBox(height: Spacing.lg),
-              _CardContainer(
-                label: '视频预览',
-                child: AspectRatio(
-                  aspectRatio: _vc != null && _vc!.value.isInitialized ? _vc!.value.aspectRatio : 16 / 9,
-                  child: _vc != null && _vcReady
-                      ? Stack(
-                          alignment: Alignment.bottomCenter,
-                          children: [
-                            VideoPlayer(_vc!),
-                            VideoProgressIndicator(_vc!, allowScrubbing: true),
-                          ],
-                        )
-                      : _VideoPlaceholder(name: videoName),
-                ),
-              ),
-            ] else ...[
-              // 宽屏：并排布局
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(
-                    child: _CardContainer(
-                      label: 'Markdown 预览',
-                      child: Builder(builder: (context) {
-                        final double cardWidth = (width - Spacing.lg) / 2;
-                        final double aspect = _vc != null && _vc!.value.isInitialized ? _vc!.value.aspectRatio : 16 / 9;
-                        final double videoH = cardWidth / aspect;
-                        final double cardHeight = videoH < minPreviewHeight ? minPreviewHeight : videoH;
-                        return SizedBox(
-                          height: cardHeight,
-                          child: Padding(
-                            padding: const EdgeInsets.all(Spacing.md),
-                            child: Markdown(
-                              data: mdContent.isEmpty ? '（暂无内容）' : mdContent,
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                            ),
-                          ),
-                        );
-                      }),
-                    ),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: Spacing.lg),
+
+        // 素材预览提示
+        _CardContainer(
+          label: '已准备的素材',
+          child: Padding(
+            padding: const EdgeInsets.all(Spacing.sm),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 视频状态（仅混合模式显示）
+                if (!isNoteOnly) ...[
+                  Row(
+                    children: [
+                      Icon(
+                        videoSource != null ? Icons.check_circle : Icons.radio_button_unchecked,
+                        size: 20,
+                        color: videoSource != null ? cs.primary : cs.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: Spacing.sm),
+                      Expanded(
+                        child: Text(
+                          '视频：${videoName ?? '未选择'}',
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: Spacing.lg),
-                  Expanded(
-                    child: _CardContainer(
-                      label: '视频预览',
-                      child: Builder(builder: (context) {
-                        final double cardWidth = (width - Spacing.lg) / 2;
-                        final double aspect = _vc != null && _vc!.value.isInitialized ? _vc!.value.aspectRatio : 16 / 9;
-                        final double videoH = cardWidth / aspect;
-                        final double cardHeight = videoH < minPreviewHeight ? minPreviewHeight : videoH;
-                        return SizedBox(
-                          height: cardHeight,
-                          child: AspectRatio(
-                            aspectRatio: aspect,
-                            child: _vc != null && _vcReady
-                                ? Stack(
-                                    alignment: Alignment.bottomCenter,
-                                    children: [
-                                      VideoPlayer(_vc!),
-                                      VideoProgressIndicator(_vc!, allowScrubbing: true),
-                                    ],
-                                  )
-                                : _VideoPlaceholder(name: videoName),
-                          ),
-                        );
-                      }),
-                    ),
-                  ),
+                  const SizedBox(height: Spacing.sm),
                 ],
-              ),
-            ],
-            const SizedBox(height: Spacing.lg),
-            // 描述 & 标签
-            if (!isWide) ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                Row(
                   children: [
-                    _CardContainer(
-                      label: '作品描述',
-                      child: TextField(
-                        controller: _descCtl,
-                        enabled: !isUploading,
-                        decoration: const InputDecoration(
-                          hintText: '为视频添加发布后描述',
-                          border: InputBorder.none,
-                        ),
-                        minLines: 4,
-                        maxLines: 8,
-                      ),
+                    Icon(
+                      mdContent.isNotEmpty ? Icons.check_circle : Icons.radio_button_unchecked,
+                      size: 20,
+                      color: mdContent.isNotEmpty ? cs.primary : cs.onSurfaceVariant,
                     ),
-                    const SizedBox(height: Spacing.lg),
-                    _CardContainer(
-                      label: '视频标签',
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
-                        children: [
-                          TextField(
-                            controller: _tagCtl,
-                            enabled: !isUploading,
-                            decoration: const InputDecoration(
-                              hintText: '输入后按回车或逗号添加',
-                              border: InputBorder.none,
-                            ),
-                            onSubmitted: (_) => _addTagFromInput(),
-                          ),
-                          const SizedBox(height: Spacing.sm),
-                          Wrap(
-                            spacing: Spacing.sm,
-                            runSpacing: Spacing.sm,
-                            children: _tags
-                                .map((t) => Chip(
-                                      label: Text(t),
-                                      onDeleted: isUploading ? null : () => setState(() => _tags.remove(t)),
-                                    ))
-                                .toList(),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ] else ...[
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-                child: Row(
-                  children: [
+                    const SizedBox(width: Spacing.sm),
                     Expanded(
-                      child: _CardContainer(
-                        label: '作品描述',
-                        child: TextField(
-                          controller: _descCtl,
-                          enabled: !isUploading,
-                          decoration: const InputDecoration(
-                            hintText: '为视频添加发布后描述',
-                            border: InputBorder.none,
-                          ),
-                          minLines: 4,
-                          maxLines: 8,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: Spacing.md),
-                    Expanded(
-                      child: _CardContainer(
-                        label: '视频标签',
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.stretch,
-                          children: [
-                            TextField(
-                              controller: _tagCtl,
-                              enabled: !isUploading,
-                              decoration: const InputDecoration(
-                                hintText: '输入后按回车或逗号添加',
-                                border: InputBorder.none,
-                              ),
-                              onSubmitted: (_) => _addTagFromInput(),
-                            ),
-                            const SizedBox(height: Spacing.sm),
-                            Wrap(
-                              spacing: Spacing.sm,
-                              runSpacing: Spacing.sm,
-                              children: _tags
-                                  .map((t) => Chip(
-                                        label: Text(t),
-                                        onDeleted: isUploading ? null : () => setState(() => _tags.remove(t)),
-                                      ))
-                                  .toList(),
-                            ),
-                          ],
-                        ),
+                      child: Text(
+                        'Markdown：${mdContent.isNotEmpty ? '${mdContent.length} 字符' : (isNoteOnly ? '未添加（必需）' : '未添加（可选）')}',
+                        style: Theme.of(context).textTheme.bodyMedium,
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
-            const SizedBox(height: Spacing.lg),
-            // 上传进度或发布按钮
-            if (isUploading) ...[
-              _UploadProgressWidget(progress: progress),
-            ] else if (progress.isFailed) ...[
-              _CardContainer(
-                label: '发布失败',
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      progress.errorMessage ?? '未知错误',
-                      style: TextStyle(color: Theme.of(context).colorScheme.error),
-                    ),
-                    const SizedBox(height: Spacing.md),
-                    FilledButton(
-                      onPressed: () {
-                        videoProvider.resetPublishProgress();
-                        _publish();
-                      },
-                      child: const Text('重试'),
-                    ),
-                  ],
-                ),
-              ),
-            ] else ...[
-              Align(
-                alignment: Alignment.centerRight,
-                child: FilledButton(onPressed: _publish, child: const Text('发布')),
-              ),
-            ],
-          ],
-        );
-      },
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: Spacing.xl),
+
+        // 下一步按钮
+        Align(
+          alignment: Alignment.centerRight,
+          child: FilledButton.icon(
+            onPressed: () {
+              // 基本验证
+              if (!isNoteOnly && (videoSource == null || videoSource!.isEmpty)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请先选择要发布的视频')),
+                );
+                return;
+              }
+              if (isNoteOnly && mdContent.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请先添加 Markdown 笔记内容')),
+                );
+                return;
+              }
+              if (_titleCtl.text.trim().isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text(isNoteOnly ? '请输入笔记标题' : '请输入视频标题')),
+                );
+                return;
+              }
+              _animateToStep(CreateStep.publish);
+            },
+            icon: const Icon(Icons.arrow_forward),
+            label: const Text('下一步：发布'),
+          ),
+        ),
+      ],
     );
   }
 
   Widget _buildPublish(double width) {
-    return Consumer<VideoProvider>(
-      builder: (context, videoProvider, child) {
-        final progress = videoProvider.publishProgress;
+    final isNoteOnly = publishMode == PublishMode.noteOnly;
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            if (progress.isSuccess) ...[
-              _CardContainer(
-                label: '发布成功',
-                child: Padding(
-                  padding: const EdgeInsets.all(Spacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.check_circle_outline,
-                        size: 64,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                      const SizedBox(height: Spacing.md),
-                      Text(
-                        '视频发布成功！',
-                        style: Theme.of(context).textTheme.headlineSmall,
-                      ),
-                      const SizedBox(height: Spacing.sm),
-                      Text(
-                        '您的视频已提交，后台正在处理中',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Theme.of(context).colorScheme.onSurfaceVariant,
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: Spacing.lg),
-              _CardContainer(
-                label: '视频信息',
-                child: Padding(
-                  padding: const EdgeInsets.all(Spacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [const Icon(Icons.video_file), const SizedBox(width: 8), Text(videoName ?? '无视频')]),
-                      const SizedBox(height: Spacing.md),
-                      Text('标题：${_titleCtl.text.isEmpty ? '（空）' : _titleCtl.text}'),
-                      const SizedBox(height: Spacing.md),
-                      Text('描述：${_descCtl.text.isEmpty ? '（空）' : _descCtl.text}'),
-                      const SizedBox(height: Spacing.md),
-                      Text('标签：${_tags.isEmpty ? '（无）' : _tags.join(', ')}'),
-                    ],
-                  ),
-                ),
-              ),
-            ] else ...[
-              _CardContainer(
-                label: '发布预览',
-                child: Padding(
-                  padding: const EdgeInsets.all(Spacing.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [const Icon(Icons.video_file), const SizedBox(width: 8), Text(videoName ?? '无视频')]),
-                      const SizedBox(height: Spacing.md),
-                      Text('标题：${_titleCtl.text.isEmpty ? '（空）' : _titleCtl.text}'),
-                      const SizedBox(height: Spacing.md),
-                      Text('描述：${_descCtl.text.isEmpty ? '（空）' : _descCtl.text}'),
-                      const SizedBox(height: Spacing.md),
-                      Text('标签：${_tags.isEmpty ? '（无）' : _tags.join(', ')}'),
-                      const SizedBox(height: Spacing.md),
-                      const Text('Markdown 片段：'),
-                      const SizedBox(height: Spacing.sm),
-                      Text(ContentValidator.summarize(mdContent, maxLen: 240)),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-            const SizedBox(height: Spacing.lg),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
+    // 使用独立的 StatefulWidget 来监听状态变化
+    // 避免 context.watch 导致整个页面重建与 PageView 布局冲突
+    return _PublishPageContent(
+      isNoteOnly: isNoteOnly,
+      titleText: _titleCtl.text,
+      descText: _descCtl.text,
+      tags: _tags,
+      mdContent: mdContent,
+      videoName: videoName,
+      videoSource: videoSource,
+      onResetAndGoBack: () {
+        context.read<VideoProvider>().resetPublishProgress();
+        _resetForm();
+        _animateToStep(CreateStep.modeSelect);
+      },
+      onPop: () => Navigator.of(context).maybePop(),
+      onGoToEdit: () => _animateToStep(CreateStep.edit),
+      onPublish: _publish,
+      onRetry: () {
+        context.read<VideoProvider>().resetPublishProgress();
+        _publish();
+      },
+      onShowVideoPreview: _showVideoPreviewDialog,
+      onShowMarkdownPreview: () => openMarkdownPreview(
+        context,
+        content: mdContent,
+        title: _titleCtl.text.isNotEmpty ? '${_titleCtl.text} - 笔记预览' : '笔记预览',
+      ),
+    );
+  }
+
+  /// 显示视频预览弹窗
+  void _showVideoPreviewDialog() {
+    showDialog(
+      context: context,
+      builder: (dialogContext) {
+        return Dialog(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 600, maxHeight: 500),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                if (progress.isSuccess) ...[
-                  OutlinedButton(
-                    onPressed: () {
-                      videoProvider.resetPublishProgress();
-                      _resetForm();
-                      _animateToStep(CreateStep.prepare);
-                    },
-                    child: const Text('发布新视频'),
+                // 标题栏
+                Padding(
+                  padding: const EdgeInsets.all(Spacing.md),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.play_circle_outline),
+                      const SizedBox(width: Spacing.sm),
+                      Expanded(
+                        child: Text(
+                          '视频预览',
+                          style: Theme.of(context).textTheme.titleMedium,
+                        ),
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => Navigator.pop(dialogContext),
+                      ),
+                    ],
                   ),
-                  const SizedBox(width: Spacing.md),
-                  FilledButton(
-                    onPressed: () => Navigator.of(context).maybePop(),
-                    child: const Text('返回首页'),
+                ),
+                // 视频播放器
+                Flexible(
+                  child: AspectRatio(
+                    aspectRatio: _vc != null && _vc!.value.isInitialized ? _vc!.value.aspectRatio : 16 / 9,
+                    child: _vc != null && _vcReady
+                        ? Stack(
+                            alignment: Alignment.bottomCenter,
+                            children: [
+                              VideoPlayer(_vc!),
+                              VideoProgressIndicator(_vc!, allowScrubbing: true),
+                            ],
+                          )
+                        : _VideoPlaceholder(name: videoName),
                   ),
-                ] else ...[
-                  FilledButton(
-                    onPressed: () => _animateToStep(CreateStep.edit),
-                    child: const Text('返回 · 继续编辑'),
+                ),
+                // 控制按钮
+                if (_vc != null && _vcReady)
+                  Padding(
+                    padding: const EdgeInsets.all(Spacing.md),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        IconButton(
+                          icon: Icon(_vc!.value.isPlaying ? Icons.pause : Icons.play_arrow),
+                          onPressed: () {
+                            if (_vc!.value.isPlaying) {
+                              _vc!.pause();
+                            } else {
+                              _vc!.play();
+                            }
+                            // 刷新对话框
+                            (dialogContext as Element).markNeedsBuild();
+                          },
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.replay),
+                          onPressed: () {
+                            _vc!.seekTo(Duration.zero);
+                            _vc!.play();
+                          },
+                        ),
+                      ],
+                    ),
                   ),
-                ],
               ],
             ),
-          ],
+          ),
         );
       },
     );
@@ -770,6 +951,7 @@ class _CreatePageState extends State<CreatePage> {
 
   void _resetForm() {
     setState(() {
+      publishMode = null;
       videoName = null;
       videoSource = null;
       mdFileName = null;
@@ -785,17 +967,46 @@ class _CreatePageState extends State<CreatePage> {
   }
 }
 
-class _MarkdownEditor extends StatelessWidget {
+class _MarkdownEditor extends StatefulWidget {
   final String content;
   final ValueChanged<String> onChanged;
   const _MarkdownEditor({required this.content, required this.onChanged});
+
+  @override
+  State<_MarkdownEditor> createState() => _MarkdownEditorState();
+}
+
+class _MarkdownEditorState extends State<_MarkdownEditor> {
+  late TextEditingController _controller;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: widget.content);
+  }
+
+  @override
+  void didUpdateWidget(covariant _MarkdownEditor oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Only update if content changed externally (e.g., file loaded)
+    if (widget.content != oldWidget.content && widget.content != _controller.text) {
+      _controller.text = widget.content;
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return _CardContainer(
       label: 'Markdown 编辑',
       child: TextField(
-        controller: TextEditingController(text: content),
-        onChanged: onChanged,
+        controller: _controller,
+        onChanged: widget.onChanged,
         maxLines: 16,
         decoration: const InputDecoration(
           hintText: '在此编辑 Markdown 文档...',
@@ -814,6 +1025,7 @@ class _CardContainer extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     return Column(
+      mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Text(label, style: Theme.of(context).textTheme.titleMedium),
@@ -844,6 +1056,7 @@ class _VideoPlaceholder extends StatelessWidget {
         color: Theme.of(context).colorScheme.surfaceContainerHigh,
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.play_circle_outline, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant),
@@ -870,6 +1083,7 @@ class _UploadProgressWidget extends StatelessWidget {
         border: Border.all(color: cs.outlineVariant),
       ),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           Row(
@@ -912,6 +1126,427 @@ class _UploadProgressWidget extends StatelessWidget {
           ],
         ],
       ),
+    );
+  }
+}
+
+/// 信息行组件（用于发布信息摘要）
+class _InfoRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _InfoRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Icon(icon, size: 20, color: cs.onSurfaceVariant),
+        const SizedBox(width: Spacing.sm),
+        SizedBox(
+          width: 48,
+          child: Text(
+            label,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+          ),
+        ),
+        const SizedBox(width: Spacing.sm),
+        Expanded(
+          child: Text(
+            value,
+            style: Theme.of(context).textTheme.bodyMedium,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 预览卡片组件（用于视频/Markdown预览按钮）
+class _PreviewCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final VoidCallback? onTap;
+
+  const _PreviewCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final isEnabled = onTap != null;
+
+    return Material(
+      color: isEnabled ? cs.surfaceContainerLow : cs.surfaceContainerHighest,
+      borderRadius: Radii.md,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: Radii.md,
+        child: Container(
+          padding: const EdgeInsets.all(Spacing.lg),
+          decoration: BoxDecoration(
+            borderRadius: Radii.md,
+            border: Border.all(
+              color: isEnabled ? cs.outline : cs.outlineVariant,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                icon,
+                size: 40,
+                color: isEnabled ? cs.primary : cs.onSurfaceVariant,
+              ),
+              const SizedBox(height: Spacing.sm),
+              Text(
+                title,
+                style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      color: isEnabled ? cs.onSurface : cs.onSurfaceVariant,
+                    ),
+              ),
+              const SizedBox(height: Spacing.xs),
+              Text(
+                subtitle,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              if (isEnabled) ...[
+                const SizedBox(height: Spacing.sm),
+                Text(
+                  '点击预览',
+                  style: Theme.of(context).textTheme.labelSmall?.copyWith(
+                        color: cs.primary,
+                      ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 发布模式选择卡片
+class _ModeCard extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String description;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ModeCard({
+    required this.icon,
+    required this.title,
+    required this.description,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    return Material(
+      color: isSelected ? cs.primaryContainer : cs.surfaceContainerLow,
+      borderRadius: Radii.md,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: Radii.md,
+        child: Container(
+          padding: const EdgeInsets.all(Spacing.lg),
+          decoration: BoxDecoration(
+            borderRadius: Radii.md,
+            border: Border.all(
+              color: isSelected ? cs.primary : cs.outlineVariant,
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(Spacing.md),
+                decoration: BoxDecoration(
+                  color: isSelected ? cs.primary : cs.surfaceContainerHigh,
+                  borderRadius: Radii.sm,
+                ),
+                child: Icon(
+                  icon,
+                  size: 32,
+                  color: isSelected ? cs.onPrimary : cs.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(width: Spacing.lg),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            color: isSelected ? cs.onPrimaryContainer : cs.onSurface,
+                            fontWeight: FontWeight.w600,
+                          ),
+                    ),
+                    const SizedBox(height: Spacing.xs),
+                    Text(
+                      description,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: isSelected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+              if (isSelected)
+                Icon(
+                  Icons.check_circle,
+                  color: cs.primary,
+                  size: 24,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// 发布页面内容组件（独立监听状态，避免与 PageView 布局冲突）
+class _PublishPageContent extends StatelessWidget {
+  final bool isNoteOnly;
+  final String titleText;
+  final String descText;
+  final List<String> tags;
+  final String mdContent;
+  final String? videoName;
+  final String? videoSource;
+  final VoidCallback onResetAndGoBack;
+  final VoidCallback onPop;
+  final VoidCallback onGoToEdit;
+  final VoidCallback onPublish;
+  final VoidCallback onRetry;
+  final VoidCallback onShowVideoPreview;
+  final VoidCallback onShowMarkdownPreview;
+
+  const _PublishPageContent({
+    required this.isNoteOnly,
+    required this.titleText,
+    required this.descText,
+    required this.tags,
+    required this.mdContent,
+    required this.videoName,
+    required this.videoSource,
+    required this.onResetAndGoBack,
+    required this.onPop,
+    required this.onGoToEdit,
+    required this.onPublish,
+    required this.onRetry,
+    required this.onShowVideoPreview,
+    required this.onShowMarkdownPreview,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+
+    // 使用 Consumer 在独立组件中监听状态，不影响父组件布局
+    return Consumer<VideoProvider>(
+      builder: (context, provider, child) {
+        final progress = provider.publishProgress;
+        final isUploading = progress.isInProgress;
+
+        if (progress.isSuccess) {
+          return _buildSuccessView(context, cs);
+        }
+
+        return _buildNormalView(context, cs, progress, isUploading);
+      },
+    );
+  }
+
+  Widget _buildSuccessView(BuildContext context, ColorScheme cs) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _CardContainer(
+          label: '发布成功',
+          child: Padding(
+            padding: const EdgeInsets.all(Spacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.check_circle_outline,
+                  size: 64,
+                  color: cs.primary,
+                ),
+                const SizedBox(height: Spacing.md),
+                Text(
+                  isNoteOnly ? '笔记发布成功！' : '视频发布成功！',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: Spacing.sm),
+                Text(
+                  isNoteOnly ? '您的笔记已发布' : '您的视频已提交，后台正在处理中',
+                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: cs.onSurfaceVariant,
+                      ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: Spacing.lg),
+        // 使用 Wrap 替代 Row，避免布局问题
+        Wrap(
+          spacing: Spacing.md,
+          runSpacing: Spacing.md,
+          alignment: WrapAlignment.end,
+          children: [
+            OutlinedButton(
+              onPressed: onResetAndGoBack,
+              child: Text(isNoteOnly ? '发布新笔记' : '发布新视频'),
+            ),
+            FilledButton(
+              onPressed: onPop,
+              child: const Text('返回首页'),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNormalView(BuildContext context, ColorScheme cs, PublishProgress progress, bool isUploading) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        // 发布信息摘要
+        _CardContainer(
+          label: '发布信息',
+          child: Padding(
+            padding: const EdgeInsets.all(Spacing.md),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _InfoRow(icon: Icons.title, label: '标题', value: titleText.isEmpty ? '（未填写）' : titleText),
+                const SizedBox(height: Spacing.sm),
+                _InfoRow(icon: Icons.description, label: '简介', value: descText.isEmpty ? '（未填写）' : descText),
+                const SizedBox(height: Spacing.sm),
+                _InfoRow(icon: Icons.tag, label: '标签', value: tags.isEmpty ? '（无）' : tags.join(', ')),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: Spacing.lg),
+
+        // 预览按钮区域
+        _buildPreviewSection(context),
+        const SizedBox(height: Spacing.lg),
+
+        // 上传进度或发布按钮
+        _buildActionSection(context, cs, progress, isUploading),
+      ],
+    );
+  }
+
+  Widget _buildPreviewSection(BuildContext context) {
+    if (isNoteOnly) {
+      return _PreviewCard(
+        icon: Icons.article_outlined,
+        title: 'Markdown 预览',
+        subtitle: mdContent.isNotEmpty ? '${mdContent.length} 字符' : '未添加',
+        onTap: mdContent.isNotEmpty ? onShowMarkdownPreview : null,
+      );
+    }
+    // 使用 Column 垂直排列预览卡片，避免 Row + Expanded 的布局问题
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        _PreviewCard(
+          icon: Icons.play_circle_outline,
+          title: '视频预览',
+          subtitle: videoName ?? '未选择',
+          onTap: videoSource != null ? onShowVideoPreview : null,
+        ),
+        const SizedBox(height: Spacing.md),
+        _PreviewCard(
+          icon: Icons.article_outlined,
+          title: 'Markdown 预览',
+          subtitle: mdContent.isNotEmpty ? '${mdContent.length} 字符' : '未添加',
+          onTap: mdContent.isNotEmpty ? onShowMarkdownPreview : null,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildActionSection(BuildContext context, ColorScheme cs, PublishProgress progress, bool isUploading) {
+    if (isUploading) {
+      return _UploadProgressWidget(progress: progress);
+    }
+    if (progress.isFailed) {
+      return _CardContainer(
+        label: '发布失败',
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              progress.errorMessage ?? '未知错误',
+              style: TextStyle(color: cs.error),
+            ),
+            const SizedBox(height: Spacing.md),
+            FilledButton(
+              onPressed: onRetry,
+              child: const Text('重试'),
+            ),
+          ],
+        ),
+      );
+    }
+    // 使用 Wrap 替代 Row，避免布局问题
+    return Wrap(
+      spacing: Spacing.md,
+      runSpacing: Spacing.md,
+      alignment: WrapAlignment.spaceBetween,
+      children: [
+        OutlinedButton.icon(
+          onPressed: onGoToEdit,
+          icon: const Icon(Icons.arrow_back),
+          label: const Text('返回编辑'),
+        ),
+        FilledButton.icon(
+          onPressed: onPublish,
+          icon: const Icon(Icons.publish),
+          label: const Text('确认发布'),
+        ),
+      ],
     );
   }
 }

@@ -74,8 +74,15 @@ class VideoRepository {
     return PagedResult(items: sliced, page: query.page, pageSize: query.pageSize, hasMore: end < items.length);
   }
 
+  /// 获取关注用户发布的视频
   Future<PagedResult<Video>> fetchFollow(VideoQuery query) async {
-    final resp = await api.list(userId: getUserId?.call(), page: query.page, size: query.pageSize);
+    final userId = getUserId?.call();
+    if (userId == null || userId.isEmpty) {
+      debugPrint('VideoRepository.fetchFollow: no userId, returning empty');
+      return PagedResult(items: [], page: query.page, pageSize: query.pageSize, hasMore: false);
+    }
+
+    final resp = await api.followFeed(userId: userId, page: query.page, size: query.pageSize);
     final root = resp.data as Map<String, dynamic>? ?? {};
     List<dynamic> raw = [];
     if (root['data'] is List) {
@@ -92,15 +99,13 @@ class VideoRepository {
               coverUrl: UrlUtils.resolveStorageUrl(v.coverUrl, defaultDir: 'covers'),
             ))
         .toList();
-    final start = (query.page - 1) * query.pageSize;
-    final end = (start + query.pageSize).clamp(0, items.length);
-    final sliced = start < items.length ? items.sublist(start, end) : <Video>[];
-    debugPrint('VideoRepository.fetchFollow: page=${query.page} size=${query.pageSize} total=${items.length} sliced=${sliced.length}');
-    if (sliced.isNotEmpty) {
-      final sample = sliced.take(3).map((e) => e.videoUrl).toList();
-      debugPrint('VideoRepository.fetchFollow: sampleUrls=$sample');
+    final hasMore = items.length == query.pageSize;
+    debugPrint('VideoRepository.fetchFollow: page=${query.page} size=${query.pageSize} items=${items.length} hasMore=$hasMore');
+    if (items.isNotEmpty) {
+      final sample = items.take(3).map((e) => '${e.title}(${e.uid})').toList();
+      debugPrint('VideoRepository.fetchFollow: sample=$sample');
     }
-    return PagedResult(items: sliced, page: query.page, pageSize: query.pageSize, hasMore: end < items.length);
+    return PagedResult(items: items, page: query.page, pageSize: query.pageSize, hasMore: hasMore);
   }
 
   Future<void> like(String videoId) async {

@@ -109,6 +109,19 @@ class VideoService {
     });
   }
 
+  /// 获取关注用户发布的视频
+  ///
+  /// [userId] 当前用户ID（用于获取其关注列表的视频）
+  /// [page] 页码
+  /// [size] 每页数量
+  Future<Response> followFeed({required String userId, int page = 1, int size = 20}) {
+    return dio.get('/feed/follow', queryParameters: {
+      'user_id': userId,
+      'page': page,
+      'size': size,
+    });
+  }
+
   Future<Response> delete({required String videoId, String? userId}) {
     return dio.delete('/video/1', queryParameters: {
       'video_id': videoId,
