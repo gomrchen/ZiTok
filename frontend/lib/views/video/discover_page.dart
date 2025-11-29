@@ -90,14 +90,51 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
     }
 
     return Scaffold(
+      backgroundColor: cs.background,
       appBar: AppBar(
         toolbarHeight: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 0,
         elevation: 0,
+        backgroundColor: cs.surface,
+        // 添加搜索输入框
+        title: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+          child: GestureDetector(
+            onTap: _onSearchTap,
+            child: Container(
+              decoration: BoxDecoration(
+                color: cs.surfaceContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.search,
+                    color: cs.onSurfaceVariant,
+                    size: 18,
+                  ), // 搜索图标
+                  const SizedBox(width: 8),
+                  Text(
+                    '搜索视频、用户或话题', // placeholder
+                    style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
         bottom: TabBar(
           controller: _tab,
-          tabs: const [Tab(text: '精选'), Tab(text: '推荐')],
+          tabs: const [
+            Tab(text: '精选'),
+            Tab(text: '推荐'),
+          ],
+          labelColor: cs.primary,
+          unselectedLabelColor: cs.onSurfaceVariant,
+          indicatorColor: cs.primary,
+          dividerColor: cs.outline,
         ),
       ),
       body: TabBarView(
@@ -121,7 +158,12 @@ class _RecommendFullScreen extends StatefulWidget {
   final ValueChanged<int> onIndexChanged;
   final bool isLoading;
   final VoidCallback onRetry;
-  const _RecommendFullScreen({required this.videos, required this.onIndexChanged, required this.isLoading, required this.onRetry});
+  const _RecommendFullScreen({
+    required this.videos,
+    required this.onIndexChanged,
+    required this.isLoading,
+    required this.onRetry,
+  });
   @override
   State<_RecommendFullScreen> createState() => _RecommendFullScreenState();
 }
@@ -222,12 +264,22 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
 
   // 顶部栏：菜单展开占位
   void _onMenu() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('菜单功能待接入'), duration: Duration(milliseconds: 1200)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('菜单功能待接入'),
+        duration: Duration(milliseconds: 1200),
+      ),
+    );
   }
 
   // 顶部栏：搜索占位
   void _onSearch() {
-    ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('搜索功能待接入'), duration: Duration(milliseconds: 1200)));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('搜索功能待接入'),
+        duration: Duration(milliseconds: 1200),
+      ),
+    );
   }
 
   // 附件：打开笔记弹窗
@@ -497,7 +549,10 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
               Container(
                 width: 40,
                 height: 40,
-                decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x33000000)),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0x33000000),
+                ),
                 child: IconButton(
                   icon: const Icon(Icons.attach_file, color: Colors.white),
                   tooltip: '查看笔记',
@@ -510,7 +565,10 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
                 width: 40,
                 height: 40,
                 margin: const EdgeInsets.only(right: 8),
-                decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x33000000)),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0x33000000),
+                ),
                 child: IconButton(
                   icon: const Icon(Icons.search, color: Colors.white),
                   tooltip: '搜索',
@@ -521,7 +579,10 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
               Container(
                 width: 40,
                 height: 40,
-                decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x33000000)),
+                decoration: const BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Color(0x33000000),
+                ),
                 child: IconButton(
                   icon: const Icon(Icons.more_vert, color: Colors.white),
                   tooltip: '菜单',
@@ -546,7 +607,8 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
               // 点赞
               _LikeActionIcon(
                 initialCount: widget.video.likes ?? 0,
-                onTap: () => context.read<VideoProvider>().like(widget.video.id),
+                onTap: () =>
+                    context.read<VideoProvider>().like(widget.video.id),
               ),
               const SizedBox(height: 16),
               // 评论
@@ -675,7 +737,6 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
   }
 }
 
-
 class _ActionIcon extends StatelessWidget {
   final IconData icon;
   final String label;
@@ -691,13 +752,21 @@ class _ActionIcon extends StatelessWidget {
           child: Container(
             width: 40,
             height: 40,
-            decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x33000000)),
+            decoration: const BoxDecoration(
+              shape: BoxShape.circle,
+              color: Color(0x33000000),
+            ),
             child: Icon(icon, color: Colors.white),
           ),
         ),
         if (label.isNotEmpty) ...[
           const SizedBox(height: 6),
-          Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white)),
+          Text(
+            label,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: Colors.white),
+          ),
         ],
       ],
     );
@@ -959,7 +1028,8 @@ class _LikeActionIcon extends StatefulWidget {
   State<_LikeActionIcon> createState() => _LikeActionIconState();
 }
 
-class _LikeActionIconState extends State<_LikeActionIcon> with TickerProviderStateMixin {
+class _LikeActionIconState extends State<_LikeActionIcon>
+    with TickerProviderStateMixin {
   late int count;
   bool liked = false;
   late AnimationController pulse; // 心形缩放
@@ -969,8 +1039,14 @@ class _LikeActionIconState extends State<_LikeActionIcon> with TickerProviderSta
   void initState() {
     super.initState();
     count = widget.initialCount;
-    pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 220));
-    burst = AnimationController(vsync: this, duration: const Duration(milliseconds: 420));
+    pulse = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 220),
+    );
+    burst = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 420),
+    );
   }
 
   @override
@@ -1024,12 +1100,20 @@ class _LikeActionIconState extends State<_LikeActionIcon> with TickerProviderSta
                 ),
                 // 圆形半透明底
                 Container(
-                  decoration: const BoxDecoration(shape: BoxShape.circle, color: Color(0x33000000)),
+                  decoration: const BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Color(0x33000000),
+                  ),
                 ),
                 // 心形图标（缩放/颜色过渡）
                 ScaleTransition(
-                  scale: Tween<double>(begin: 1.0, end: 1.25).animate(CurvedAnimation(parent: pulse, curve: Curves.easeOut)),
-                  child: Icon(liked ? Icons.favorite : Icons.favorite_border, color: liked ? Colors.red : Colors.white),
+                  scale: Tween<double>(begin: 1.0, end: 1.25).animate(
+                    CurvedAnimation(parent: pulse, curve: Curves.easeOut),
+                  ),
+                  child: Icon(
+                    liked ? Icons.favorite : Icons.favorite_border,
+                    color: liked ? Colors.red : Colors.white,
+                  ),
                 ),
               ],
             ),

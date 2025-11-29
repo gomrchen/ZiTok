@@ -10,6 +10,7 @@ class Video {
   final int? views;       // 观看数（保留兼容）
   final int? commentCount; // 评论数
   final List<String> tags;
+  final int? comments;
 
   const Video({
     required this.id,
@@ -23,6 +24,7 @@ class Video {
     this.views,
     this.commentCount,
     this.tags = const [],
+    this.comments,
   });
 
   factory Video.fromJson(Map<String, dynamic> j) => Video(
@@ -53,6 +55,7 @@ class Video {
                 ? j['comment_count'] as int
                 : int.tryParse('${j['commentCount'] ?? j['comment_count']}')),
         tags: (j['tags'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
+        comments: j['commentCount'] is int ? j['commentCount'] as int : int.tryParse('${j['commentCount']}')
       );
 
   Video copyWith({

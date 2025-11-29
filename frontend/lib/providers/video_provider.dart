@@ -26,9 +26,16 @@ class VideoProvider extends ChangeNotifier {
   String? _followError;
   double _followScrollOffset = 0.0;
   int? _recommendStartIndexInFollow;
-
+  
   // 投稿相关状态
   PublishProgress _publishProgress = PublishProgress.idle();
+
+  // 搜索状态
+  List<Video> _searchResults = [];
+  bool _loadingSearch = false;
+  bool _searchHasMore = true;
+  int _searchPage = 1;
+  String? _searchKeyword;
 
   VideoProvider({required this.repo});
 
@@ -46,6 +53,12 @@ class VideoProvider extends ChangeNotifier {
   String? get followError => _followError;
   double get followScrollOffset => _followScrollOffset;
   int? get recommendStartIndexInFollow => _recommendStartIndexInFollow;
+  
+  // 搜索相关getter
+  List<Video> get searchResults => _searchResults;
+  bool get loadingSearch => _loadingSearch;
+  bool get searchHasMore => _searchHasMore;
+  String? get searchKeyword => _searchKeyword;
 
   // 投稿相关getter
   PublishProgress get publishProgress => _publishProgress;
@@ -225,13 +238,45 @@ class VideoProvider extends ChangeNotifier {
     debugPrint('VideoProvider.loadMoreFeatured: page=$_featuredPage');
     _loadingFeatured = true;
     notifyListeners();
-    final res = await repo.fetchFeatured(VideoQuery(page: _featuredPage, pageSize: 20, keyword: _keyword, tags: _filters));
+    final res = await repo.fetchFeatured(VideoQuery(page: _featuredPage, pageSize: 10, keyword: _keyword, tags: _filters));
     _featured.addAll(res.items);
     _featuredHasMore = res.hasMore;
     _featuredPage += 1;
     _loadingFeatured = false;
     notifyListeners();
     debugPrint('VideoProvider.loadMoreFeatured: page=$_featuredPage items_now=${_featured.length} hasMore=$_featuredHasMore');
+  }
+  
+  /// 刷新搜索结果
+  Future<void> refreshSearch(String keyword) async {
+    debugPrint('VideoProvider.refreshSearch: start keyword=$keyword');
+    _searchPage = 1;
+    _searchKeyword = keyword;
+    _searchResults = [];
+    _searchHasMore = true;
+    await loadMoreSearch();
+    debugPrint('VideoProvider.refreshSearch: done items=${_searchResults.length}');
+  }
+  
+  /// 加载更多搜索结果
+  Future<void> loadMoreSearch() async {
+    if (_loadingSearch || !_searchHasMore || _searchKeyword == null) return;
+    debugPrint('VideoProvider.loadMoreSearch: page=$_searchPage keyword=$_searchKeyword');
+    _loadingSearch = true;
+    notifyListeners();
+    
+    try {
+      final res = await repo.fetchSearch(_searchKeyword!, _searchPage, 20);
+      _searchResults.addAll(res.items);
+      _searchHasMore = res.hasMore;
+      _searchPage += 1;
+    } catch (e) {
+      debugPrint('VideoProvider.loadMoreSearch: error=$e');
+    } finally {
+      _loadingSearch = false;
+      notifyListeners();
+      debugPrint('VideoProvider.loadMoreSearch: page=$_searchPage items_now=${_searchResults.length} hasMore=$_searchHasMore');
+    }
   }
 
   /// 发布视频

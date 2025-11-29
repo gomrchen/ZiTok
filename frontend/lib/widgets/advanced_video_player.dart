@@ -125,15 +125,7 @@ class _AdvancedVideoPlayerState extends State<AdvancedVideoPlayer> {
     await _setupController(_currentSourceByLabel(label));
   }
 
-  void _cycleVolume() {
-    // 在 0 → 0.5 → 1.0 间循环切换
-    const levels = [0.0, 0.5, 1.0];
-    final idx = levels.indexWhere((v) => (v - _volume).abs() < 0.01);
-    final next = levels[(idx + 1) % levels.length];
-    _volume = next;
-    _vp?.setVolume(_volume);
-    setState(() {});
-  }
+  // 音量调节方法已移除，暂时不需要循环音量功能
 
   @override
   Widget build(BuildContext context) {
@@ -192,9 +184,9 @@ class _AdvancedVideoPlayerState extends State<AdvancedVideoPlayer> {
                         width: 48,
                         height: 48,
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.5),
-                          shape: BoxShape.circle,
-                        ),
+                        color: Color.fromRGBO(0, 0, 0, 0.5),
+                        shape: BoxShape.circle,
+                      ),
                         alignment: Alignment.center,
                         child: const Icon(Icons.arrow_back, color: Colors.white),
                       ),

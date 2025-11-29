@@ -111,6 +111,29 @@ class VideoRepository {
     await api.visit(videoId: videoId);
   }
 
+  Future<PagedResult<Video>> fetchSearch(String keyword, int page, int pageSize) async {
+    final resp = await api.search(keywords: keyword, pageSize: pageSize, pageNum: page);
+    final root = resp.data as Map<String, dynamic>? ?? {};
+    List<dynamic> raw = [];
+    if (root['data'] is List) {
+      raw = root['data'] as List;
+    } else if (root['data'] is Map && (root['data'] as Map)['items'] is List) {
+      raw = (root['data'] as Map)['items'] as List;
+    } else if (root['items'] is List) {
+      raw = root['items'] as List;
+    }
+    var items = raw.map((e) => Video.fromJson(e as Map<String, dynamic>)).toList();
+    items = items
+        .map((v) => v.copyWith(
+              videoUrl: UrlUtils.resolveStorageUrl(v.videoUrl, defaultDir: 'videos'),
+              coverUrl: UrlUtils.resolveStorageUrl(v.coverUrl, defaultDir: 'covers'),
+            ))
+        .toList();
+    final hasMore = items.length == pageSize;
+    debugPrint('VideoRepository.fetchSearch: keyword=$keyword page=$page size=$pageSize items=${items.length}');
+    return PagedResult(items: items, page: page, pageSize: pageSize, hasMore: hasMore);
+  }
+
   /// 发布视频
   ///
   /// [request] 视频发布请求

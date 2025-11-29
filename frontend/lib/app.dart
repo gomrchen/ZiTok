@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -42,11 +43,14 @@ class AppBootstrap {
 
 class ZitokApp extends StatelessWidget {
   const ZitokApp({super.key});
+  
+  // 静态缓存GoRouter实例，避免主题变化时重新创建路由
+  static GoRouter? _routerCache;
 
   @override
   Widget build(BuildContext context) {
     final authRepository = AuthRepository(
-      authService: AuthService(AppBootstrap.apiClient),
+      authService: AuthService(AppBootstrap.apiClient, prefs: AppBootstrap.prefs),
       prefs: AppBootstrap.prefs,
     );
     final videoRepository = VideoRepository(
@@ -93,8 +97,14 @@ class ZitokApp extends StatelessWidget {
       ],
       child: Builder(
         builder: (context) {
-          final router = AppRouter.buildRouter(context.read<AuthProvider>());
+          final authProvider = context.read<AuthProvider>();
+          
+          // 只有当_routerCache为null时才创建新的GoRouter实例
+          // 这样主题变化时就不会重新创建路由，保持导航状态
+          final router = _routerCache ??= AppRouter.buildRouter(authProvider);
+          
           final theme = context.watch<ThemeProvider>().theme;
+          
           return MaterialApp.router(
             title: '知音App',
             theme: theme,

@@ -101,7 +101,7 @@ class VideoService {
     );
   }
 
-  Future<Response> search({required String keywords, int pageSize = 20, int pageNum = 1}) {
+  Future<Response> search({required String keywords, int pageSize = 10, int pageNum = 1}) {
     return dio.post('/video/search', data: {
       'keywords': keywords,
       'page_size': pageSize,

@@ -1,30 +1,79 @@
 import 'package:dio/dio.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../services/api_client.dart';
+import '../config/env.dart';
 
 /// 认证服务（登录、注册、资料）
 class AuthService {
   final ApiClient client;
-  AuthService(this.client);
+  late final ApiClient _verificationClient;
 
-  /// 登录：用户名 + 密码
-  Future<Response<dynamic>> login({required String username, required String password}) {
-    return client.dio.post('/user/login', data: {
-      'username': username,
-      'password': password,
-    });
+  AuthService(this.client, {required SharedPreferences prefs}) {
+    // 创建专门用于验证码请求的 ApiClient 实例，使用不同的 baseUrl
+    _verificationClient = ApiClient(
+      baseUrl: Env.verificationBaseUrl,
+      prefs: prefs,
+    );
   }
 
-  /// 注册：用户名 + 邮箱 + 密码
-  Future<Response<dynamic>> register({required String username, required String email, required String password}) {
-    return client.dio.post('/user/register', data: {
-      'username': username,
-      'email': email,
-      'password': password,
-    });
+  /// 登录：用户名 + 密码
+  Future<Response<dynamic>> login({
+    required String username,
+    required String password,
+  }) {
+    return client.dio.post(
+      '/user/login',
+      data: {'username': username, 'password': password},
+    );
+  }
+
+  /// 注册：用户名 + 邮箱 + 密码 + 验证码
+  Future<Response<dynamic>> register({
+    required String username,
+    required String email,
+    required String password,
+    required String verificationCode,
+  }) {
+    return client.dio.post(
+      '/user/register',
+      data: {
+        'username': username,
+        'email': email,
+        'password': password,
+        'code': verificationCode,
+      },
+    );
   }
 
   /// 当前用户信息
   Future<Response<dynamic>> profile() {
     return client.dio.get('/user/info');
+  }
+
+  /// 修改密码
+  Future<Response<dynamic>> changePassword({
+    required String code,
+    required String newPassword,
+    required String email,
+  }) {
+    return client.dio.post(
+      '/user/password',
+      data: {'email': email, 'code': code, 'newPwd': newPassword},
+    );
+  }
+
+  // 发送验证码 - 使用专门的端口号
+  Future<Response<dynamic>> sendVerificationCode({required String email}) {
+    // 使用专门的验证码服务客户端
+    return _verificationClient.dio.post(
+      '/send_code',
+      data: {'email': email},
+    );
+  }
+
+  /// 登出
+  Future<Response<dynamic>> logout() {
+    return client.dio.post('/user/logout');
+    
   }
 }
