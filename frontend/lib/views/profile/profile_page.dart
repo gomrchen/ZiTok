@@ -7,6 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../app.dart';
 import '../../models/video.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/video_provider.dart';
 import '../../services/user_service.dart';
 import '../../theme/theme_tokens.dart';
 import '../../providers/profile_provider.dart';
@@ -728,21 +729,165 @@ class _StatsRowState extends State<_StatsRow> {
   }
 }
 
-class _FavoritesList extends StatelessWidget {
+class _FavoritesList extends StatefulWidget {
   const _FavoritesList();
+
+  @override
+  State<_FavoritesList> createState() => _FavoritesListState();
+}
+
+class _FavoritesListState extends State<_FavoritesList> {
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final vp = context.read<VideoProvider>();
+      if (vp.favorites.isEmpty) {
+        vp.refreshFavorites();
+      }
+    });
+  }
+
+  Widget _buildThumbnail(Video video) {
+    final coverUrl = video.coverUrl;
+    if (coverUrl != null && coverUrl.isNotEmpty) {
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.network(
+          UrlUtils.resolveStorageUrl(coverUrl, defaultDir: 'covers'),
+          width: 80,
+          height: 60,
+          fit: BoxFit.cover,
+          errorBuilder: (_, __, ___) => _buildDefaultThumbnail(),
+        ),
+      );
+    }
+    return _buildDefaultThumbnail();
+  }
+
+  Widget _buildDefaultThumbnail() {
+    return Container(
+      width: 80,
+      height: 60,
+      decoration: BoxDecoration(
+        color: Colors.grey[300],
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Icon(Icons.videocam, color: Colors.grey),
+    );
+  }
+
+  Future<void> _unfavorite(String videoId) async {
+    final vp = context.read<VideoProvider>();
+    final success = await vp.toggleFavorite(videoId);
+    if (success) {
+      // 刷新收藏列表
+      await vp.refreshFavorites();
+    } else if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('取消收藏失败')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    return ListView.separated(
-      padding: const EdgeInsets.all(Spacing.md),
-      itemBuilder: (context, i) => ListTile(
-        leading: const Icon(Icons.bookmark),
-        title: Text('收藏项 #$i'),
-        subtitle: const Text('收藏的内容简介'),
-        trailing: const Icon(Icons.chevron_right),
-        onTap: () {},
+    final vp = context.watch<VideoProvider>();
+    final cs = Theme.of(context).colorScheme;
+    final favorites = vp.favorites;
+    final loading = vp.loadingFavorites;
+
+    if (loading && favorites.isEmpty) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(Spacing.lg),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (favorites.isEmpty) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(Spacing.lg),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.star_border,
+                color: cs.onSurfaceVariant,
+                size: 64,
+              ),
+              const SizedBox(height: Spacing.md),
+              Text(
+                '暂无收藏',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: Spacing.sm),
+              Text(
+                '您还没有收藏任何视频',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: cs.onSurfaceVariant,
+                ),
+              ),
+              const SizedBox(height: Spacing.lg),
+              ElevatedButton(
+                onPressed: () => vp.refreshFavorites(),
+                child: const Text('刷新'),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () => vp.refreshFavorites(),
+      child: ListView.separated(
+        padding: const EdgeInsets.all(Spacing.md),
+        itemCount: favorites.length + (vp.favoritesHasMore ? 1 : 0),
+        separatorBuilder: (_, __) => const SizedBox(height: Spacing.sm),
+        itemBuilder: (context, i) {
+          // 加载更多指示器
+          if (i >= favorites.length) {
+            if (!loading) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                vp.loadMoreFavorites();
+              });
+            }
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(Spacing.md),
+                child: CircularProgressIndicator(),
+              ),
+            );
+          }
+
+          final video = favorites[i];
+          return ListTile(
+            leading: _buildThumbnail(video),
+            title: Text(
+              video.title ?? '未命名视频',
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            subtitle: Text(
+              '👍 ${video.likes ?? 0} · 👁️ ${video.views ?? 0}',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            trailing: IconButton(
+              icon: const Icon(Icons.star, color: Color(0xFFFFD700)),
+              tooltip: '取消收藏',
+              onPressed: () => _unfavorite(video.id),
+            ),
+            onTap: () {
+              context.push('/video/${video.id}', extra: video);
+            },
+          );
+        },
       ),
-      separatorBuilder: (_, __) => const SizedBox(height: Spacing.sm),
-      itemCount: 6,
     );
   }
 }

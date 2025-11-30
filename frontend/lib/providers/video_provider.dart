@@ -8,21 +8,32 @@ class VideoProvider extends ChangeNotifier {
   List<Video> _discover = [];
   List<Video> _featured = [];
   List<Video> _follow = [];
+  List<Video> _recommend = []; // 推荐视频列表（使用新推荐接口）
+  List<Video> _favorites = []; // 收藏列表
   bool _loadingDiscover = false;
   bool _loadingFeatured = false;
   bool _loadingFollow = false;
+  bool _loadingRecommend = false;
+  bool _loadingFavorites = false;
   bool _discoverHasMore = true;
   bool _featuredHasMore = true;
   bool _followHasMore = true;
+  bool _recommendHasMore = true;
+  bool _favoritesHasMore = true;
   int _discoverPage = 1;
   int _featuredPage = 1;
   int _followPage = 1;
+  int _favoritesPage = 1;
+  int? _lastVisit; // 推荐接口的游标
   String? _keyword;
   List<String>? _filters;
   String? _followError;
   double _followScrollOffset = 0.0;
   int? _recommendStartIndexInFollow;
-  
+
+  // 收藏状态缓存 - 记录已收藏的视频ID
+  final Set<String> _favoritedIds = {};
+
   // 投稿相关状态
   PublishProgress _publishProgress = PublishProgress.idle();
 
@@ -38,18 +49,24 @@ class VideoProvider extends ChangeNotifier {
   List<Video> get discover => _discover;
   List<Video> get featured => _featured;
   List<Video> get follow => _follow;
+  List<Video> get recommend => _recommend;
+  List<Video> get favorites => _favorites;
   bool get loadingDiscover => _loadingDiscover;
   bool get loadingFeatured => _loadingFeatured;
   bool get loadingFollow => _loadingFollow;
+  bool get loadingRecommend => _loadingRecommend;
+  bool get loadingFavorites => _loadingFavorites;
   bool get discoverHasMore => _discoverHasMore;
   bool get featuredHasMore => _featuredHasMore;
   bool get followHasMore => _followHasMore;
+  bool get recommendHasMore => _recommendHasMore;
+  bool get favoritesHasMore => _favoritesHasMore;
   String? get keyword => _keyword;
   List<String>? get filters => _filters;
   String? get followError => _followError;
   double get followScrollOffset => _followScrollOffset;
   int? get recommendStartIndexInFollow => _recommendStartIndexInFollow;
-  
+
   // 搜索相关getter
   List<Video> get searchResults => _searchResults;
   bool get loadingSearch => _loadingSearch;
@@ -58,6 +75,9 @@ class VideoProvider extends ChangeNotifier {
 
   // 投稿相关getter
   PublishProgress get publishProgress => _publishProgress;
+
+  /// 检查视频是否已收藏
+  bool isFavorited(String videoId) => _favoritedIds.contains(videoId);
 
   Future<void> refreshDiscover({String? keyword, List<String>? tags}) async {
     _discoverPage = 1;
@@ -150,31 +170,62 @@ class VideoProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// 收藏或取消收藏视频
+  /// 返回操作是否成功
+  Future<bool> toggleFavorite(String videoId) async {
+    final isCurrentlyFavorited = _favoritedIds.contains(videoId);
+
+    // 乐观更新UI
+    if (isCurrentlyFavorited) {
+      _favoritedIds.remove(videoId);
+    } else {
+      _favoritedIds.add(videoId);
+    }
+    _updateFavoriteInLists(videoId, !isCurrentlyFavorited);
+    notifyListeners();
+
+    // 调用API
+    bool success;
+    if (isCurrentlyFavorited) {
+      success = await repo.unfavorite(videoId);
+    } else {
+      success = await repo.favorite(videoId);
+    }
+
+    // 如果API调用失败，回滚状态
+    if (!success) {
+      if (isCurrentlyFavorited) {
+        _favoritedIds.add(videoId);
+      } else {
+        _favoritedIds.remove(videoId);
+      }
+      _updateFavoriteInLists(videoId, isCurrentlyFavorited);
+      notifyListeners();
+    }
+
+    return success;
+  }
+
+  /// 收藏视频（兼容旧代码）
   Future<void> collect(String videoId) async {
+    await toggleFavorite(videoId);
+  }
+
+  /// 更新所有列表中视频的收藏状态（只更新状态，不更新收藏数）
+  void _updateFavoriteInLists(String videoId, bool isFavorited) {
     void updateList(List<Video> list) {
       final i = list.indexWhere((v) => v.id == videoId);
       if (i >= 0) {
         final v = list[i];
-        list[i] = Video(
-          id: v.id,
-          uid: v.uid,
-          title: v.title,
-          intro: v.intro,
-          coverUrl: v.coverUrl,
-          videoUrl: v.videoUrl,
-          stars: (v.stars ?? 0) + 1,
-          likes: v.likes,
-          views: v.views,
-          commentCount: v.commentCount,
-          tags: v.tags,
-        );
+        list[i] = v.copyWith(isFavorited: isFavorited);
       }
     }
 
     updateList(_follow);
     updateList(_discover);
     updateList(_featured);
-    notifyListeners();
+    updateList(_recommend);
+    updateList(_searchResults);
   }
 
   Future<void> visit(String videoId) async {
@@ -319,4 +370,89 @@ class VideoProvider extends ChangeNotifier {
     _publishProgress = PublishProgress.idle();
     notifyListeners();
   }
+
+  // ==================== 推荐视频相关方法 ====================
+
+  /// 刷新推荐视频（使用新推荐接口）
+  Future<void> refreshRecommend({String? category}) async {
+    _recommend = [];
+    _lastVisit = null;
+    _recommendHasMore = true;
+    await loadMoreRecommend(category: category);
+  }
+
+  /// 加载更多推荐视频
+  Future<void> loadMoreRecommend({String? category}) async {
+    if (_loadingRecommend || !_recommendHasMore) return;
+    _loadingRecommend = true;
+    notifyListeners();
+
+    try {
+      final res = await repo.fetchRecommend(
+        limit: 10,
+        category: category,
+        lastVisit: _lastVisit,
+      );
+
+      // 标记已收藏的视频
+      final items = res.items.map((v) {
+        if (_favoritedIds.contains(v.id)) {
+          return v.copyWith(isFavorited: true);
+        }
+        return v;
+      }).toList();
+
+      _recommend.addAll(items);
+      _recommendHasMore = res.hasMore;
+
+      // 更新游标（如果最后一个视频有views，用作下次请求的last_visit）
+      if (items.isNotEmpty) {
+        _lastVisit = items.last.views ?? DateTime.now().millisecondsSinceEpoch;
+      }
+
+      debugPrint('VideoProvider.loadMoreRecommend: items=${items.length} total=${_recommend.length} hasMore=$_recommendHasMore');
+    } catch (e) {
+      debugPrint('VideoProvider.loadMoreRecommend: error=$e');
+    } finally {
+      _loadingRecommend = false;
+      notifyListeners();
+    }
+  }
+
+  // ==================== 收藏列表相关方法 ====================
+
+  /// 刷新收藏列表
+  Future<void> refreshFavorites() async {
+    _favoritesPage = 1;
+    _favorites = [];
+    _favoritesHasMore = true;
+    await loadMoreFavorites();
+  }
+
+  /// 加载更多收藏
+  Future<void> loadMoreFavorites() async {
+    if (_loadingFavorites || !_favoritesHasMore) return;
+    _loadingFavorites = true;
+    notifyListeners();
+
+    try {
+      final res = await repo.fetchFavorites(_favoritesPage, 20);
+      _favorites.addAll(res.items);
+
+      // 更新收藏ID缓存
+      for (final v in res.items) {
+        _favoritedIds.add(v.id);
+      }
+
+      _favoritesHasMore = res.hasMore;
+      _favoritesPage += 1;
+      debugPrint('VideoProvider.loadMoreFavorites: page=$_favoritesPage items=${res.items.length} total=${_favorites.length}');
+    } catch (e) {
+      debugPrint('VideoProvider.loadMoreFavorites: error=$e');
+    } finally {
+      _loadingFavorites = false;
+      notifyListeners();
+    }
+  }
+
 }

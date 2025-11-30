@@ -1,5 +1,6 @@
 // 文件路径: lib/providers/messaging_provider.dart
 
+import 'dart:developer' as developer;
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../repositories/relation_repository.dart';
@@ -217,27 +218,108 @@ class MessagingProvider extends ChangeNotifier {
     _socketService.connect(uri.toString());
 
     _socketService.onMessage = (dynamic rawData) {
-      if (rawData is Map) {
-        final Map<String, dynamic> data = Map<String, dynamic>.from(rawData);
-        final type = data['type'];
+      developer.log(
+        '[MessagingProvider] onMessage收到数据: ${rawData.runtimeType}',
+        name: 'Chat',
+      );
 
-        if (type == 'history') {
-          _handleHistoryMessage(data['messages']);
-        } else if (data.containsKey('content') && data.containsKey('from')) {
-          _handleSingleMessage(data);
+      Map<String, dynamic>? data;
+
+      // 尝试将rawData转换为Map
+      if (rawData is Map) {
+        data = Map<String, dynamic>.from(rawData);
+        developer.log('[MessagingProvider] rawData是Map类型', name: 'Chat');
+      } else if (rawData is String) {
+        final trimmed = rawData.trim();
+        developer.log(
+          '[MessagingProvider] rawData是String: ${trimmed.substring(0, trimmed.length > 200 ? 200 : trimmed.length)}',
+          name: 'Chat',
+        );
+        // 处理Go map格式的字符串（支持换行符）
+        if (trimmed.startsWith('map[')) {
+          data = parseGoMapString(trimmed);
+          developer.log('[MessagingProvider] 解析Go map结果: $data', name: 'Chat');
         }
+      }
+
+      if (data == null) {
+        developer.log('[MessagingProvider] data为null，跳过处理', name: 'Chat');
+        return;
+      }
+
+      final type = data['type'];
+      developer.log('[MessagingProvider] 消息类型: $type', name: 'Chat');
+
+      if (type == 'history') {
+        final messages = data['messages'];
+        developer.log(
+          '[MessagingProvider] 收到history消息，messages类型: ${messages.runtimeType}, 长度: ${messages is List ? messages.length : "N/A"}',
+          name: 'Chat',
+        );
+        _handleHistoryMessage(messages);
+      } else if (data.containsKey('content') && data.containsKey('from')) {
+        _handleSingleMessage(data);
       }
     };
   }
 
-  void _handleHistoryMessage(List<dynamic>? rawMessages) {
+  void _handleHistoryMessage(dynamic rawMessages) {
     final uid = currentUid;
-    if (rawMessages == null || uid == null) return;
+    if (rawMessages == null || uid == null) {
+      developer.log('[_handleHistoryMessage] rawMessages或uid为null', name: 'Chat');
+      return;
+    }
+
+    // 确保rawMessages是List类型
+    List<dynamic> messageList;
+    if (rawMessages is List) {
+      messageList = rawMessages;
+    } else {
+      developer.log('[_handleHistoryMessage] rawMessages不是List: ${rawMessages.runtimeType}', name: 'Chat');
+      return;
+    }
+
+    developer.log('[_handleHistoryMessage] 开始处理 ${messageList.length} 条消息', name: 'Chat');
+
     final Map<String, List<ChatMessage>> serverMsgMap = {};
 
-    for (var item in rawMessages) {
+    for (int i = 0; i < messageList.length; i++) {
+      final item = messageList[i];
       try {
-        final msg = ChatMessage.fromJson(Map<String, dynamic>.from(item));
+        // 调试日志：打印每条消息的原始数据
+        developer.log(
+          '[_handleHistoryMessage] 消息[$i] 类型: ${item.runtimeType}, 值: ${item.toString().substring(0, item.toString().length > 300 ? 300 : item.toString().length)}',
+          name: 'Chat',
+        );
+
+        ChatMessage? msg;
+
+        // 使用tryParse自动检测并解析各种格式
+        msg = ChatMessage.tryParse(item);
+
+        if (msg != null) {
+          developer.log(
+            '[_handleHistoryMessage] 消息[$i] tryParse成功: content="${msg.content}", from=${msg.senderId}',
+            name: 'Chat',
+          );
+        } else {
+          developer.log('[_handleHistoryMessage] 消息[$i] tryParse返回null', name: 'Chat');
+        }
+
+        // 如果tryParse失败，尝试直接解析
+        if (msg == null && item is Map) {
+          msg = ChatMessage.fromJson(Map<String, dynamic>.from(item));
+          developer.log(
+            '[_handleHistoryMessage] 消息[$i] fromJson成功: content="${msg.content}"',
+            name: 'Chat',
+          );
+        }
+
+        if (msg == null) {
+          developer.log('[_handleHistoryMessage] 消息[$i] 解析失败，跳过', name: 'Chat');
+          continue;
+        }
+
         String key;
         if (msg.roomId != null && msg.roomId != -1) {
           key = msg.roomId.toString();
@@ -250,10 +332,12 @@ class MessagingProvider extends ChangeNotifier {
           serverMsgMap[key] = [];
         }
         serverMsgMap[key]!.add(msg);
-      } catch (_) {
-        // Parse error, skip this item
+      } catch (e) {
+        developer.log('[_handleHistoryMessage] 消息[$i] 解析异常: $e', name: 'Chat');
       }
     }
+
+    developer.log('[_handleHistoryMessage] 解析完成，共 ${serverMsgMap.length} 个会话', name: 'Chat');
 
     serverMsgMap.forEach((key, serverMsgs) {
       final localMsgs = _messages[key] ?? [];
@@ -393,9 +477,23 @@ class MessagingProvider extends ChangeNotifier {
       final box = await Hive.openBox('messages_box');
       for (var key in box.keys) {
         final List dynamicList = box.get(key) ?? [];
-        final msgs = dynamicList
-            .map((e) => ChatMessage.fromJson(Map<String, dynamic>.from(e)))
-            .toList();
+        final List<ChatMessage> msgs = [];
+
+        for (var e in dynamicList) {
+          try {
+            // 使用tryParse自动检测并解析各种格式
+            final msg = ChatMessage.tryParse(e);
+            if (msg != null) {
+              msgs.add(msg);
+            } else if (e is Map) {
+              // 回退到直接解析Map
+              msgs.add(ChatMessage.fromJson(Map<String, dynamic>.from(e)));
+            }
+          } catch (_) {
+            // 单条消息解析失败，跳过
+          }
+        }
+
         _messages[key.toString()] = msgs;
       }
       notifyListeners();

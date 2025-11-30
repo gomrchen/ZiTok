@@ -1,6 +1,119 @@
 // 文件路径: lib/models/social_models.dart
 
+import 'dart:developer' as developer;
 import '../utils/url_utils.dart'; // 如果没有这个文件，可以暂时注释掉这一行，改用下方的备用逻辑
+
+/// 解析Go语言map格式的字符串
+/// 例如: "map[content:急急急 from:7 room_id:1 timestamp:1.764435002e+09 type:group]"
+/// 返回: {"content": "急急急", "from": "7", "room_id": "1", ...}
+///
+/// 支持换行符、多余空格等各种格式
+Map<String, dynamic>? parseGoMapString(dynamic input) {
+  if (input == null) return null;
+
+  String str = input.toString().trim();
+
+  developer.log('[parseGoMapString] 输入: ${str.substring(0, str.length > 200 ? 200 : str.length)}', name: 'Parse');
+
+  // 检查是否是Go map格式
+  if (!str.startsWith('map[') || !str.endsWith(']')) {
+    developer.log('[parseGoMapString] 不是Go map格式', name: 'Parse');
+    return null;
+  }
+
+  // 去掉 "map[" 和 "]"
+  String inner = str.substring(4, str.length - 1);
+  if (inner.isEmpty) {
+    developer.log('[parseGoMapString] inner为空', name: 'Parse');
+    return null;
+  }
+
+  // 将换行符、制表符等替换为空格，然后规范化多余空格
+  inner = inner.replaceAll(RegExp(r'[\r\n\t]+'), ' ');
+  inner = inner.replaceAll(RegExp(r'\s+'), ' ').trim();
+
+  developer.log('[parseGoMapString] 规范化后: $inner', name: 'Parse');
+
+  // 已知的所有可能的key（按长度降序排列，避免短key匹配到长key的一部分）
+  final knownKeys = [
+    'receiver_id', 'sender_id', 'created_at', 'timestamp',
+    'room_id', 'to_user', 'content', 'is_read', 'from', 'type', 'id', 'message'
+  ];
+
+  // 找到所有key的位置
+  final List<MapEntry<int, String>> keyPositions = [];
+
+  for (var key in knownKeys) {
+    // 检查开头的情况
+    if (inner.startsWith('$key:')) {
+      keyPositions.add(MapEntry(0, key));
+    }
+
+    // 检查中间的情况（前面有空格）
+    int searchStart = 0;
+    while (true) {
+      final pattern = ' $key:';
+      int pos = inner.indexOf(pattern, searchStart);
+      if (pos == -1) break;
+      keyPositions.add(MapEntry(pos + 1, key)); // +1 跳过空格
+      searchStart = pos + pattern.length;
+    }
+  }
+
+  if (keyPositions.isEmpty) {
+    developer.log('[parseGoMapString] 未找到任何已知key', name: 'Parse');
+    return null;
+  }
+
+  // 按位置排序
+  keyPositions.sort((a, b) => a.key.compareTo(b.key));
+
+  developer.log('[parseGoMapString] 找到keys: ${keyPositions.map((e) => "${e.value}@${e.key}").join(", ")}', name: 'Parse');
+
+  final Map<String, dynamic> result = {};
+
+  for (int i = 0; i < keyPositions.length; i++) {
+    final pos = keyPositions[i].key;
+    final key = keyPositions[i].value;
+    final valueStart = pos + key.length + 1; // 跳过 "key:"
+
+    int valueEnd;
+    if (i + 1 < keyPositions.length) {
+      valueEnd = keyPositions[i + 1].key - 1; // 下一个key前面的空格
+    } else {
+      valueEnd = inner.length;
+    }
+
+    if (valueStart <= valueEnd && valueStart < inner.length) {
+      final value = inner.substring(valueStart, valueEnd).trim();
+      result[key] = value;
+      developer.log('[parseGoMapString] 解析字段: $key = "$value"', name: 'Parse');
+    }
+  }
+
+  developer.log('[parseGoMapString] 最终结果: $result', name: 'Parse');
+  return result.isNotEmpty ? result : null;
+}
+
+/// 尝试将任意数据转换为 `Map<String, dynamic>`
+/// 支持: Map, Go map格式字符串
+Map<String, dynamic>? tryParseToMap(dynamic data) {
+  if (data == null) return null;
+
+  // 已经是Map
+  if (data is Map) {
+    return Map<String, dynamic>.from(data);
+  }
+
+  final str = data.toString();
+
+  // 尝试解析Go map格式
+  if (str.startsWith('map[')) {
+    return parseGoMapString(str);
+  }
+
+  return null;
+}
 
 abstract class Conversation {
   String get id;
@@ -93,9 +206,33 @@ class ChatMessage {
     this.createdAt = 0,
   });
 
+  /// 从WebSocket消息创建ChatMessage
+  /// 支持标准JSON格式和Go map格式字符串
   factory ChatMessage.fromSocketJson(Map<String, dynamic> json) {
-    final int ts = json['timestamp'] ?? 0;
-    final int fromId = json['from'] ?? 0;
+    // 解析timestamp，支持科学计数法
+    int ts = 0;
+    if (json['timestamp'] != null) {
+      final tsValue = json['timestamp'];
+      if (tsValue is int) {
+        ts = tsValue;
+      } else if (tsValue is double) {
+        ts = tsValue.toInt();
+      } else {
+        // 支持科学计数法字符串，如 "1.764435002e+09"
+        final parsed = double.tryParse(tsValue.toString());
+        if (parsed != null) {
+          ts = parsed.toInt();
+        }
+      }
+    }
+
+    // 解析fromId
+    int fromId = 0;
+    if (json['from'] != null) {
+      fromId = int.tryParse(json['from'].toString()) ?? 0;
+    }
+
+    // 解析room_id
     int? parsedRoomId;
     if (json['room_id'] != null) {
       final rId = int.tryParse(json['room_id'].toString()) ?? -1;
@@ -104,16 +241,21 @@ class ChatMessage {
       }
     }
 
-    String rawContent = json['content']?.toString() ?? '';
-    // 简单的脏数据清洗逻辑
-    if (rawContent.startsWith('map[')) {
-      try {
-        final start = rawContent.indexOf('content:');
-        if (start != -1) {
-          // 简易清洗，实际情况可能更复杂
-          rawContent = rawContent.substring(start + 8).split(' ').first;
+    // 解析content，处理可能嵌套的Go map格式
+    String rawContent = '';
+    if (json['content'] != null) {
+      final contentValue = json['content'];
+      if (contentValue is String && contentValue.startsWith('map[')) {
+        // content本身是Go map格式，尝试提取其中的content字段
+        final nestedMap = parseGoMapString(contentValue);
+        if (nestedMap != null && nestedMap['content'] != null) {
+          rawContent = nestedMap['content'].toString();
+        } else {
+          rawContent = contentValue;
         }
-      } catch (_) {}
+      } else {
+        rawContent = contentValue.toString();
+      }
     }
 
     return ChatMessage(
@@ -127,17 +269,74 @@ class ChatMessage {
     );
   }
 
+  /// 从任意数据创建ChatMessage（自动检测格式）
+  /// 支持: Map, Go map格式字符串, 普通字符串
+  static ChatMessage? tryParse(dynamic data) {
+    if (data == null) {
+      developer.log('[ChatMessage.tryParse] data为null', name: 'Parse');
+      return null;
+    }
+
+    developer.log('[ChatMessage.tryParse] 输入类型: ${data.runtimeType}', name: 'Parse');
+
+    Map<String, dynamic>? json;
+
+    if (data is Map) {
+      json = Map<String, dynamic>.from(data);
+      developer.log('[ChatMessage.tryParse] 已是Map类型，keys: ${json.keys.toList()}', name: 'Parse');
+    } else if (data is String) {
+      final trimmed = data.trim();
+      developer.log('[ChatMessage.tryParse] 是String，开头: ${trimmed.substring(0, trimmed.length > 50 ? 50 : trimmed.length)}', name: 'Parse');
+      // 检查是否是Go map格式（支持换行符在中间的情况）
+      if (trimmed.startsWith('map[')) {
+        developer.log('[ChatMessage.tryParse] 检测到Go map格式，调用parseGoMapString', name: 'Parse');
+        json = parseGoMapString(trimmed);
+      } else {
+        developer.log('[ChatMessage.tryParse] 不是Go map格式', name: 'Parse');
+      }
+    } else {
+      developer.log('[ChatMessage.tryParse] 未知类型: ${data.runtimeType}', name: 'Parse');
+    }
+
+    if (json == null) {
+      developer.log('[ChatMessage.tryParse] json为null，解析失败', name: 'Parse');
+      return null;
+    }
+
+    developer.log('[ChatMessage.tryParse] 解析后json: $json', name: 'Parse');
+
+    // 根据字段判断使用哪个解析方法
+    // WebSocket消息通常包含 'from' 和 'timestamp' 字段
+    if (json.containsKey('from') || json.containsKey('timestamp')) {
+      developer.log('[ChatMessage.tryParse] 使用fromSocketJson解析', name: 'Parse');
+      return ChatMessage.fromSocketJson(json);
+    } else {
+      developer.log('[ChatMessage.tryParse] 使用fromJson解析', name: 'Parse');
+      return ChatMessage.fromJson(json);
+    }
+  }
+
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
     final sId = int.tryParse(json['sender_id'].toString()) ?? 0;
     final rId = int.tryParse(json['receiver_id'].toString()) ?? 0;
     final rmId = json['room_id'] != null ? int.tryParse(json['room_id'].toString()) : null;
+
+    // 处理content字段，可能是Go map格式的字符串
+    String rawContent = json['content']?.toString() ?? json['message']?.toString() ?? '';
+    if (rawContent.trim().startsWith('map[')) {
+      final parsed = parseGoMapString(rawContent);
+      if (parsed != null && parsed['content'] != null) {
+        rawContent = parsed['content'].toString();
+        developer.log('[ChatMessage.fromJson] content是Go map格式，解析后: $rawContent', name: 'Parse');
+      }
+    }
 
     return ChatMessage(
       id: json['id'] ?? DateTime.now().millisecondsSinceEpoch,
       senderId: sId,
       receiverId: rId,
       roomId: rmId,
-      content: json['content'] ?? json['message'] ?? '',
+      content: rawContent,
       isRead: json['is_read'] ?? false,
       createdAt: (json['created_at'] != null && json['created_at'] > 0)
           ? json['created_at']

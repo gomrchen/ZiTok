@@ -11,6 +11,7 @@ class Video {
   final int? commentCount; // 评论数
   final List<String> tags;
   final int? comments;
+  final bool isFavorited; // 当前用户是否已收藏
 
   const Video({
     required this.id,
@@ -25,10 +26,11 @@ class Video {
     this.commentCount,
     this.tags = const [],
     this.comments,
+    this.isFavorited = false,
   });
 
   factory Video.fromJson(Map<String, dynamic> j) => Video(
-        id: (j['id'] ?? '').toString(),
+        id: (j['id'] ?? j['video_id'] ?? '').toString(),
         uid: (j['uid'] ?? j['user_id'] ?? j['authorId'])?.toString(),
         videoUrl: (j['video_url'] as String?) ?? (j['playUrl'] as String?),
         coverUrl: (j['cover_url'] as String?) ?? (j['coverUrl'] as String?),
@@ -55,7 +57,8 @@ class Video {
                 ? j['comment_count'] as int
                 : int.tryParse('${j['commentCount'] ?? j['comment_count']}')),
         tags: (j['tags'] as List<dynamic>? ?? []).map((e) => e.toString()).toList(),
-        comments: j['commentCount'] is int ? j['commentCount'] as int : int.tryParse('${j['commentCount']}')
+        comments: j['commentCount'] is int ? j['commentCount'] as int : int.tryParse('${j['commentCount']}'),
+        isFavorited: j['is_favorited'] == true || j['isFavorited'] == true,
       );
 
   Video copyWith({
@@ -70,6 +73,7 @@ class Video {
     int? views,
     int? commentCount,
     List<String>? tags,
+    bool? isFavorited,
   }) {
     return Video(
       id: id ?? this.id,
@@ -83,6 +87,7 @@ class Video {
       views: views ?? this.views,
       commentCount: commentCount ?? this.commentCount,
       tags: tags ?? this.tags,
+      isFavorited: isFavorited ?? this.isFavorited,
     );
   }
 }

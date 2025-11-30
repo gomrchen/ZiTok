@@ -128,4 +128,46 @@ class VideoService {
       if (userId != null) 'user_id': userId,
     });
   }
+
+  // ==================== 收藏相关接口 ====================
+
+  /// 收藏视频
+  /// POST /user/favorite
+  /// body: {video_id: int}
+  Future<Response> favorite({required int videoId}) {
+    return dio.post('/user/favorite', data: {
+      'video_id': videoId,
+    });
+  }
+
+  /// 取消收藏
+  /// DELETE /user/favorite/{video_id}
+  Future<Response> unfavorite({required int videoId}) {
+    return dio.delete('/user/favorite/$videoId');
+  }
+
+  /// 获取收藏列表
+  /// GET /user/favorites?page=1&size=10
+  Future<Response> favorites({int page = 1, int size = 10}) {
+    return dio.get('/user/favorites', queryParameters: {
+      'page': page,
+      'size': size,
+    });
+  }
+
+  // ==================== 推荐接口 ====================
+
+  /// 获取推荐视频
+  /// GET /video/recommend?limit=10&category=&last_visit=0
+  Future<Response> recommend({
+    int limit = 10,
+    String? category,
+    int? lastVisit,
+  }) {
+    return dio.get('/video/recommend', queryParameters: {
+      'limit': limit,
+      if (category != null && category.isNotEmpty) 'category': category,
+      if (lastVisit != null) 'last_visit': lastVisit,
+    });
+  }
 }

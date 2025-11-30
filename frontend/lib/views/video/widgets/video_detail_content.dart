@@ -129,6 +129,7 @@ class _IntroSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -136,8 +137,15 @@ class _IntroSection extends StatelessWidget {
         const SizedBox(height: 6),
         Row(children: [
           Text('👍 ${video.likes ?? 0} · 👁️ ${video.views ?? 0}', style: theme.textTheme.bodySmall),
-          const SizedBox(width: 12),
-          IconButton(onPressed: () => context.read<VideoProvider>().like(video.id), icon: const Icon(Icons.favorite_border)),
+          const Spacer(),
+          // 点赞按钮
+          IconButton(
+            onPressed: () => context.read<VideoProvider>().like(video.id),
+            icon: const Icon(Icons.favorite_border),
+            tooltip: '点赞',
+          ),
+          // 收藏按钮
+          _FavoriteButton(videoId: video.id),
         ]),
         const SizedBox(height: Spacing.sm),
         if ((video.intro ?? '').isNotEmpty)
@@ -146,6 +154,76 @@ class _IntroSection extends StatelessWidget {
         if (video.tags.isNotEmpty)
           Wrap(spacing: 8, children: video.tags.map((t) => Chip(label: Text(t))).toList()),
       ],
+    );
+  }
+}
+
+/// 收藏按钮组件
+class _FavoriteButton extends StatefulWidget {
+  final String videoId;
+
+  const _FavoriteButton({required this.videoId});
+
+  @override
+  State<_FavoriteButton> createState() => _FavoriteButtonState();
+}
+
+class _FavoriteButtonState extends State<_FavoriteButton> {
+  bool _loading = false;
+
+  Future<void> _toggleFavorite() async {
+    if (_loading) return;
+
+    setState(() => _loading = true);
+
+    try {
+      final success = await context.read<VideoProvider>().toggleFavorite(widget.videoId);
+      if (!success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('操作失败，请重试'),
+            duration: Duration(milliseconds: 2000),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('操作失败: $e'),
+            duration: const Duration(milliseconds: 2000),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final vp = context.watch<VideoProvider>();
+    final isFavorited = vp.isFavorited(widget.videoId);
+    final theme = Theme.of(context);
+
+    return IconButton(
+      onPressed: _loading ? null : _toggleFavorite,
+      icon: _loading
+          ? SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: theme.colorScheme.primary,
+              ),
+            )
+          : Icon(
+              isFavorited ? Icons.star : Icons.star_border,
+              color: isFavorited ? const Color(0xFFFFD700) : null,
+            ),
+      tooltip: isFavorited ? '取消收藏' : '收藏',
     );
   }
 }

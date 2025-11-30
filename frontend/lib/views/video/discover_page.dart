@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
-import '../../models/video.dart';
 import '../../providers/video_provider.dart';
 import '../../theme/theme_tokens.dart';
 import '../../services/video/video_preload_manager.dart';
@@ -175,38 +174,25 @@ class _RecommendFullScreen extends StatefulWidget {
 
 class _RecommendFullScreenState extends State<_RecommendFullScreen> {
   late final PageController _pageController;
-  List<dynamic> _items = [];
-  bool _loading = false;
-  bool _hasMore = true;
-  String? _error;
-  int _page = 1;
 
   Future<void> _fetch({bool refresh = false}) async {
-    if (_loading) return;
-    setState(() => _loading = true);
+    final vp = context.read<VideoProvider>();
     if (refresh) {
-      _page = 1;
-      _items = [];
-      _hasMore = true;
-      _error = null;
-    }
-    try {
-      final repo = context.read<VideoProvider>().repo;
-      final res = await repo.fetchDiscover(VideoQuery(page: _page, pageSize: 10));
-      _items.addAll(res.items);
-      _hasMore = res.hasMore;
-      _page += 1;
-    } catch (e) {
-      _error = e.toString();
-    } finally {
-      setState(() => _loading = false);
+      await vp.refreshRecommend();
+    } else {
+      await vp.loadMoreRecommend();
     }
   }
   @override
   void initState() {
     super.initState();
     _pageController = PageController();
-    WidgetsBinding.instance.addPostFrameCallback((_) => _fetch(refresh: true));
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final vp = context.read<VideoProvider>();
+      if (vp.recommend.isEmpty) {
+        _fetch(refresh: true);
+      }
+    });
   }
 
   @override
@@ -217,13 +203,15 @@ class _RecommendFullScreenState extends State<_RecommendFullScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading && _items.isEmpty) {
+    final vp = context.watch<VideoProvider>();
+    final items = vp.recommend;
+    final loading = vp.loadingRecommend;
+    final hasMore = vp.recommendHasMore;
+
+    if (loading && items.isEmpty) {
       return const Center(child: CircularProgressIndicator());
     }
-    if (_error != null && _items.isEmpty) {
-      return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('推荐加载失败'), const SizedBox(height: 8), ElevatedButton(onPressed: () => _fetch(refresh: true), child: const Text('重试'))]));
-    }
-    if (_items.isEmpty) {
+    if (items.isEmpty) {
       return Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('暂无推荐内容'), const SizedBox(height: 8), ElevatedButton(onPressed: () => _fetch(refresh: true), child: const Text('重新加载'))]),
       );
@@ -231,13 +219,13 @@ class _RecommendFullScreenState extends State<_RecommendFullScreen> {
     return PageView.builder(
       scrollDirection: Axis.vertical,
       controller: _pageController,
-      itemCount: _items.length,
+      itemCount: items.length,
       onPageChanged: (i) {
         widget.onIndexChanged(i);
-        if (_hasMore && i >= _items.length - 2) _fetch();
+        if (hasMore && i >= items.length - 2) _fetch();
       },
       itemBuilder: (context, i) {
-        final v = _items[i];
+        final v = items[i];
         return _FullScreenVideoItem(video: v);
       },
     );
@@ -626,10 +614,7 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
               ),
               const SizedBox(height: 16),
               // 收藏
-              _CollectActionIcon(
-                initialCount: widget.video.stars ?? 0,
-                onTap: () => context.read<VideoProvider>().collect(widget.video.id),
-              ),
+              _CollectActionIcon(videoId: widget.video.id),
               // 注：转发按钮按需求不予实现，但保留注释说明
               // const SizedBox(height: 16),
               // _ActionIcon(
@@ -892,25 +877,21 @@ class _PublisherAvatarState extends State<_PublisherAvatar> {
   }
 }
 
-/// 收藏图标（星形）带动画与计数
+/// 收藏图标（星形）带动画，不显示计数
 class _CollectActionIcon extends StatefulWidget {
-  final int initialCount;
-  final VoidCallback? onTap;
-  const _CollectActionIcon({required this.initialCount, this.onTap});
+  final String videoId;
+  const _CollectActionIcon({required this.videoId});
   @override
   State<_CollectActionIcon> createState() => _CollectActionIconState();
 }
 
 class _CollectActionIconState extends State<_CollectActionIcon> with SingleTickerProviderStateMixin {
-  late int count;
-  bool collected = false;
   bool loading = false;
   late AnimationController pulse;
 
   @override
   void initState() {
     super.initState();
-    count = widget.initialCount;
     pulse = AnimationController(vsync: this, duration: const Duration(milliseconds: 220));
   }
 
@@ -923,27 +904,22 @@ class _CollectActionIconState extends State<_CollectActionIcon> with SingleTicke
   Future<void> _toggle() async {
     if (loading) return;
 
-    setState(() {
-      loading = true;
-      collected = !collected;
-      count += collected ? 1 : -1;
-    });
-
+    setState(() => loading = true);
     pulse.forward(from: 0);
 
     try {
-      if (widget.onTap != null) {
-        widget.onTap!();
+      final success = await context.read<VideoProvider>().toggleFavorite(widget.videoId);
+      if (!success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('操作失败，请重试'),
+            duration: Duration(milliseconds: 2000),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
-      // 模拟网络延迟
-      await Future.delayed(const Duration(milliseconds: 300));
     } catch (e) {
-      // 失败回滚
       if (mounted) {
-        setState(() {
-          collected = !collected;
-          count += collected ? 1 : -1;
-        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('操作失败: $e'),
@@ -961,6 +937,9 @@ class _CollectActionIconState extends State<_CollectActionIcon> with SingleTicke
 
   @override
   Widget build(BuildContext context) {
+    final vp = context.watch<VideoProvider>();
+    final isFavorited = vp.isFavorited(widget.videoId);
+
     return Column(
       children: [
         GestureDetector(
@@ -971,26 +950,23 @@ class _CollectActionIconState extends State<_CollectActionIcon> with SingleTicke
             child: Stack(
               alignment: Alignment.center,
               children: [
-                // 圆形半透明底
                 Container(
                   decoration: const BoxDecoration(
                     shape: BoxShape.circle,
                     color: Color(0x33000000),
                   ),
                 ),
-                // 星形图标（缩放动画）
                 if (!loading)
                   ScaleTransition(
                     scale: Tween<double>(begin: 1.0, end: 1.25).animate(
                       CurvedAnimation(parent: pulse, curve: Curves.easeOut),
                     ),
                     child: Icon(
-                      collected ? Icons.star : Icons.star_border,
-                      color: collected ? const Color(0xFFFFD700) : Colors.white,
+                      isFavorited ? Icons.star : Icons.star_border,
+                      color: isFavorited ? const Color(0xFFFFD700) : Colors.white,
                       size: 28,
                     ),
                   ),
-                // 加载指示器
                 if (loading)
                   const SizedBox(
                     width: 20,
@@ -1006,7 +982,7 @@ class _CollectActionIconState extends State<_CollectActionIcon> with SingleTicke
         ),
         const SizedBox(height: 6),
         Text(
-          _formatCount(count),
+          '收藏',
           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: Colors.white.withValues(alpha: 0.7),
                 fontSize: 12,
@@ -1014,13 +990,6 @@ class _CollectActionIconState extends State<_CollectActionIcon> with SingleTicke
         ),
       ],
     );
-  }
-
-  String _formatCount(int c) {
-    if (c >= 100000000) return '${(c / 100000000).toStringAsFixed(1)}亿';
-    if (c >= 10000) return '${(c / 10000).toStringAsFixed(1)}万';
-    if (c >= 1000) return '${(c / 1000).toStringAsFixed(1)}k';
-    return '$c';
   }
 }
 

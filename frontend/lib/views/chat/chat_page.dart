@@ -1,3 +1,4 @@
+import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -120,6 +121,16 @@ class _ChatPageState extends State<ChatPage> {
     );
 
     final messages = mp.messagesFor(widget.conversationId);
+
+    // 调试日志：打印所有消息内容
+    developer.log('[ChatPage] 会话${widget.conversationId} 共${messages.length}条消息', name: 'UI');
+    for (int i = 0; i < messages.length; i++) {
+      final m = messages[i];
+      developer.log(
+        '[ChatPage] 消息[$i] senderId=${m.senderId}, content="${m.content.substring(0, m.content.length > 100 ? 100 : m.content.length)}"',
+        name: 'UI',
+      );
+    }
 
     final myId = mp.currentUid?.toString() ?? '';
     final currentUser = context.read<UserProvider>().currentUser;

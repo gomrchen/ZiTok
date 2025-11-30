@@ -1,0 +1,234 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "默认模块",
+    "description": "",
+    "version": "1.0.0"
+  },
+  "tags": [],
+  "paths": {
+    "/user/favorite": {
+      "post": {
+        "summary": "收藏",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "{{token}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              },
+              "example": {
+                "video_id": 12
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/user/favorite/{video_id}": {
+      "delete": {
+        "summary": "取消收藏",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "video_id",
+            "in": "path",
+            "description": "",
+            "required": true,
+            "example": "",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "{{token}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/user/favorites": {
+      "get": {
+        "summary": "收藏列表",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "page",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "example": "1",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "size",
+            "in": "query",
+            "description": "",
+            "required": false,
+            "example": "10",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "Authorization",
+            "in": "header",
+            "description": "",
+            "required": false,
+            "example": "{{token}}",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {}
+              },
+              "example": ""
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    },
+    "/video/recommend": {
+      "get": {
+        "summary": "视频推荐",
+        "deprecated": false,
+        "description": "",
+        "tags": [],
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "description": "限制返回视频数量 (默认 10)",
+            "required": false,
+            "example": "10",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "category",
+            "in": "query",
+            "description": "(可选) 按分类筛选",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "last_visit",
+            "in": "query",
+            "description": "(可选) 游标，用于翻页 (热门模式下有效)",
+            "required": false,
+            "example": 0,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {}
+                }
+              }
+            },
+            "headers": {}
+          }
+        },
+        "security": []
+      }
+    }
+  },
+  "webhooks": {},
+  "components": {
+    "schemas": {},
+    "responses": {},
+    "securitySchemes": {}
+  },
+  "servers": [],
+  "security": []
+}

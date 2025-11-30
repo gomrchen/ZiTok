@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -49,6 +50,9 @@ class AppBootstrap {
 
     // 迁移旧的 auth_user_id 到新的 user_id
     await _migrateUserId();
+
+    // 验证本地缓存的token和用户状态
+    await _validateSession();
   }
 
   /// 迁移旧的用户 ID 存储方式
@@ -61,6 +65,71 @@ class AppBootstrap {
       await prefs.setString('user_id', oldUserId);
       await userSession.restoreSession(prefs);
     }
+  }
+
+  /// 验证本地缓存的会话是否仍然有效
+  ///
+  /// 如果本地有token和userId，向服务端验证用户是否仍然存在。
+  /// 验证失败时清除本地缓存，确保用户需要重新登录。
+  static Future<void> _validateSession() async {
+    // 如果没有登录信息，无需验证
+    if (!userSession.isLoggedIn) return;
+
+    final token = prefs.getString('access_token');
+    if (token == null || token.isEmpty) {
+      // 有userId但没有token，清除会话
+      await _clearSession();
+      return;
+    }
+
+    try {
+      // 调用 /user/info 验证token和用户状态
+      final response = await apiClient.dio.get('/user/info');
+      final body = response.data as Map<String, dynamic>? ?? {};
+      final code = body['code'];
+
+      // 检查业务码
+      if (code != 10000 && code != 200 && !(code == 0 && response.statusCode == 200)) {
+        // 业务码异常，可能用户被删除
+        await _clearSession();
+        return;
+      }
+
+      // 检查返回的用户数据
+      final data = body['data'] as Map<String, dynamic>?;
+      if (data == null) {
+        await _clearSession();
+        return;
+      }
+
+      // 检查用户是否被删除（如果后端返回deleted_at字段）
+      final deletedAt = data['deleted_at'];
+      if (deletedAt != null && deletedAt.toString().isNotEmpty) {
+        await _clearSession();
+        return;
+      }
+
+      // 验证通过，可以选择更新本地用户信息
+    } catch (e) {
+      // 网络错误或服务端错误
+      // 对于 401/403 错误，清除会话
+      if (e is DioException) {
+        final statusCode = e.response?.statusCode;
+        if (statusCode == 401 || statusCode == 403) {
+          await _clearSession();
+          return;
+        }
+        // 其他网络错误（如无网络），保留本地会话，让用户可以查看缓存内容
+      }
+    }
+  }
+
+  /// 清除本地会话信息
+  static Future<void> _clearSession() async {
+    await userSession.clear(prefs);
+    await prefs.remove('access_token');
+    await prefs.remove('refresh_token');
+    await prefs.remove('auth_user_id');
   }
 }
 
