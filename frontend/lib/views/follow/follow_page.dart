@@ -10,6 +10,8 @@ import '../../theme/theme_tokens.dart';
 import '../../widgets/comment_sheet.dart';
 import '../../widgets/video_stats.dart';
 import '../../utils/url_utils.dart';
+import '../../services/user_service.dart';
+import '../../app.dart';
 
 class FollowPage extends StatefulWidget {
   const FollowPage({super.key});
@@ -185,7 +187,7 @@ class _EmptyState extends StatelessWidget {
   }
 }
 
-class _FollowListItem extends StatelessWidget {
+class _FollowListItem extends StatefulWidget {
   final Video video;
   final bool isRecommended;
   final VoidCallback onTap;
@@ -202,20 +204,90 @@ class _FollowListItem extends StatelessWidget {
   });
 
   @override
+  State<_FollowListItem> createState() => _FollowListItemState();
+}
+
+class _FollowListItemState extends State<_FollowListItem> {
+  String? _authorAvatarUrl;
+  bool _fetchingAvatar = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 如果视频没有作者头像，则根据uid获取
+    if ((widget.video.authorAvatarUrl == null || widget.video.authorAvatarUrl!.isEmpty) &&
+        widget.video.uid != null) {
+      _fetchAuthorAvatar();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _FollowListItem oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.video.uid != widget.video.uid) {
+      _authorAvatarUrl = null;
+      if ((widget.video.authorAvatarUrl == null || widget.video.authorAvatarUrl!.isEmpty) &&
+          widget.video.uid != null) {
+        _fetchAuthorAvatar();
+      }
+    }
+  }
+
+  Future<void> _fetchAuthorAvatar() async {
+    if (_fetchingAvatar || widget.video.uid == null) return;
+    _fetchingAvatar = true;
+
+    try {
+      final userService = UserService(AppBootstrap.apiClient.dio);
+      final resp = await userService.info(userId: widget.video.uid);
+      final data = resp.data as Map<String, dynamic>? ?? {};
+
+      if (data['code']?.toString() == '10000' && data['data'] != null) {
+        final userData = data['data'] as Map<String, dynamic>;
+        final avatarUrl = (userData['avatar'] ?? userData['avatar_url'])?.toString();
+        if (avatarUrl != null && avatarUrl.isNotEmpty && mounted) {
+          setState(() {
+            _authorAvatarUrl = UrlUtils.resolveStorageUrl(avatarUrl, defaultDir: 'avatars');
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('_FollowListItem: fetch avatar error: $e');
+    } finally {
+      _fetchingAvatar = false;
+    }
+  }
+
+  /// 获取有效的作者头像URL
+  String? get _effectiveAvatarUrl {
+    if (widget.video.authorAvatarUrl != null && widget.video.authorAvatarUrl!.isNotEmpty) {
+      return UrlUtils.resolveStorageUrl(widget.video.authorAvatarUrl, defaultDir: 'avatars');
+    }
+    return _authorAvatarUrl;
+  }
+
+  void _goToAuthorProfile() {
+    if (widget.video.uid != null) {
+      context.push('/user/${widget.video.uid}');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
     // 作者名称：优先使用uid，没有则用title的第一部分
-    final authorName = video.uid ?? '用户${video.id.substring(0, 4)}';
+    final authorName = widget.video.uid ?? '用户${widget.video.id.substring(0, 4)}';
     final authorInitial = authorName.isNotEmpty ? authorName.substring(0, 1).toUpperCase() : '?';
+    final avatarUrl = _effectiveAvatarUrl;
 
     // 视频标题
-    final videoTitle = video.title ?? '未命名视频';
+    final videoTitle = widget.video.title ?? '未命名视频';
 
     // 处理封面URL
-    final coverUrl = video.coverUrl != null && video.coverUrl!.isNotEmpty
-        ? UrlUtils.resolveStorageUrl(video.coverUrl, defaultDir: 'covers')
+    final coverUrl = widget.video.coverUrl != null && widget.video.coverUrl!.isNotEmpty
+        ? UrlUtils.resolveStorageUrl(widget.video.coverUrl, defaultDir: 'covers')
         : null;
 
     return Padding(
@@ -226,16 +298,24 @@ class _FollowListItem extends StatelessWidget {
           // 头部：作者信息与推荐标记
           Row(
             children: [
-              // 作者头像
-              CircleAvatar(
-                radius: 18,
-                backgroundColor: cs.primaryContainer,
-                child: Text(
-                  authorInitial,
-                  style: TextStyle(
-                    color: cs.onPrimaryContainer,
-                    fontWeight: FontWeight.w600,
-                  ),
+              // 作者头像（可点��进入主页）
+              GestureDetector(
+                onTap: _goToAuthorProfile,
+                child: CircleAvatar(
+                  radius: 18,
+                  backgroundColor: cs.primaryContainer,
+                  backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                      ? CachedNetworkImageProvider(avatarUrl)
+                      : null,
+                  child: avatarUrl == null || avatarUrl.isEmpty
+                      ? Text(
+                          authorInitial,
+                          style: TextStyle(
+                            color: cs.onPrimaryContainer,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        )
+                      : null,
                 ),
               ),
               const SizedBox(width: Spacing.sm),
@@ -252,9 +332,9 @@ class _FollowListItem extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                     ),
-                    if (video.intro != null && video.intro!.isNotEmpty)
+                    if (widget.video.intro != null && widget.video.intro!.isNotEmpty)
                       Text(
-                        video.intro!,
+                        widget.video.intro!,
                         style: theme.textTheme.bodySmall?.copyWith(
                           color: cs.onSurfaceVariant,
                         ),
@@ -265,7 +345,7 @@ class _FollowListItem extends StatelessWidget {
                 ),
               ),
               // 推荐标记
-              if (isRecommended)
+              if (widget.isRecommended)
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
@@ -295,10 +375,10 @@ class _FollowListItem extends StatelessWidget {
           const SizedBox(height: Spacing.xs),
 
           // 标签
-          if (video.tags.isNotEmpty)
+          if (widget.video.tags.isNotEmpty)
             Wrap(
               spacing: Spacing.xs,
-              children: video.tags.take(3).map((tag) => Text(
+              children: widget.video.tags.take(3).map((tag) => Text(
                 '#$tag',
                 style: theme.textTheme.bodySmall?.copyWith(
                   color: cs.primary,
@@ -309,7 +389,7 @@ class _FollowListItem extends StatelessWidget {
 
           // 封面图
           GestureDetector(
-            onTap: onTap,
+            onTap: widget.onTap,
             child: AspectRatio(
               aspectRatio: 16 / 9,
               child: ClipRRect(
@@ -334,7 +414,7 @@ class _FollowListItem extends StatelessWidget {
               // 分享按钮
               _IconAction(
                 icon: Icons.share_outlined,
-                onPressed: onShare,
+                onPressed: widget.onShare,
                 tooltip: '复制视频ID',
               ),
               const SizedBox(width: Spacing.md),
@@ -342,10 +422,10 @@ class _FollowListItem extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _IconAction(icon: Icons.chat_bubble_outline, onPressed: onComment),
+                  _IconAction(icon: Icons.chat_bubble_outline, onPressed: widget.onComment),
                   const SizedBox(width: 4),
                   Text(
-                    formatCount(video.commentCount ?? video.comments ?? 0),
+                    formatCount(widget.video.commentCount ?? widget.video.comments ?? 0),
                     style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
                   ),
                 ],
@@ -355,10 +435,10 @@ class _FollowListItem extends StatelessWidget {
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _IconAction(icon: Icons.favorite_border, onPressed: onLike),
+                  _IconAction(icon: Icons.favorite_border, onPressed: widget.onLike),
                   const SizedBox(width: 4),
                   Text(
-                    formatCount(video.likes ?? 0),
+                    formatCount(widget.video.likes ?? 0),
                     style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
                   ),
                 ],

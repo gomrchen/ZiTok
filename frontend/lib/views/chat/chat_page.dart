@@ -5,7 +5,8 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
 import '../../providers/messaging_provider.dart';
-import '../../providers/user_provider.dart';
+import '../../providers/profile_provider.dart';
+import '../../utils/url_utils.dart';
 import 'friend_search_page.dart';
 
 class ChatPage extends StatefulWidget {
@@ -133,7 +134,8 @@ class _ChatPageState extends State<ChatPage> {
     }
 
     final myId = mp.currentUid?.toString() ?? '';
-    final currentUser = context.read<UserProvider>().currentUser;
+    final profileProvider = context.watch<ProfileProvider>();
+    final myAvatarUrl = profileProvider.user?.avatarUrl;
 
     return PopScope(
       canPop: !_emojiShowing,
@@ -212,7 +214,7 @@ class _ChatPageState extends State<ChatPage> {
                           mainAxisAlignment: isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
                           children: [
                             if (!isMine) ...[
-                              _buildAvatar(senderAvatar),
+                              _buildAvatar(UrlUtils.resolveStorageUrl(senderAvatar, defaultDir: 'avatars')),
                               const SizedBox(width: 8),
                             ],
                             Flexible(
@@ -234,7 +236,7 @@ class _ChatPageState extends State<ChatPage> {
                             ),
                             if (isMine) ...[
                               const SizedBox(width: 8),
-                              _buildAvatar(currentUser?.avatarUrl),
+                              _buildAvatar(UrlUtils.resolveStorageUrl(myAvatarUrl, defaultDir: 'avatars')),
                             ],
                           ],
                         ),

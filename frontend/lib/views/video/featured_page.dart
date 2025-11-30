@@ -178,7 +178,17 @@ class _FeaturedHeroCard extends StatelessWidget {
                   children: [
                     Text(video.title ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.white)),
                     const SizedBox(height: Spacing.sm),
-                    Text('点赞 ${(video.likes ?? 0)} · 收藏 ${(video.stars ?? 0)}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70)),
+                    Row(
+                      children: [
+                        const Icon(Icons.favorite, size: 14, color: Colors.white70),
+                        const SizedBox(width: 4),
+                        Text('${video.likes ?? 0}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70)),
+                        const SizedBox(width: 12),
+                        const Icon(Icons.chat_bubble_outline, size: 14, color: Colors.white70),
+                        const SizedBox(width: 4),
+                        Text('${video.commentCount ?? 0}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70)),
+                      ],
+                    ),
                   ],
                 ),
               ),
@@ -215,7 +225,17 @@ class _FeaturedListItem extends StatelessWidget {
                   const SizedBox(height: 6),
                   Text('${video.intro ?? ''}', maxLines: 2, overflow: TextOverflow.ellipsis, style: Theme.of(context).textTheme.bodySmall),
                   const SizedBox(height: 4),
-                  Text('点赞 ${fmt(video.likes ?? 0)} · 收藏 ${fmt(video.stars ?? 0)}', style: Theme.of(context).textTheme.bodySmall),
+                  Row(
+                    children: [
+                      Icon(Icons.favorite, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 4),
+                      Text(fmt(video.likes ?? 0), style: Theme.of(context).textTheme.bodySmall),
+                      const SizedBox(width: 12),
+                      Icon(Icons.chat_bubble_outline, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      const SizedBox(width: 4),
+                      Text(fmt(video.commentCount ?? 0), style: Theme.of(context).textTheme.bodySmall),
+                    ],
+                  ),
                 ],
               ),
             ),
