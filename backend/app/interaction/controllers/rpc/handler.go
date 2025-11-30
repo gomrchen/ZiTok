@@ -67,7 +67,7 @@ func (h *InteractionHandler) Comment(ctx context.Context, req *interaction.Comme
 func (h *InteractionHandler) GetComments(ctx context.Context, req *interaction.GetCommentsRequest) (r *interaction.GetCommentsResponse, err error) {
 	r = new(interaction.GetCommentsResponse)
 
-	comments, err := h.useCase.GetComments(ctx, req.VideoId, req.Page, req.Size)
+	comments, err := h.useCase.GetComments(ctx, req.VideoId, req.Page, req.Size, req.CommentId)
 	if err != nil {
 		return
 	}
@@ -78,6 +78,7 @@ func (h *InteractionHandler) GetComments(ctx context.Context, req *interaction.G
 			UserId:  comment.UserID,
 			VideoId: comment.VideoID,
 			Content: comment.Content,
+			ParentId: comment.ParentID,
 		}
 	}
 	return

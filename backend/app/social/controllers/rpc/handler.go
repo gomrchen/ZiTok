@@ -111,9 +111,11 @@ func (h *SocialHandler) GetChatMessages(ctx context.Context, req *social.GetChat
 func (h *SocialHandler) AddFriend(ctx context.Context, req *social.AddFriendRequest) (r *social.AddFriendResponse, err error) {
 	r = new(social.AddFriendResponse)
 
-	if err = h.useCase.AddFriend(ctx, req.UserId, req.FriendId); err != nil {
+	friendship, err := h.useCase.AddFriend(ctx, req.UserId, req.FriendId)
+	if err != nil {
 		return
 	}
+	r.Friend = pack.PackFriendship(friendship)
 	r.Base = base.BuildBaseResp(err)
 	return
 }

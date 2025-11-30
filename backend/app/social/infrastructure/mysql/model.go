@@ -84,6 +84,11 @@ type MessageReadStatus struct {
 	CreatedAt time.Time  `json:"created_at"`                                     // 创建时间
 }
 
+// User 用户模型（用于验证用户是否存在）
+type User struct {
+	ID int64 `json:"id" gorm:"primarykey"`
+}
+
 // TableName 指定表名
 func (PrivateMessage) TableName() string {
 	return "private_messages"
@@ -111,4 +116,8 @@ func (FriendRequest) TableName() string {
 
 func (MessageReadStatus) TableName() string {
 	return "message_read_status"
+}
+
+func (User) TableName() string {
+	return "users"
 }

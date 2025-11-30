@@ -5,6 +5,7 @@ package user
 import (
 	"context"
 	"io"
+	"strconv"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	api "github.com/yxrxy/videoHub/app/gateway/model/user"
@@ -24,9 +25,14 @@ func Register(ctx context.Context, c *app.RequestContext) {
 		pack.RespError(c, errno.ParamVerifyError.WithError(err))
 		return
 	}
+	if err := rpc.VerifyEmailCode(ctx, *req.Email, req.Code); err != nil {
+		pack.RespError(c, err)
+		return
+	}
 	resp, err := rpc.RegisterRPC(ctx, &user.RegisterRequest{
 		Username: req.Username,
 		Password: req.Password,
+		Email:    req.Email, // 新增字段
 	})
 	if err != nil {
 		pack.RespError(c, err)
@@ -75,13 +81,27 @@ func RefreshToken(ctx context.Context, c *app.RequestContext) {
 		pack.RespError(c, errno.ParamVerifyError.WithError(err))
 		return
 	}
+
+	// Extract refresh token from header
+	refreshToken := req.RefreshToken
+	if refreshToken == "" {
+		pack.RespError(c, errno.NewErrNo(errno.AuthNoTokenCode, "未提供刷新令牌"))
+		return
+	}
+
 	resp, err := rpc.RefreshTokenRPC(ctx, &user.RefreshTokenRequest{
-		UserId: req.UserID,
+		UserId:       req.UserID,
+		RefreshToken: refreshToken,
 	})
 	if err != nil {
 		pack.RespError(c, err)
 		return
 	}
+
+	// Set tokens in response headers
+	c.Header("Authorization", "Bearer "+resp.Token)
+	c.Header("RefreshToken", resp.RefreshToken)
+
 	pack.RespData(c, resp)
 }
 
@@ -105,7 +125,7 @@ func GetUserInfo(ctx context.Context, c *app.RequestContext) {
 	pack.RespData(c, resp)
 }
 
-// UploadAvatar .
+// UploadAvatar ..
 // @router /api/v1/user/avatar [POST]
 func UploadAvatar(ctx context.Context, c *app.RequestContext) {
 	var err error
@@ -132,6 +152,226 @@ func UploadAvatar(ctx context.Context, c *app.RequestContext) {
 	resp, err := rpc.UploadAvatarRPC(ctx, &user.UploadAvatarRequest{
 		AvatarData:  avatarData,
 		ContentType: fileHeader.Header.Get("Content-Type"),
+	})
+	if err != nil {
+		pack.RespError(c, err)
+		return
+	}
+
+	pack.RespData(c, resp)
+}
+
+// UpdateUserInfo .
+// @router /api/v1/user/info [PUT]
+func UpdateUserInfo(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req api.UpdateUserInfoRequest
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+		return
+	}
+
+	// 调用 RPC 更新信息
+	resp, err := rpc.UpdateUserInfoRPC(ctx, &user.UpdateUserInfoRequest{
+		Username:  req.Username,
+		Password:  req.Password,
+		Signature: req.Signature,
+		Gender:    req.Gender,
+		Birthday:  req.Birthday,
+		Email:     req.Email,
+	})
+
+	if err != nil {
+		pack.RespError(c, err)
+		return
+	}
+
+	pack.RespData(c, resp) // 或 resp.Base
+}
+
+// UploadBackground .
+// @router /api/v1/user/background [POST]
+func UploadBackground(ctx context.Context, c *app.RequestContext) {
+	var err error
+
+	// 与 UploadAvatar 逻辑类似，读取背景图文件
+	fileHeader, err := c.FormFile("background_data")
+	if err != nil {
+		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+		return
+	}
+
+	file, err := fileHeader.Open()
+	if err != nil {
+		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+		return
+	}
+	defer file.Close()
+
+	backgroundData, err := io.ReadAll(file)
+	if err != nil {
+		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+		return
+	}
+
+	// 调用 RPC
+	resp, err := rpc.UploadBackgroundRPC(ctx, &user.UploadBackgroundRequest{
+		BackgroundData: backgroundData,
+		ContentType:    fileHeader.Header.Get("Content-Type"),
+	})
+	if err != nil {
+		pack.RespError(c, err)
+		return
+	}
+
+	pack.RespData(c, resp) // 返回更新后的 User
+}
+
+// Password .
+// @router /api/v1/user/password [POST]
+func Password(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req user.PasswordRequest
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+		return
+	}
+
+	if err := rpc.VerifyEmailCode(ctx, *req.Email, req.Code); err != nil {
+		pack.RespError(c, err)
+		return
+	}
+
+	uuid, err := rpc.FindUserByEmailRPC(ctx, &user.FindUserByEmailRequest{
+		Email: *req.Email,
+	})
+	if err != nil {
+		pack.RespError(c, err)
+		return
+	}
+
+	resp, err := rpc.UpdateUserInfoRPC(ctx, &user.UpdateUserInfoRequest{
+		UserId:   &uuid.UserId,
+		Password: &req.NewPwd_,
+	})
+
+	if err != nil {
+		pack.RespError(c, err)
+		return
+	}
+
+	pack.RespData(c, resp)
+}
+
+// FindUsersByUsername .
+// @router /api/v1/user/username [GET]
+func FindUsersByUsername(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req api.FindUsersByUsernameRequest
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+		return
+	}
+
+	resp, err := rpc.FindUsersByUsernameRPC(ctx, &user.FindUsersByUsernameRequest{
+		Username: req.Username,
+	})
+	if err != nil {
+		pack.RespError(c, err)
+		return
+	}
+
+	pack.RespData(c, resp)
+}
+
+// FindUserByEmail .
+// @router /api/v1/user/email [GET]
+func FindUserByEmail(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req api.FindUserByEmailRequest
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+		return
+	}
+
+	resp, err := rpc.FindUserByEmailRPC(ctx, &user.FindUserByEmailRequest{
+		Email: req.Email,
+	})
+	if err != nil {
+		pack.RespError(c, err)
+		return
+	}
+
+	pack.RespData(c, resp)
+}
+
+// FavoriteVideo .
+// @router /api/v1/user/favorite [POST]
+func FavoriteVideo(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req api.FavoriteVideoRequest
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+		return
+	}
+
+	resp, err := rpc.FavoriteVideoRPC(ctx, &user.FavoriteVideoRequest{
+		VideoId: req.VideoID,
+	})
+	if err != nil {
+		pack.RespError(c, err)
+		return
+	}
+
+	pack.RespData(c, resp)
+}
+
+// UnfavoriteVideo .
+// @router /api/v1/user/favorite/:video_id [DELETE]
+func UnfavoriteVideo(ctx context.Context, c *app.RequestContext) {
+	var err error
+	videoID, exists := c.Params.Get("video_id")
+	if !exists {
+		pack.RespError(c, errno.NewErrNo(errno.ParamVerifyErrorCode, "video_id is required"))
+		return
+	}
+
+	var videoIDInt int64
+	if videoIDInt, err = strconv.ParseInt(videoID, 10, 64); err != nil {
+		pack.RespError(c, errno.NewErrNo(errno.ParamVerifyErrorCode, "invalid video_id"))
+		return
+	}
+
+	resp, err := rpc.UnfavoriteVideoRPC(ctx, &user.UnfavoriteVideoRequest{
+		VideoId: videoIDInt,
+	})
+	if err != nil {
+		pack.RespError(c, err)
+		return
+	}
+
+	pack.RespData(c, resp)
+}
+
+// GetFavoriteVideos .
+// @router /api/v1/user/favorites [GET]
+func GetFavoriteVideos(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req api.GetFavoriteVideosRequest
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+		return
+	}
+
+	resp, err := rpc.GetFavoriteVideosRPC(ctx, &user.GetFavoriteVideosRequest{
+		Page: req.Page,
+		Size: req.Size,
 	})
 	if err != nil {
 		pack.RespError(c, err)

@@ -63,3 +63,54 @@ func _refreshtokenMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _uploadbackgroundMw() []app.HandlerFunc {
+	return []app.HandlerFunc{
+		mw.Auth(),
+	}
+}
+
+func _updateuserinfoMw() []app.HandlerFunc {
+	return []app.HandlerFunc{
+		mw.Auth(),
+	}
+}
+
+func _passwordMw() []app.HandlerFunc {
+	return []app.HandlerFunc{
+		mw.Auth(),
+	}
+}
+
+func _finduserbyemailMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _findusersbyusernameMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _favoriteMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _favoritevideoMw() []app.HandlerFunc {
+	return []app.HandlerFunc{
+		mw.Auth(),
+	}
+}
+
+func _unfavoritevideoMw() []app.HandlerFunc {
+	return []app.HandlerFunc{
+		mw.Auth(),
+	}
+}
+
+func _getfavoritevideosMw() []app.HandlerFunc {
+	return []app.HandlerFunc{
+		mw.Auth(),
+	}
+}

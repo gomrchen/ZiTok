@@ -84,6 +84,19 @@ func GetHotVideosRPC(ctx context.Context, req *video.HotVideoRequest) ([]*model.
 	return resp.Videos, nil
 }
 
+// RecommendRPC 个性化推荐
+func RecommendRPC(ctx context.Context, req *video.HotVideoRequest) ([]*model.Video, error) {
+    resp, err := videoClient.Recommend(ctx, req)
+	if err != nil {
+		log.Printf("获取个性化推荐RPC调用失败: %v", err)
+		return nil, errno.InternalServiceError.WithError(err)
+	}
+	if resp.Base.Code != errno.SuccessCode {
+		return nil, errno.InternalServiceError.WithMessage(resp.Base.Msg)
+	}
+	return resp.Videos, nil
+}
+
 // IncrementVisitCountRPC 增加视频访问量
 func IncrementVisitCountRPC(ctx context.Context, req *video.IncrementVisitCountRequest) error {
 	resp, err := videoClient.IncrementVisitCount(ctx, req)
@@ -132,4 +145,17 @@ func SemanticSearchRPC(ctx context.Context, req *video.SemanticSearchRequest) ([
 		return nil, errno.InternalServiceError.WithMessage(resp.Base.Msg)
 	}
 	return resp.Results, nil
+}
+
+// UploadCoverRPC 上传视频封面
+func UploadCoverRPC(ctx context.Context, req *video.UploadCoverRequest) (*video.UploadCoverResponse, error) {
+	resp, err := videoClient.UploadCover(ctx, req)
+	if err != nil {
+		log.Printf("上传视频封面RPC调用失败: %v", err)
+		return nil, errno.InternalServiceError.WithError(err)
+	}
+	if resp.Base.Code != errno.SuccessCode {
+		return nil, errno.InternalServiceError.WithMessage(resp.Base.Msg)
+	}
+	return resp, nil
 }

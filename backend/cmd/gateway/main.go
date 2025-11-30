@@ -37,6 +37,8 @@ func main() {
 	h := server.New(
 		server.WithHostPorts(listenAddr),
 		server.WithHandleMethodNotAllowed(true),
+		// 直接硬编码请求体大小上限为 100MB（单位：字节）
+		server.WithMaxRequestBodySize(100<<20),
 	)
 
 	h.NoHijackConnPool = true

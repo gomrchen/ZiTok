@@ -194,11 +194,6 @@ func (s *VideoService) Search(
 
 // IndexVideo 添加视频时同时更新向量索引和(ES索引TODO)
 func (s *VideoService) IndexVideo(ctx context.Context, video *model.Video, _ string) error {
-	// 生成视频内容的向量表示
-	err := s.GenerateVideoEmbedding(ctx, video.ID)
-	if err != nil {
-		return fmt.Errorf("生成向量失败: %w", err)
-	}
 	return nil
 }
 

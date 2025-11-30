@@ -15,6 +15,7 @@ import (
 	"github.com/bytedance/sonic"
 	"github.com/yxrxy/videoHub/app/video/domain/model"
 	"github.com/yxrxy/videoHub/config"
+	pkgcontext "github.com/yxrxy/videoHub/pkg/base/context"
 	"github.com/yxrxy/videoHub/pkg/constants"
 )
 
@@ -69,9 +70,8 @@ func (s *VideoService) SaveVideo(ctx context.Context, userID int64, videoData []
 
 	// 3. 存入数据库
 	if err := s.db.CreateVideo(ctx, video); err != nil {
-		err := os.Remove(videoPath)
-		if err != nil {
-			return "", err
+		if removeErr := os.Remove(videoPath); removeErr != nil {
+			return "", removeErr
 		}
 		return "", fmt.Errorf("保存视频记录失败: %w", err)
 	}
@@ -95,12 +95,33 @@ func (s *VideoService) SaveVideo(ctx context.Context, userID int64, videoData []
 	if err != nil {
 		return "", err
 	}
+	if s.recommender != nil {
+		go func(v *model.Video) {
+			_ = s.recommender.InsertItem(context.Background(), v)
+		}(video)
+	}
 	return videoPath, nil
 }
 
+func (s *VideoService) ReportFeedback(ctx context.Context, userID int64, videoID int64, feedbackType string, ts time.Time) {
+	if s.recommender == nil {
+		return
+	}
+	go func() {
+		_ = s.recommender.InsertFeedback(context.Background(), userID, videoID, feedbackType, ts)
+	}()
+}
+
 func (s *VideoService) processVideo(ctx context.Context, videoID int64, videoPath string) error {
-	// 1. 生成封面
-	coverPath := strings.TrimSuffix(videoPath, filepath.Ext(videoPath)) + "_cover.jpg"
+	// 1. 确保封面目录存在
+	coverDir := "/home/ZiTok/src/storage/covers"
+	if err := os.MkdirAll(coverDir, constants.DirPermission); err != nil {
+		return fmt.Errorf("创建封面目录失败: %w", err)
+	}
+
+	// 2. 生成封面
+	coverFilename := strings.TrimSuffix(filepath.Base(videoPath), filepath.Ext(videoPath)) + "_cover.jpg"
+	coverPath := filepath.Join(coverDir, coverFilename)
 	cmd := exec.Command("ffmpeg",
 		"-i", videoPath, // 输入文件
 		"-ss", "00:00:01", // 在1秒处截图
@@ -287,6 +308,44 @@ func (s *VideoService) GetHotVideos(
 	return res, total, nextVisit, nextLike, nextID, nil
 }
 
+func (s *VideoService) RecommendVideos(
+	ctx context.Context,
+	limit int32,
+) ([]*model.Video, error) {
+	if s.recommender != nil {
+		if uid, err := pkgcontext.GetUserID(ctx); err == nil && uid > 0 {
+			ids, err := s.recommender.Recommend(ctx, uid, int(limit))
+			if err == nil && len(ids) > 0 {
+				var res []*model.Video
+				for _, id := range ids {
+					v, err := s.db.GetVideoByID(ctx, id)
+					if err == nil && v != nil {
+						res = append(res, &model.Video{
+							ID:           v.ID,
+							UserID:       v.UserID,
+							VideoURL:     v.VideoURL,
+							CoverURL:     v.CoverURL,
+							Title:        v.Title,
+							Description:  v.Description,
+							Duration:     v.Duration,
+							Category:     v.Category,
+							Tags:         v.Tags,
+							VisitCount:   v.VisitCount,
+							LikeCount:    v.LikeCount,
+							CommentCount: v.CommentCount,
+							IsPrivate:    v.IsPrivate,
+						})
+					}
+				}
+				if len(res) > 0 {
+					return res, nil
+				}
+			}
+		}
+	}
+	return nil, nil
+}
+
 // GenerateVideoEmbedding 为视频生成向量表示
 func (s *VideoService) GenerateVideoEmbedding(ctx context.Context, videoID int64) error {
 	// 获取视频信息
@@ -355,4 +414,65 @@ func (s *VideoService) GenerateEmbeddingsForAllVideos(ctx context.Context) {
 		}
 		page++
 	}
+}
+
+// UploadCover 上传视频封面
+func (s *VideoService) UploadCover(ctx context.Context, videoID int64, coverData []byte, contentType string) (string, error) {
+	// 1. 验证封面数据
+	if !s.isValidCoverType(contentType) {
+		return "", fmt.Errorf("不支持的封面类型: %s", contentType)
+	}
+
+	// 2. 检查视频是否存在
+	video, err := s.db.GetVideoByID(ctx, videoID)
+	if err != nil {
+		return "", fmt.Errorf("获取视频失败: %w", err)
+	}
+
+	// 3. 生成封面文件名
+	ext := ".jpg"
+	switch contentType {
+	case "image/jpeg":
+		ext = ".jpg"
+	case "image/png":
+		ext = ".png"
+	case "image/gif":
+		ext = ".gif"
+	}
+
+	timestamp := time.Now().Unix()
+	coverFilename := fmt.Sprintf("%d_%d%s", videoID, timestamp, ext)
+	coverPath := filepath.Join(config.Upload.Video.CoverDir, coverFilename)
+
+	// 4. 确保封面目录存在
+	if err := os.MkdirAll(config.Upload.Video.CoverDir, constants.DirPermission); err != nil {
+		return "", fmt.Errorf("创建封面目录失败: %w", err)
+	}
+
+	// 5. 保存封面文件
+	if err := os.WriteFile(coverPath, coverData, constants.FilePermission); err != nil {
+		return "", fmt.Errorf("保存封面文件失败: %w", err)
+	}
+
+	// 6. 更新视频记录
+	coverURL := fmt.Sprintf("%s/covers/%s", config.Upload.Video.BaseURL, coverFilename)
+	video.CoverURL = coverURL
+
+	if err := s.db.UpdateVideo(ctx, video); err != nil {
+		// 如果更新数据库失败，删除已保存的封面文件
+		_ = os.Remove(coverPath)
+		return "", fmt.Errorf("更新视频封面信息失败: %w", err)
+	}
+
+	return coverURL, nil
+}
+
+// isValidCoverType 验证封面类型
+func (s *VideoService) isValidCoverType(contentType string) bool {
+	validTypes := map[string]bool{
+		"image/jpeg": true,
+		"image/png":  true,
+		"image/gif":  true,
+	}
+	return validTypes[contentType]
 }

@@ -26,6 +26,7 @@ import (
 	etcd "github.com/kitex-contrib/registry-etcd"
 	"github.com/yxrxy/videoHub/config"
 	"github.com/yxrxy/videoHub/kitex_gen/interaction/interactionservice"
+	"github.com/yxrxy/videoHub/kitex_gen/notes/notesservice"
 	"github.com/yxrxy/videoHub/kitex_gen/social/socialservice"
 	"github.com/yxrxy/videoHub/kitex_gen/user/userservice"
 	"github.com/yxrxy/videoHub/kitex_gen/video/videoservice"
@@ -38,6 +39,7 @@ const (
 	VideoServiceName              = "VideoService"
 	InteractionServiceName        = "InteractionService"
 	SocialServiceName             = "SocialService"
+	NoteServiceName               = "NoteService"
 )
 
 // 通用的RPC客户端初始化函数
@@ -77,4 +79,8 @@ func InitInteractionRPC() (*interactionservice.Client, error) {
 
 func InitSocialRPC() (*socialservice.Client, error) {
 	return initRPCClient(SocialServiceName, socialservice.NewClient)
+}
+
+func InitNoteRPC() (*notesservice.Client, error) {
+	return initRPCClient(NoteServiceName, notesservice.NewClient)
 }

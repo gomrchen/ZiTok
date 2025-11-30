@@ -51,6 +51,7 @@ struct GetCommentsRequest {
     1: required i64 video_id         // 视频ID
     2: required i32 page             // 页码
     3: required i32 size             // 每页大小
+    4: optional i64 comment_id       // 评论ID（可选，用于筛选特定评论）
 }
 
 // 获取评论列表响应

@@ -1,10 +1,12 @@
 package usecase
 
 import (
-	"context"
+    "context"
+    "time"
 
-	"github.com/yxrxy/videoHub/app/video/domain/model"
-	"github.com/yxrxy/videoHub/pkg/errno"
+    "github.com/yxrxy/videoHub/app/video/domain/model"
+    "github.com/yxrxy/videoHub/pkg/errno"
+    pkgcontext "github.com/yxrxy/videoHub/pkg/base/context"
 )
 
 func (s *useCase) Publish(ctx context.Context, userID int64, videoData []byte, contentType,
@@ -67,6 +69,25 @@ func (s *useCase) GetHotVideos(
 	return s.svc.GetHotVideos(ctx, limit, category, lastVisit, lastLike, lastID)
 }
 
+func (s *useCase) RecommendVideos(
+	ctx context.Context,
+	limit int32,
+) ([]*model.Video, error) {
+	// 1. 尝试个性化推荐
+	videos, err := s.svc.RecommendVideos(ctx, limit)
+	if err == nil && len(videos) > 0 {
+		return videos, nil
+	}
+	
+	// 2. 降级为热门视频
+	// 注意：GetHotVideos返回 cursor 等分页信息，这里我们只需要列表
+	hotVideos, _, _, _, _, err := s.svc.GetHotVideos(ctx, limit, "all", 0, 0, 0)
+	if err != nil {
+		return nil, err
+	}
+	return hotVideos, nil
+}
+
 func (s *useCase) DeleteVideo(ctx context.Context, videoID, userID int64) error {
 	video, err := s.db.GetVideoByID(ctx, videoID)
 	if err != nil {
@@ -88,11 +109,23 @@ func (s *useCase) DeleteVideo(ctx context.Context, videoID, userID int64) error 
 }
 
 func (s *useCase) IncrementVisitCount(ctx context.Context, videoID int64) error {
-	return s.db.IncrementVisitCount(ctx, videoID)
+    if err := s.db.IncrementVisitCount(ctx, videoID); err != nil {
+        return err
+    }
+    if uid, err := pkgcontext.GetUserID(ctx); err == nil && uid > 0 {
+        s.svc.ReportFeedback(ctx, uid, videoID, "read", time.Now())
+    }
+    return nil
 }
 
 func (s *useCase) IncrementLikeCount(ctx context.Context, videoID int64) error {
-	return s.db.IncrementLikeCount(ctx, videoID)
+    if err := s.db.IncrementLikeCount(ctx, videoID); err != nil {
+        return err
+    }
+    if uid, err := pkgcontext.GetUserID(ctx); err == nil && uid > 0 {
+        s.svc.ReportFeedback(ctx, uid, videoID, "like", time.Now())
+    }
+    return nil
 }
 
 func (s *useCase) SemanticSearch(
@@ -122,4 +155,8 @@ func (s *useCase) SemanticSearch(
 		res = append(res, item)
 	}
 	return res, nil
+}
+
+func (s *useCase) UploadCover(ctx context.Context, videoID int64, coverData []byte, contentType string) (string, error) {
+	return s.svc.UploadCover(ctx, videoID, coverData, contentType)
 }

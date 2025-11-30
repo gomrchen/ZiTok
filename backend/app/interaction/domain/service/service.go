@@ -73,9 +73,10 @@ func (s *InteractionService) Comment(ctx context.Context, userID int64, videoID 
 	return true, nil
 }
 
-func (s *InteractionService) GetComments(ctx context.Context, videoID int64, page int32, size int32) ([]*model.Comment, error) {
+func (s *InteractionService) GetComments(ctx context.Context, videoID int64, page int32, size int32, commentID *int64) ([]*model.Comment, error) {
 	offset := (page - 1) * size
-	comments, _, err := s.db.GetCommentList(ctx, videoID, int(offset), int(size))
+
+	comments, _, err := s.db.GetCommentList(ctx, videoID, int(offset), int(size), commentID)
 	if err != nil {
 		return nil, err
 	}

@@ -45,14 +45,22 @@ var fieldIDToName_BaseResp = map[int16]string{
 }
 
 type User struct {
-	Id            int64   `thrift:"id,1,required" frugal:"1,required,i64" json:"id"`
-	Username      string  `thrift:"username,2,required" frugal:"2,required,string" json:"username"`
-	Avatar        *string `thrift:"avatar,4,optional" frugal:"4,optional,string" json:"avatar,omitempty"`
-	FollowCount   *int64  `thrift:"followCount,6,optional" frugal:"6,optional,i64" json:"followCount,omitempty"`
-	FollowerCount *int64  `thrift:"followerCount,7,optional" frugal:"7,optional,i64" json:"followerCount,omitempty"`
-	IsFollow      *bool   `thrift:"isFollow,8,optional" frugal:"8,optional,bool" json:"isFollow,omitempty"`
-	LikeCount     *int64  `thrift:"likeCount,9,optional" frugal:"9,optional,i64" json:"likeCount,omitempty"`
-	VideoCount    *int64  `thrift:"videoCount,10,optional" frugal:"10,optional,i64" json:"videoCount,omitempty"`
+	Id             int64   `thrift:"id,1,required" frugal:"1,required,i64" json:"id"`
+	Username       string  `thrift:"username,2,required" frugal:"2,required,string" json:"username"`
+	Email          *string `thrift:"email,3,optional" frugal:"3,optional,string" json:"email,omitempty"`
+	Avatar         *string `thrift:"avatar,4,optional" frugal:"4,optional,string" json:"avatar,omitempty"`
+	BackgroundUrl  *string `thrift:"backgroundUrl,5,optional" frugal:"5,optional,string" json:"backgroundUrl,omitempty"`
+	Signature      *string `thrift:"signature,6,optional" frugal:"6,optional,string" json:"signature,omitempty"`
+	Gender         *int64  `thrift:"gender,7,optional" frugal:"7,optional,i64" json:"gender,omitempty"`
+	Birthday       *string `thrift:"birthday,8,optional" frugal:"8,optional,string" json:"birthday,omitempty"`
+	Status         *int64  `thrift:"status,9,optional" frugal:"9,optional,i64" json:"status,omitempty"`
+	FollowCount    *int64  `thrift:"followCount,10,optional" frugal:"10,optional,i64" json:"followCount,omitempty"`
+	FollowerCount  *int64  `thrift:"followerCount,11,optional" frugal:"11,optional,i64" json:"followerCount,omitempty"`
+	IsFollow       *bool   `thrift:"isFollow,12,optional" frugal:"12,optional,bool" json:"isFollow,omitempty"`
+	LikeCount      *int64  `thrift:"likeCount,13,optional" frugal:"13,optional,i64" json:"likeCount,omitempty"`
+	VideoCount     *int64  `thrift:"videoCount,14,optional" frugal:"14,optional,i64" json:"videoCount,omitempty"`
+	TotalFavorited *int64  `thrift:"totalFavorited,15,optional" frugal:"15,optional,i64" json:"totalFavorited,omitempty"`
+	WorkCount      *int64  `thrift:"workCount,16,optional" frugal:"16,optional,i64" json:"workCount,omitempty"`
 }
 
 func NewUser() *User {
@@ -70,6 +78,15 @@ func (p *User) GetUsername() (v string) {
 	return p.Username
 }
 
+var User_Email_DEFAULT string
+
+func (p *User) GetEmail() (v string) {
+	if !p.IsSetEmail() {
+		return User_Email_DEFAULT
+	}
+	return *p.Email
+}
+
 var User_Avatar_DEFAULT string
 
 func (p *User) GetAvatar() (v string) {
@@ -77,6 +94,51 @@ func (p *User) GetAvatar() (v string) {
 		return User_Avatar_DEFAULT
 	}
 	return *p.Avatar
+}
+
+var User_BackgroundUrl_DEFAULT string
+
+func (p *User) GetBackgroundUrl() (v string) {
+	if !p.IsSetBackgroundUrl() {
+		return User_BackgroundUrl_DEFAULT
+	}
+	return *p.BackgroundUrl
+}
+
+var User_Signature_DEFAULT string
+
+func (p *User) GetSignature() (v string) {
+	if !p.IsSetSignature() {
+		return User_Signature_DEFAULT
+	}
+	return *p.Signature
+}
+
+var User_Gender_DEFAULT int64
+
+func (p *User) GetGender() (v int64) {
+	if !p.IsSetGender() {
+		return User_Gender_DEFAULT
+	}
+	return *p.Gender
+}
+
+var User_Birthday_DEFAULT string
+
+func (p *User) GetBirthday() (v string) {
+	if !p.IsSetBirthday() {
+		return User_Birthday_DEFAULT
+	}
+	return *p.Birthday
+}
+
+var User_Status_DEFAULT int64
+
+func (p *User) GetStatus() (v int64) {
+	if !p.IsSetStatus() {
+		return User_Status_DEFAULT
+	}
+	return *p.Status
 }
 
 var User_FollowCount_DEFAULT int64
@@ -123,14 +185,50 @@ func (p *User) GetVideoCount() (v int64) {
 	}
 	return *p.VideoCount
 }
+
+var User_TotalFavorited_DEFAULT int64
+
+func (p *User) GetTotalFavorited() (v int64) {
+	if !p.IsSetTotalFavorited() {
+		return User_TotalFavorited_DEFAULT
+	}
+	return *p.TotalFavorited
+}
+
+var User_WorkCount_DEFAULT int64
+
+func (p *User) GetWorkCount() (v int64) {
+	if !p.IsSetWorkCount() {
+		return User_WorkCount_DEFAULT
+	}
+	return *p.WorkCount
+}
 func (p *User) SetId(val int64) {
 	p.Id = val
 }
 func (p *User) SetUsername(val string) {
 	p.Username = val
 }
+func (p *User) SetEmail(val *string) {
+	p.Email = val
+}
 func (p *User) SetAvatar(val *string) {
 	p.Avatar = val
+}
+func (p *User) SetBackgroundUrl(val *string) {
+	p.BackgroundUrl = val
+}
+func (p *User) SetSignature(val *string) {
+	p.Signature = val
+}
+func (p *User) SetGender(val *int64) {
+	p.Gender = val
+}
+func (p *User) SetBirthday(val *string) {
+	p.Birthday = val
+}
+func (p *User) SetStatus(val *int64) {
+	p.Status = val
 }
 func (p *User) SetFollowCount(val *int64) {
 	p.FollowCount = val
@@ -147,9 +245,39 @@ func (p *User) SetLikeCount(val *int64) {
 func (p *User) SetVideoCount(val *int64) {
 	p.VideoCount = val
 }
+func (p *User) SetTotalFavorited(val *int64) {
+	p.TotalFavorited = val
+}
+func (p *User) SetWorkCount(val *int64) {
+	p.WorkCount = val
+}
+
+func (p *User) IsSetEmail() bool {
+	return p.Email != nil
+}
 
 func (p *User) IsSetAvatar() bool {
 	return p.Avatar != nil
+}
+
+func (p *User) IsSetBackgroundUrl() bool {
+	return p.BackgroundUrl != nil
+}
+
+func (p *User) IsSetSignature() bool {
+	return p.Signature != nil
+}
+
+func (p *User) IsSetGender() bool {
+	return p.Gender != nil
+}
+
+func (p *User) IsSetBirthday() bool {
+	return p.Birthday != nil
+}
+
+func (p *User) IsSetStatus() bool {
+	return p.Status != nil
 }
 
 func (p *User) IsSetFollowCount() bool {
@@ -172,6 +300,14 @@ func (p *User) IsSetVideoCount() bool {
 	return p.VideoCount != nil
 }
 
+func (p *User) IsSetTotalFavorited() bool {
+	return p.TotalFavorited != nil
+}
+
+func (p *User) IsSetWorkCount() bool {
+	return p.WorkCount != nil
+}
+
 func (p *User) String() string {
 	if p == nil {
 		return "<nil>"
@@ -182,12 +318,20 @@ func (p *User) String() string {
 var fieldIDToName_User = map[int16]string{
 	1:  "id",
 	2:  "username",
+	3:  "email",
 	4:  "avatar",
-	6:  "followCount",
-	7:  "followerCount",
-	8:  "isFollow",
-	9:  "likeCount",
-	10: "videoCount",
+	5:  "backgroundUrl",
+	6:  "signature",
+	7:  "gender",
+	8:  "birthday",
+	9:  "status",
+	10: "followCount",
+	11: "followerCount",
+	12: "isFollow",
+	13: "likeCount",
+	14: "videoCount",
+	15: "totalFavorited",
+	16: "workCount",
 }
 
 type Video struct {
@@ -389,6 +533,7 @@ type Comment struct {
 	User      *User  `thrift:"user,5,optional" frugal:"5,optional,User" json:"user,omitempty"`
 	CreatedAt *int64 `thrift:"createdAt,6,optional" frugal:"6,optional,i64" json:"createdAt,omitempty"`
 	UpdatedAt *int64 `thrift:"updatedAt,7,optional" frugal:"7,optional,i64" json:"updatedAt,omitempty"`
+	ParentId  *int64 `thrift:"parentId,8,optional" frugal:"8,optional,i64" json:"parentId,omitempty"`
 }
 
 func NewComment() *Comment {
@@ -440,6 +585,15 @@ func (p *Comment) GetUpdatedAt() (v int64) {
 	}
 	return *p.UpdatedAt
 }
+
+var Comment_ParentId_DEFAULT int64
+
+func (p *Comment) GetParentId() (v int64) {
+	if !p.IsSetParentId() {
+		return Comment_ParentId_DEFAULT
+	}
+	return *p.ParentId
+}
 func (p *Comment) SetId(val int64) {
 	p.Id = val
 }
@@ -461,6 +615,9 @@ func (p *Comment) SetCreatedAt(val *int64) {
 func (p *Comment) SetUpdatedAt(val *int64) {
 	p.UpdatedAt = val
 }
+func (p *Comment) SetParentId(val *int64) {
+	p.ParentId = val
+}
 
 func (p *Comment) IsSetUser() bool {
 	return p.User != nil
@@ -472,6 +629,10 @@ func (p *Comment) IsSetCreatedAt() bool {
 
 func (p *Comment) IsSetUpdatedAt() bool {
 	return p.UpdatedAt != nil
+}
+
+func (p *Comment) IsSetParentId() bool {
+	return p.ParentId != nil
 }
 
 func (p *Comment) String() string {
@@ -489,6 +650,7 @@ var fieldIDToName_Comment = map[int16]string{
 	5: "user",
 	6: "createdAt",
 	7: "updatedAt",
+	8: "parentId",
 }
 
 type LikeInfo struct {
@@ -1389,4 +1551,78 @@ var fieldIDToName_SemanticSearchResultItem = map[int16]string{
 	2: "summary",
 	3: "related_queries",
 	4: "from_cache",
+}
+
+type FavoriteInfo struct {
+	Id        int64  `thrift:"id,1,required" frugal:"1,required,i64" json:"id"`
+	UserId    int64  `thrift:"user_id,2,required" frugal:"2,required,i64" json:"user_id"`
+	VideoId   int64  `thrift:"video_id,3,required" frugal:"3,required,i64" json:"video_id"`
+	CreatedAt int64  `thrift:"created_at,4,required" frugal:"4,required,i64" json:"created_at"`
+	DeletedAt *int64 `thrift:"deleted_at,5,optional" frugal:"5,optional,i64" json:"deleted_at,omitempty"`
+}
+
+func NewFavoriteInfo() *FavoriteInfo {
+	return &FavoriteInfo{}
+}
+
+func (p *FavoriteInfo) InitDefault() {
+}
+
+func (p *FavoriteInfo) GetId() (v int64) {
+	return p.Id
+}
+
+func (p *FavoriteInfo) GetUserId() (v int64) {
+	return p.UserId
+}
+
+func (p *FavoriteInfo) GetVideoId() (v int64) {
+	return p.VideoId
+}
+
+func (p *FavoriteInfo) GetCreatedAt() (v int64) {
+	return p.CreatedAt
+}
+
+var FavoriteInfo_DeletedAt_DEFAULT int64
+
+func (p *FavoriteInfo) GetDeletedAt() (v int64) {
+	if !p.IsSetDeletedAt() {
+		return FavoriteInfo_DeletedAt_DEFAULT
+	}
+	return *p.DeletedAt
+}
+func (p *FavoriteInfo) SetId(val int64) {
+	p.Id = val
+}
+func (p *FavoriteInfo) SetUserId(val int64) {
+	p.UserId = val
+}
+func (p *FavoriteInfo) SetVideoId(val int64) {
+	p.VideoId = val
+}
+func (p *FavoriteInfo) SetCreatedAt(val int64) {
+	p.CreatedAt = val
+}
+func (p *FavoriteInfo) SetDeletedAt(val *int64) {
+	p.DeletedAt = val
+}
+
+func (p *FavoriteInfo) IsSetDeletedAt() bool {
+	return p.DeletedAt != nil
+}
+
+func (p *FavoriteInfo) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("FavoriteInfo(%+v)", *p)
+}
+
+var fieldIDToName_FavoriteInfo = map[int16]string{
+	1: "id",
+	2: "user_id",
+	3: "video_id",
+	4: "created_at",
+	5: "deleted_at",
 }

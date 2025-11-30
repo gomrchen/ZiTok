@@ -22,6 +22,7 @@ type SocialDB interface {
 
 	// 好友关系相关
 	AddFriend(ctx context.Context, friendship *model.Friendship) error
+	UpdateFriendship(ctx context.Context, friendship *model.Friendship) error
 	GetFriendship(ctx context.Context, userID, friendID int64) (*model.Friendship, error)
 	GetUserFriends(ctx context.Context, userID int64) ([]model.Friendship, error)
 
@@ -33,6 +34,9 @@ type SocialDB interface {
 	// 消息已读状态相关
 	MarkMessageRead(ctx context.Context, messageID, userID int64) error
 	GetUnreadMessageCount(ctx context.Context, userID int64) (int64, error)
+
+	// 用户验证相关
+	IsUserExists(ctx context.Context, userID int64) (bool, error)
 }
 
 type SocialCache interface {

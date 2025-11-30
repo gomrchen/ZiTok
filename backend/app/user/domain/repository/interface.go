@@ -14,6 +14,15 @@ type UserDB interface {
 	GetUserByID(ctx context.Context, id int64) (*model.User, error)
 	UpdateUser(ctx context.Context, user *model.User) error
 	UpdateAvatar(ctx context.Context, user *model.User) error
+	UpdateBackground(ctx context.Context, user *model.User) error
+	FindUserByEmail(ctx context.Context, email string) (int64, error)
+	FindUsersByUsername(ctx context.Context, username string) ([]*model.User, error)
+
+	// --- 收藏相关方法 ---
+	FavoriteVideo(ctx context.Context, userID, videoID int64) error
+	UnfavoriteVideo(ctx context.Context, userID, videoID int64) error
+	GetFavoriteVideos(ctx context.Context, userID int64, page, size int) ([]int64, int64, error)
+	IsVideoFavorited(ctx context.Context, userID, videoID int64) (bool, error)
 }
 
 type UserCache interface {

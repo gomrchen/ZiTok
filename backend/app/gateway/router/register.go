@@ -5,6 +5,7 @@ package router
 import (
 	"github.com/cloudwego/hertz/pkg/app/server"
 	api_interaction "github.com/yxrxy/videoHub/app/gateway/router/api/interaction"
+	api_notes "github.com/yxrxy/videoHub/app/gateway/router/api/notes"
 	api_social "github.com/yxrxy/videoHub/app/gateway/router/api/social"
 	api_user "github.com/yxrxy/videoHub/app/gateway/router/api/user"
 	api_video "github.com/yxrxy/videoHub/app/gateway/router/api/video"
@@ -20,5 +21,7 @@ func GeneratedRegister(r *server.Hertz) {
 	api_user.Register(r)
 
 	api_social.Register(r)
+
+	api_notes.Register(r)
 
 }

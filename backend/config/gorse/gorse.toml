@@ -1,0 +1,59 @@
+# ====================== 1. 数据库配置 ======================
+[database]
+# 使用你已有的 MySQL 数据库 videohub
+# 注意这里 host 用的是 docker-compose 里的服务名 videohub-mysql
+data_store = "mysql://videohub:videohub@tcp(videohub-mysql:3306)/videohub?parseTime=true"
+
+# 使用 Redis 做缓存，密码是 videohub
+# 没有用户名时，写成 :password@host 的形式
+cache_store = "redis://:videohub@videohub-redis:6379/0"
+
+# 给 Gorse 的表加前缀，避免和你原有表撞名
+table_prefix = "gorse_"
+
+# ====================== 2. master 节点（Dashboard/HTTP） ======================
+[master]
+host      = "0.0.0.0"
+port      = 8086          # gRPC 端口（一般用不到）
+http_host = "0.0.0.0"
+http_port = 8088          # 非常重要：Dashboard + REST API 都在这个端口
+
+# Dashboard 登录账号和密码（可以按需修改）
+dashboard_user_name = "admin"
+dashboard_password  = "admin123"
+
+# ====================== 3. server 节点（RESTful API） ======================
+[server]
+# 关键：这里设置 API Key（就是你问的那个东西）
+# 任意字符串即可，只要和你应用 config.yaml 里的 gorse.api_key 一致。
+api_key = "videohub_gorse_key_2025"
+
+# 默认一次返回多少个推荐
+default_n = 20
+
+# 推荐：自动创建用户和 item（这样就算先插 feedback 也不会报错）
+auto_insert_user = true
+auto_insert_item = true
+
+# ====================== 4. 推荐策略（作业版简化） ======================
+[recommend]
+# 用默认值就行，不写也可以，这里只是示意
+
+[recommend.data_source]
+# 正反馈行为：只用 "like"，足够完成作业
+positive_feedback_types = ["like"]
+# 浏览/阅读行为（可选）
+read_feedback_types = ["view"]
+
+[recommend.offline]
+# 开启最基础的三种推荐来源
+enable_collaborative_recommend = true
+enable_latest_recommend = true
+enable_popular_recommend = true
+enable_user_based_recommend = false
+enable_item_based_recommend = false
+enable_click_through_prediction = false
+
+[recommend.online]
+# 离线推荐不够的时候兜底走 latest
+fallback_recommend = ["latest"]

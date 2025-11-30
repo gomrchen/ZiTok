@@ -16,13 +16,16 @@ import (
 	"github.com/yxrxy/videoHub/pkg/storage"
 )
 
+// Register 注册逻辑
 func (s *UserService) Register(ctx context.Context, req *model.User) (int64, error) {
 	passwordHash := fmt.Sprintf("%x", md5.Sum([]byte(req.Password)))
 
 	newUser := &model.User{
 		Username:  req.Username,
 		Password:  passwordHash,
+		Email:     req.Email, // 处理 Email
 		AvatarURL: config.User.DefaultAvatar,
+        // BackgroundURL 可以设置默认值，或者为空
 	}
 
 	id, err := s.db.CreateUser(ctx, newUser)
@@ -33,6 +36,7 @@ func (s *UserService) Register(ctx context.Context, req *model.User) (int64, err
 	return id, nil
 }
 
+// Login 登录逻辑
 func (s *UserService) Login(ctx context.Context, u *model.User) (*model.User, error) {
 	// 从数据库获取用户信息
 	dbUser, err := s.db.GetUserInfo(ctx, u.Username)
@@ -60,25 +64,23 @@ func (s *UserService) Login(ctx context.Context, u *model.User) (*model.User, er
 
 	// 将令牌存入缓存
 	if err := s.cache.SetUserAccessToken(ctx, fmt.Sprintf("access_token:%d", dbUser.ID), token); err != nil {
-		// 这里我们只记录错误但不返回，因为主要流程已经成功
 		log.Printf("failed to cache access token: %v", err)
 	}
 	if err := s.cache.SetUserRefreshToken(ctx, fmt.Sprintf("refresh_token:%d", dbUser.ID), refreshToken); err != nil {
 		log.Printf("failed to cache refresh token: %v", err)
 	}
 
-	return &model.User{
-		ID:           dbUser.ID,
-		Username:     dbUser.Username,
-		AvatarURL:    dbUser.AvatarURL,
-		Token:        token,
-		RefreshToken: refreshToken,
-	}, nil
+    // 返回完整的用户信息，包括新生成的 token
+    dbUser.Token = token
+    dbUser.RefreshToken = refreshToken
+    
+	return dbUser, nil
 }
 
-func (s *UserService) UploadAvatar(ctx context.Context, uid int64, avatarData []byte, contentType string) (string, error) {
+// UploadAvatar 上传头像并更新 DB，返回更新后的 User
+func (s *UserService) UploadAvatar(ctx context.Context, uid int64, avatarData []byte, contentType string) (*model.User, error) {
 	if !isValidImageType(contentType) {
-		return "", errno.NewErrNo(errno.InternalServiceErrorCode, "invalid param")
+		return nil, errno.NewErrNo(errno.InternalServiceErrorCode, "invalid param: content type")
 	}
 
 	fileName := fmt.Sprintf("avatar_%d_%d.%s", uid, time.Now().Unix(), getFileExt(contentType))
@@ -86,23 +88,54 @@ func (s *UserService) UploadAvatar(ctx context.Context, uid int64, avatarData []
 	storage := storage.NewLocalStorage(config.Upload.Avatar.UploadDir, config.Upload.Avatar.BaseURL)
 	avatarURL, err := storage.Save(avatarData, fileName)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
+    // 更新 DB
 	if err := s.db.UpdateAvatar(ctx, &model.User{
 		ID:        uid,
 		AvatarURL: avatarURL,
 	}); err != nil {
-		return "", err
+		return nil, err
 	}
 
-	return avatarURL, nil
+    // 获取最新用户信息返回
+    return s.db.GetUserByID(ctx, uid)
 }
+
+// UploadBackground 上传背景图并更新 DB，返回更新后的 User (新增)
+func (s *UserService) UploadBackground(ctx context.Context, uid int64, backgroundData []byte, contentType string) (*model.User, error) {
+	if !isValidImageType(contentType) {
+		return nil, errno.NewErrNo(errno.InternalServiceErrorCode, "invalid param: content type")
+	}
+
+	fileName := fmt.Sprintf("bg_%d_%d.%s", uid, time.Now().Unix(), getFileExt(contentType))
+
+    // 假设使用与头像相同的存储策略，或者可以在 config 中配置独立的 Background 目录
+	storage := storage.NewLocalStorage(config.Upload.Avatar.UploadDir, config.Upload.Avatar.BaseURL)
+	bgURL, err := storage.Save(backgroundData, fileName)
+	if err != nil {
+		return nil, err
+	}
+
+    // 更新 DB (需要在 repository 中实现 UpdateBackground)
+	if err := s.db.UpdateBackground(ctx, &model.User{
+		ID:            uid,
+		BackgroundURL: bgURL,
+	}); err != nil {
+		return nil, err
+	}
+
+    // 获取最新用户信息返回
+    return s.db.GetUserByID(ctx, uid)
+}
+
 
 func isValidImageType(contentType string) bool {
 	validTypes := map[string]bool{
 		"image/jpeg": true,
 		"image/png":  true,
+        "image/jpg":  true,
 	}
 	return validTypes[contentType]
 }
@@ -120,25 +153,49 @@ func getFileExt(contentType string) string {
 	}
 }
 
-func (s *UserService) RefreshToken(ctx context.Context, uid int64) (string, error) {
-	refreshToken, err := s.cache.GetToken(ctx, fmt.Sprintf("refresh_token:%d", uid))
+// RefreshToken 根据 refresh_token 刷新并返回双 token
+// 修改：入参为 refreshToken 字符串，返回 (accessToken, refreshToken, error)
+func (s *UserService) RefreshToken(ctx context.Context, refreshTokenStr string) (string, string, error) {
+    // 1. 解析传入的 refresh token
+	claims, err := jwt.ParseRefreshToken(refreshTokenStr)
 	if err != nil {
-		if errors.Is(err, redis.Nil) { // token不存在或已过期
-			return "", errno.NewErrNo(errno.AuthRefreshExpiredCode, "refresh token expired")
+		return "", "", errno.NewErrNo(errno.AuthRefreshExpiredCode, "invalid refresh token")
+	}
+    
+    uid := claims.UserID
+
+    // 2. 验证缓存中的 refresh token 是否一致 (可选，增强安全性)
+	cachedToken, err := s.cache.GetToken(ctx, fmt.Sprintf("refresh_token:%d", uid))
+	if err != nil {
+		if errors.Is(err, redis.Nil) { 
+			return "", "", errno.NewErrNo(errno.AuthRefreshExpiredCode, "refresh token expired")
 		}
-		// Redis连接错误等其他错误
-		return "", errno.NewErrNo(errno.InternalRedisErrorCode, "failed to get refresh token")
+		return "", "", errno.NewErrNo(errno.InternalRedisErrorCode, "failed to get refresh token")
 	}
+    if cachedToken != refreshTokenStr {
+        return "", "", errno.NewErrNo(errno.AuthRefreshExpiredCode, "token mismatch")
+    }
 
-	claims, err := jwt.ParseRefreshToken(refreshToken)
+    // 3. 生成新双 token
+	newToken, err := jwt.GenerateToken(uid)
 	if err != nil {
-		return "", err
+		return "", "", err
+	}
+    
+    // 这里不仅生成 AccessToken，通常 RefreshToken 也建议一起轮转，或者保持原样
+    // 假设我们一起轮转：
+    newRefreshToken, err := jwt.GenerateRefreshToken(uid)
+    if err != nil {
+        return "", "", err
+    }
+
+    // 4. 更新缓存
+    if err := s.cache.SetUserAccessToken(ctx, fmt.Sprintf("access_token:%d", uid), newToken); err != nil {
+		log.Printf("failed to cache access token: %v", err)
+	}
+	if err := s.cache.SetUserRefreshToken(ctx, fmt.Sprintf("refresh_token:%d", uid), newRefreshToken); err != nil {
+		log.Printf("failed to cache refresh token: %v", err)
 	}
 
-	newToken, err := jwt.GenerateToken(claims.UserID)
-	if err != nil {
-		return "", err
-	}
-
-	return newToken, nil
+	return newToken, newRefreshToken, nil
 }

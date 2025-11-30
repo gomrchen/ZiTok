@@ -34,6 +34,13 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"UpdateUserInfo": kitex.NewMethodInfo(
+		updateUserInfoHandler,
+		newUserServiceUpdateUserInfoArgs,
+		newUserServiceUpdateUserInfoResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 	"UploadAvatar": kitex.NewMethodInfo(
 		uploadAvatarHandler,
 		newUserServiceUploadAvatarArgs,
@@ -41,10 +48,52 @@ var serviceMethods = map[string]kitex.MethodInfo{
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
+	"UploadBackground": kitex.NewMethodInfo(
+		uploadBackgroundHandler,
+		newUserServiceUploadBackgroundArgs,
+		newUserServiceUploadBackgroundResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
 	"RefreshToken": kitex.NewMethodInfo(
 		refreshTokenHandler,
 		newUserServiceRefreshTokenArgs,
 		newUserServiceRefreshTokenResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"FindUsersByUsername": kitex.NewMethodInfo(
+		findUsersByUsernameHandler,
+		newUserServiceFindUsersByUsernameArgs,
+		newUserServiceFindUsersByUsernameResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"FindUserByEmail": kitex.NewMethodInfo(
+		findUserByEmailHandler,
+		newUserServiceFindUserByEmailArgs,
+		newUserServiceFindUserByEmailResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"FavoriteVideo": kitex.NewMethodInfo(
+		favoriteVideoHandler,
+		newUserServiceFavoriteVideoArgs,
+		newUserServiceFavoriteVideoResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"UnfavoriteVideo": kitex.NewMethodInfo(
+		unfavoriteVideoHandler,
+		newUserServiceUnfavoriteVideoArgs,
+		newUserServiceUnfavoriteVideoResult,
+		false,
+		kitex.WithStreamingMode(kitex.StreamingNone),
+	),
+	"GetFavoriteVideos": kitex.NewMethodInfo(
+		getFavoriteVideosHandler,
+		newUserServiceGetFavoriteVideosArgs,
+		newUserServiceGetFavoriteVideosResult,
 		false,
 		kitex.WithStreamingMode(kitex.StreamingNone),
 	),
@@ -168,6 +217,24 @@ func newUserServiceGetUserInfoResult() interface{} {
 	return user.NewUserServiceGetUserInfoResult()
 }
 
+func updateUserInfoHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*user.UserServiceUpdateUserInfoArgs)
+	realResult := result.(*user.UserServiceUpdateUserInfoResult)
+	success, err := handler.(user.UserService).UpdateUserInfo(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newUserServiceUpdateUserInfoArgs() interface{} {
+	return user.NewUserServiceUpdateUserInfoArgs()
+}
+
+func newUserServiceUpdateUserInfoResult() interface{} {
+	return user.NewUserServiceUpdateUserInfoResult()
+}
+
 func uploadAvatarHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
 	realArg := arg.(*user.UserServiceUploadAvatarArgs)
 	realResult := result.(*user.UserServiceUploadAvatarResult)
@@ -186,6 +253,24 @@ func newUserServiceUploadAvatarResult() interface{} {
 	return user.NewUserServiceUploadAvatarResult()
 }
 
+func uploadBackgroundHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*user.UserServiceUploadBackgroundArgs)
+	realResult := result.(*user.UserServiceUploadBackgroundResult)
+	success, err := handler.(user.UserService).UploadBackground(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newUserServiceUploadBackgroundArgs() interface{} {
+	return user.NewUserServiceUploadBackgroundArgs()
+}
+
+func newUserServiceUploadBackgroundResult() interface{} {
+	return user.NewUserServiceUploadBackgroundResult()
+}
+
 func refreshTokenHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
 	realArg := arg.(*user.UserServiceRefreshTokenArgs)
 	realResult := result.(*user.UserServiceRefreshTokenResult)
@@ -202,6 +287,96 @@ func newUserServiceRefreshTokenArgs() interface{} {
 
 func newUserServiceRefreshTokenResult() interface{} {
 	return user.NewUserServiceRefreshTokenResult()
+}
+
+func findUsersByUsernameHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*user.UserServiceFindUsersByUsernameArgs)
+	realResult := result.(*user.UserServiceFindUsersByUsernameResult)
+	success, err := handler.(user.UserService).FindUsersByUsername(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newUserServiceFindUsersByUsernameArgs() interface{} {
+	return user.NewUserServiceFindUsersByUsernameArgs()
+}
+
+func newUserServiceFindUsersByUsernameResult() interface{} {
+	return user.NewUserServiceFindUsersByUsernameResult()
+}
+
+func findUserByEmailHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*user.UserServiceFindUserByEmailArgs)
+	realResult := result.(*user.UserServiceFindUserByEmailResult)
+	success, err := handler.(user.UserService).FindUserByEmail(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newUserServiceFindUserByEmailArgs() interface{} {
+	return user.NewUserServiceFindUserByEmailArgs()
+}
+
+func newUserServiceFindUserByEmailResult() interface{} {
+	return user.NewUserServiceFindUserByEmailResult()
+}
+
+func favoriteVideoHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*user.UserServiceFavoriteVideoArgs)
+	realResult := result.(*user.UserServiceFavoriteVideoResult)
+	success, err := handler.(user.UserService).FavoriteVideo(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newUserServiceFavoriteVideoArgs() interface{} {
+	return user.NewUserServiceFavoriteVideoArgs()
+}
+
+func newUserServiceFavoriteVideoResult() interface{} {
+	return user.NewUserServiceFavoriteVideoResult()
+}
+
+func unfavoriteVideoHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*user.UserServiceUnfavoriteVideoArgs)
+	realResult := result.(*user.UserServiceUnfavoriteVideoResult)
+	success, err := handler.(user.UserService).UnfavoriteVideo(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newUserServiceUnfavoriteVideoArgs() interface{} {
+	return user.NewUserServiceUnfavoriteVideoArgs()
+}
+
+func newUserServiceUnfavoriteVideoResult() interface{} {
+	return user.NewUserServiceUnfavoriteVideoResult()
+}
+
+func getFavoriteVideosHandler(ctx context.Context, handler interface{}, arg, result interface{}) error {
+	realArg := arg.(*user.UserServiceGetFavoriteVideosArgs)
+	realResult := result.(*user.UserServiceGetFavoriteVideosResult)
+	success, err := handler.(user.UserService).GetFavoriteVideos(ctx, realArg.Req)
+	if err != nil {
+		return err
+	}
+	realResult.Success = success
+	return nil
+}
+func newUserServiceGetFavoriteVideosArgs() interface{} {
+	return user.NewUserServiceGetFavoriteVideosArgs()
+}
+
+func newUserServiceGetFavoriteVideosResult() interface{} {
+	return user.NewUserServiceGetFavoriteVideosResult()
 }
 
 type kClient struct {
@@ -244,6 +419,16 @@ func (p *kClient) GetUserInfo(ctx context.Context, req *user.UserInfoRequest) (r
 	return _result.GetSuccess(), nil
 }
 
+func (p *kClient) UpdateUserInfo(ctx context.Context, req *user.UpdateUserInfoRequest) (r *user.UpdateUserInfoResponse, err error) {
+	var _args user.UserServiceUpdateUserInfoArgs
+	_args.Req = req
+	var _result user.UserServiceUpdateUserInfoResult
+	if err = p.c.Call(ctx, "UpdateUserInfo", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
 func (p *kClient) UploadAvatar(ctx context.Context, req *user.UploadAvatarRequest) (r *user.UploadAvatarResponse, err error) {
 	var _args user.UserServiceUploadAvatarArgs
 	_args.Req = req
@@ -254,11 +439,71 @@ func (p *kClient) UploadAvatar(ctx context.Context, req *user.UploadAvatarReques
 	return _result.GetSuccess(), nil
 }
 
+func (p *kClient) UploadBackground(ctx context.Context, req *user.UploadBackgroundRequest) (r *user.UploadBackgroundResponse, err error) {
+	var _args user.UserServiceUploadBackgroundArgs
+	_args.Req = req
+	var _result user.UserServiceUploadBackgroundResult
+	if err = p.c.Call(ctx, "UploadBackground", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
 func (p *kClient) RefreshToken(ctx context.Context, req *user.RefreshTokenRequest) (r *user.RefreshTokenResponse, err error) {
 	var _args user.UserServiceRefreshTokenArgs
 	_args.Req = req
 	var _result user.UserServiceRefreshTokenResult
 	if err = p.c.Call(ctx, "RefreshToken", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) FindUsersByUsername(ctx context.Context, req *user.FindUsersByUsernameRequest) (r *user.FindUsersByUsernameResponse, err error) {
+	var _args user.UserServiceFindUsersByUsernameArgs
+	_args.Req = req
+	var _result user.UserServiceFindUsersByUsernameResult
+	if err = p.c.Call(ctx, "FindUsersByUsername", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) FindUserByEmail(ctx context.Context, req *user.FindUserByEmailRequest) (r *user.FindUserByEmailResponse, err error) {
+	var _args user.UserServiceFindUserByEmailArgs
+	_args.Req = req
+	var _result user.UserServiceFindUserByEmailResult
+	if err = p.c.Call(ctx, "FindUserByEmail", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) FavoriteVideo(ctx context.Context, req *user.FavoriteVideoRequest) (r *user.FavoriteVideoResponse, err error) {
+	var _args user.UserServiceFavoriteVideoArgs
+	_args.Req = req
+	var _result user.UserServiceFavoriteVideoResult
+	if err = p.c.Call(ctx, "FavoriteVideo", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) UnfavoriteVideo(ctx context.Context, req *user.UnfavoriteVideoRequest) (r *user.UnfavoriteVideoResponse, err error) {
+	var _args user.UserServiceUnfavoriteVideoArgs
+	_args.Req = req
+	var _result user.UserServiceUnfavoriteVideoResult
+	if err = p.c.Call(ctx, "UnfavoriteVideo", &_args, &_result); err != nil {
+		return
+	}
+	return _result.GetSuccess(), nil
+}
+
+func (p *kClient) GetFavoriteVideos(ctx context.Context, req *user.GetFavoriteVideosRequest) (r *user.GetFavoriteVideosResponse, err error) {
+	var _args user.UserServiceGetFavoriteVideosArgs
+	_args.Req = req
+	var _result user.UserServiceGetFavoriteVideosResult
+	if err = p.c.Call(ctx, "GetFavoriteVideos", &_args, &_result); err != nil {
 		return
 	}
 	return _result.GetSuccess(), nil

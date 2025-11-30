@@ -1,6 +1,6 @@
-# ZiTok-VideoHub API
+# VideoHub
 
-API文档: https://s.apifox.cn/e938def1-534a-419b-b74a-75a18b662375n
+API文档: https://2pr5l6um26.apifox.cn
 
 ## 服务接口列表
 

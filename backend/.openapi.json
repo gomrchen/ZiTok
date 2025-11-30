@@ -1,0 +1,206 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "VideoHub 笔记模块 API",
+    "version": "1.0.0",
+    "description": "笔记模块的网关接口定义"
+  },
+  "servers": [
+    { "url": "http://localhost" }
+  ],
+  "paths": {
+    "/api/v1/note/create": {
+      "post": {
+        "summary": "创建笔记",
+        "security": [ { "BearerAuth": [] } ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/CreateNoteRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "创建成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": { "note_id": { "type": "integer", "format": "int64" } }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/note/delete": {
+      "post": {
+        "summary": "删除笔记",
+        "security": [ { "BearerAuth": [] } ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/DeleteNoteRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "删除成功" }
+        }
+      }
+    },
+    "/api/v1/note/video": {
+      "get": {
+        "summary": "获取视频的笔记列表",
+        "parameters": [
+          { "name": "videoId", "in": "query", "required": true, "schema": { "type": "integer", "format": "int64" } },
+          { "name": "page", "in": "query", "required": false, "schema": { "type": "integer", "default": 1 } },
+          { "name": "pageSize", "in": "query", "required": false, "schema": { "type": "integer", "default": 10 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "笔记列表",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GetNotesResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/note/user": {
+      "get": {
+        "summary": "获取用户的笔记列表",
+        "parameters": [
+          { "name": "userId", "in": "query", "required": true, "schema": { "type": "integer", "format": "int64" } },
+          { "name": "page", "in": "query", "required": false, "schema": { "type": "integer", "default": 1 } },
+          { "name": "pageSize", "in": "query", "required": false, "schema": { "type": "integer", "default": 10 } }
+        ],
+        "responses": {
+          "200": {
+            "description": "笔记列表",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GetNotesResponse" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/note/like": {
+      "post": {
+        "summary": "点赞笔记",
+        "security": [ { "BearerAuth": [] } ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/LikeNoteRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "点赞成功" }
+        }
+      }
+    },
+    "/api/v1/note/favorite": {
+      "post": {
+        "summary": "收藏笔记",
+        "security": [ { "BearerAuth": [] } ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/FavoriteNoteRequest" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "收藏成功" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "schemas": {
+      "CreateNoteRequest": {
+        "type": "object",
+        "properties": {
+          "video_id": { "type": "integer", "format": "int64" },
+          "title": { "type": "string" },
+          "content": { "type": "string" },
+          "seconds": { "type": "integer", "format": "int32" }
+        },
+        "required": ["video_id", "title", "content", "seconds"]
+      },
+      "DeleteNoteRequest": {
+        "type": "object",
+        "properties": {
+          "note_id": { "type": "integer", "format": "int64" }
+        },
+        "required": ["note_id"]
+      },
+      "LikeNoteRequest": {
+        "type": "object",
+        "properties": {
+          "note_id": { "type": "integer", "format": "int64" }
+        },
+        "required": ["note_id"]
+      },
+      "FavoriteNoteRequest": {
+        "type": "object",
+        "properties": {
+          "note_id": { "type": "integer", "format": "int64" }
+        },
+        "required": ["note_id"]
+      },
+      "NoteInfo": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "integer", "format": "int64" },
+          "user_id": { "type": "integer", "format": "int64" },
+          "video_id": { "type": "integer", "format": "int64" },
+          "title": { "type": "string" },
+          "content": { "type": "string" },
+          "seconds": { "type": "integer", "format": "int32" },
+          "created_at": { "type": "integer", "format": "int64" },
+          "updated_at": { "type": "integer", "format": "int64" },
+          "like_count": { "type": "integer", "format": "int32" },
+          "comment_count": { "type": "integer", "format": "int32" },
+          "favorite_count": { "type": "integer", "format": "int32" },
+          "is_liked": { "type": "boolean" },
+          "is_favorited": { "type": "boolean" }
+        }
+      },
+      "GetNotesResponse": {
+        "type": "object",
+        "properties": {
+          "Base": {
+            "type": "object",
+            "properties": {
+              "code": { "type": "integer" },
+              "msg": { "type": "string" }
+            }
+          },
+          "notes": { "type": "array", "items": { "$ref": "#/components/schemas/NoteInfo" } },
+          "total": { "type": "integer", "format": "int64" }
+        },
+        "required": ["notes", "total"]
+      }
+    }
+  }
+}

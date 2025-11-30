@@ -14,8 +14,15 @@ type Client interface {
 	Register(ctx context.Context, req *user.RegisterRequest, callOptions ...callopt.Option) (r *user.RegisterResponse, err error)
 	Login(ctx context.Context, req *user.LoginRequest, callOptions ...callopt.Option) (r *user.LoginResponse, err error)
 	GetUserInfo(ctx context.Context, req *user.UserInfoRequest, callOptions ...callopt.Option) (r *user.UserInfoResponse, err error)
+	UpdateUserInfo(ctx context.Context, req *user.UpdateUserInfoRequest, callOptions ...callopt.Option) (r *user.UpdateUserInfoResponse, err error)
 	UploadAvatar(ctx context.Context, req *user.UploadAvatarRequest, callOptions ...callopt.Option) (r *user.UploadAvatarResponse, err error)
+	UploadBackground(ctx context.Context, req *user.UploadBackgroundRequest, callOptions ...callopt.Option) (r *user.UploadBackgroundResponse, err error)
 	RefreshToken(ctx context.Context, req *user.RefreshTokenRequest, callOptions ...callopt.Option) (r *user.RefreshTokenResponse, err error)
+	FindUsersByUsername(ctx context.Context, req *user.FindUsersByUsernameRequest, callOptions ...callopt.Option) (r *user.FindUsersByUsernameResponse, err error)
+	FindUserByEmail(ctx context.Context, req *user.FindUserByEmailRequest, callOptions ...callopt.Option) (r *user.FindUserByEmailResponse, err error)
+	FavoriteVideo(ctx context.Context, req *user.FavoriteVideoRequest, callOptions ...callopt.Option) (r *user.FavoriteVideoResponse, err error)
+	UnfavoriteVideo(ctx context.Context, req *user.UnfavoriteVideoRequest, callOptions ...callopt.Option) (r *user.UnfavoriteVideoResponse, err error)
+	GetFavoriteVideos(ctx context.Context, req *user.GetFavoriteVideosRequest, callOptions ...callopt.Option) (r *user.GetFavoriteVideosResponse, err error)
 }
 
 // NewClient creates a client for the service defined in IDL.
@@ -62,12 +69,47 @@ func (p *kUserServiceClient) GetUserInfo(ctx context.Context, req *user.UserInfo
 	return p.kClient.GetUserInfo(ctx, req)
 }
 
+func (p *kUserServiceClient) UpdateUserInfo(ctx context.Context, req *user.UpdateUserInfoRequest, callOptions ...callopt.Option) (r *user.UpdateUserInfoResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.UpdateUserInfo(ctx, req)
+}
+
 func (p *kUserServiceClient) UploadAvatar(ctx context.Context, req *user.UploadAvatarRequest, callOptions ...callopt.Option) (r *user.UploadAvatarResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.UploadAvatar(ctx, req)
 }
 
+func (p *kUserServiceClient) UploadBackground(ctx context.Context, req *user.UploadBackgroundRequest, callOptions ...callopt.Option) (r *user.UploadBackgroundResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.UploadBackground(ctx, req)
+}
+
 func (p *kUserServiceClient) RefreshToken(ctx context.Context, req *user.RefreshTokenRequest, callOptions ...callopt.Option) (r *user.RefreshTokenResponse, err error) {
 	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
 	return p.kClient.RefreshToken(ctx, req)
+}
+
+func (p *kUserServiceClient) FindUsersByUsername(ctx context.Context, req *user.FindUsersByUsernameRequest, callOptions ...callopt.Option) (r *user.FindUsersByUsernameResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.FindUsersByUsername(ctx, req)
+}
+
+func (p *kUserServiceClient) FindUserByEmail(ctx context.Context, req *user.FindUserByEmailRequest, callOptions ...callopt.Option) (r *user.FindUserByEmailResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.FindUserByEmail(ctx, req)
+}
+
+func (p *kUserServiceClient) FavoriteVideo(ctx context.Context, req *user.FavoriteVideoRequest, callOptions ...callopt.Option) (r *user.FavoriteVideoResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.FavoriteVideo(ctx, req)
+}
+
+func (p *kUserServiceClient) UnfavoriteVideo(ctx context.Context, req *user.UnfavoriteVideoRequest, callOptions ...callopt.Option) (r *user.UnfavoriteVideoResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.UnfavoriteVideo(ctx, req)
+}
+
+func (p *kUserServiceClient) GetFavoriteVideos(ctx context.Context, req *user.GetFavoriteVideosRequest, callOptions ...callopt.Option) (r *user.GetFavoriteVideosResponse, err error) {
+	ctx = client.NewCtxWithCallOptions(ctx, callOptions)
+	return p.kClient.GetFavoriteVideos(ctx, req)
 }

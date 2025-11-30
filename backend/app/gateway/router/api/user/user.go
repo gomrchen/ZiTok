@@ -24,9 +24,18 @@ func Register(r *server.Hertz) {
 			{
 				_user := _v1.Group("/user", _userMw()...)
 				_user.POST("/avatar", append(_uploadavatarMw(), user.UploadAvatar)...)
+				_user.POST("/background", append(_uploadbackgroundMw(), user.UploadBackground)...)
+				_user.GET("/email", append(_finduserbyemailMw(), user.FindUserByEmail)...)
+				_user.POST("/favorite", append(_favoritevideoMw(), user.FavoriteVideo)...)
+				_favorite := _user.Group("/favorite", _favoriteMw()...)
+				_favorite.DELETE("/:video_id", append(_unfavoritevideoMw(), user.UnfavoriteVideo)...)
+				_user.GET("/favorites", append(_getfavoritevideosMw(), user.GetFavoriteVideos)...)
 				_user.GET("/info", append(_getuserinfoMw(), user.GetUserInfo)...)
+				_user.PUT("/info", append(_updateuserinfoMw(), user.UpdateUserInfo)...)
 				_user.POST("/login", append(_loginMw(), user.Login)...)
+				_user.POST("/password", append(_passwordMw(), user.Password)...)
 				_user.POST("/register", append(_registerMw(), user.Register)...)
+				_user.POST("/username", append(_findusersbyusernameMw(), user.FindUsersByUsername)...)
 				{
 					_token := _user.Group("/token", _tokenMw()...)
 					_token.POST("/refresh", append(_refreshtokenMw(), user.RefreshToken)...)

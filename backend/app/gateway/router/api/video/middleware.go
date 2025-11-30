@@ -83,3 +83,13 @@ func _semanticsearchMw() []app.HandlerFunc {
 	// your code...
 	return nil
 }
+
+func _recommendMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}
+
+func _uploadcoverMw() []app.HandlerFunc {
+	// your code...
+	return nil
+}

@@ -97,6 +97,7 @@ func GetComments(ctx context.Context, c *app.RequestContext) {
 		VideoId: req.VideoID,
 		Page:    req.Page,
 		Size:    req.Size,
+		CommentId: req.CommentID,
 	})
 	if err != nil {
 		pack.RespError(c, err)

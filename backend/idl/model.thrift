@@ -10,12 +10,22 @@ struct BaseResp {
 struct User {
     1: required i64 id,              // 用户ID
     2: required string username,     // 用户名
+    3: optional string email,        // 邮箱 (新增)
     4: optional string avatar,       // 头像URL
-    6: optional i64 followCount,     // 关注数
-    7: optional i64 followerCount,   // 粉丝数
-    8: optional bool isFollow,       // 是否已关注
-    9: optional i64 likeCount,       // 获赞数量
-    10: optional i64 videoCount,     // 视频数量
+    5: optional string backgroundUrl,// 背景图片URL (新增)
+    6: optional string signature,    // 简介/个性签名 (新增)
+    7: optional i64 gender,          // 性别 0:未知 1:男 2:女 (新增)
+    8: optional string birthday,     // 生日 YYYY-MM-DD (新增)
+    9: optional i64 status,          // 在线状态 0:离线 1:在线 (新增)
+    
+    // 以下为业务聚合字段（非数据库原生字段）
+    10: optional i64 followCount,    // 关注数
+    11: optional i64 followerCount,  // 粉丝数
+    12: optional bool isFollow,      // 是否已关注
+    13: optional i64 likeCount,      // 获赞数量
+    14: optional i64 videoCount,     // 视频数量
+    15: optional i64 totalFavorited, // 总被点赞数
+    16: optional i64 workCount,      // 作品数
 }
 
 // 视频模型
@@ -28,7 +38,7 @@ struct Video {
     6: optional i64 favoriteCount,   // 点赞数
     7: optional i64 commentCount,    // 评论数
     8: optional bool isFavorite,     // 是否已点赞
-    9: optional User author,         // 作者信息
+    9: optional User author,         // 作者信息 
     10: optional string description, // 视频描述
     11: optional i64 createdAt,      // 创建时间
     12: optional i64 updatedAt,      // 更新时间
@@ -43,6 +53,7 @@ struct Comment {
     5: optional User user,           // 用户信息
     6: optional i64 createdAt,       // 创建时间
     7: optional i64 updatedAt,       // 更新时间
+    8: optional i64 parentId,        // 父评论ID
 }
 
 struct LikeInfo {
@@ -136,8 +147,17 @@ struct FriendRequest {
 
 // 语义搜索结果项
 struct SemanticSearchResultItem {
-    1: required list<Video> videos            // 视频列表
+    1: required list<Video> videos      // 视频列表
     2: optional string summary          // 摘要
     3: optional list<string> related_queries  // 相关查询
     4: optional bool from_cache         // 是否来自缓存
+}
+
+// 收藏信息
+struct FavoriteInfo {
+    1: required i64 id                   // 收藏ID
+    2: required i64 user_id              // 用户ID
+    3: required i64 video_id             // 视频ID
+    4: required i64 created_at           // 创建时间
+    5: optional i64 deleted_at           // 删除时间
 }

@@ -23,7 +23,7 @@ type SocialUseCase interface {
 	GetChatMessages(ctx context.Context, roomID int64, page, size int32) ([]*model.ChatMessage, error)
 
 	// 好友关系相关
-	AddFriend(ctx context.Context, userID, friendID int64) error
+	AddFriend(ctx context.Context, userID, friendID int64) (*model.Friendship, error)
 	GetFriendship(ctx context.Context, userID, friendID int64) (*model.Friendship, error)
 	GetUserFriends(ctx context.Context, userID int64) ([]*model.Friendship, error)
 

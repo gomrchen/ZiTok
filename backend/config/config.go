@@ -63,6 +63,7 @@ type ServicesConfig struct {
 	Social      ServiceConfig `mapstructure:"social"`
 	Interaction ServiceConfig `mapstructure:"interaction"`
 	Gateway     ServiceConfig `mapstructure:"gateway"`
+	Note        ServiceConfig `mapstructure:"note"`
 }
 
 type OtelConfig struct {
@@ -96,8 +97,18 @@ type VideoConfig struct {
 	RPCAddr string `mapstructure:"rpc_addr"`
 }
 
+type NoteConfig struct {
+	Name    string
+	RPCAddr string `mapstructure:"rpc_addr"`
+}
+
 type ElasticsearchConfig struct {
 	Addr string `mapstructure:"addr"`
+}
+
+type GorseConfig struct {
+	Endpoint string `mapstructure:"endpoint"`
+	APIKey   string `mapstructure:"api_key"`
 }
 
 type SocialConfig struct {
@@ -161,6 +172,8 @@ var (
 	Elasticsearch     *ElasticsearchConfig
 	Upyun             *UpyunConfig
 	ApiKey            *ApiKeyConfig
+	Gorse             *GorseConfig
+	Note              *NoteConfig
 	runtimeViper      = viper.New()
 )
 
@@ -189,6 +202,8 @@ type Config struct {
 	Elasticsearch     ElasticsearchConfig
 	Upyun             UpyunConfig
 	ApiKey            ApiKeyConfig `mapstructure:"api_key"`
+	Gorse             GorseConfig  `mapstructure:"gorse"`
+	Note              NoteConfig
 }
 
 // Init 初始化配置，支持从etcd远程获取配置
@@ -254,6 +269,8 @@ func configMapping() {
 	Elasticsearch = &conf.Elasticsearch
 	Upyun = &conf.Upyun
 	ApiKey = &conf.ApiKey
+	Gorse = &conf.Gorse
+	Note = &conf.Note
 }
 
 // GetDSN 获取MySQL连接字符串
@@ -299,6 +316,8 @@ func GetServiceName(serviceType string) string {
 		return Services.Interaction.Name
 	case "gateway":
 		return Services.Gateway.Name
+	case "note":
+		return Services.Note.Name
 	default:
 		return Server.Name // 默认返回通用服务名
 	}

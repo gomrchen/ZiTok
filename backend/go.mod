@@ -1,14 +1,14 @@
 module github.com/yxrxy/videoHub
 
-go 1.23.0
+go 1.24.0
 
 toolchain go1.24.4
 
 require (
 	github.com/apache/thrift v0.16.0
-	github.com/bytedance/gopkg v0.1.2
+	github.com/bytedance/gopkg v0.1.3
 	github.com/bytedance/mockey v1.2.12
-	github.com/bytedance/sonic v1.13.2
+	github.com/bytedance/sonic v1.14.2
 	github.com/cloudflare/cfssl v1.6.5
 	github.com/cloudwego/gopkg v0.1.4
 	github.com/cloudwego/hertz v0.9.7
@@ -44,10 +44,10 @@ require (
 	cloud.google.com/go/firestore v1.17.0 // indirect
 	cloud.google.com/go/longrunning v0.6.2 // indirect
 	github.com/armon/go-metrics v0.4.1 // indirect
-	github.com/bytedance/sonic/loader v0.2.4 // indirect
+	github.com/bytedance/sonic/loader v0.4.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/cloudwego/base64x v0.1.5 // indirect
+	github.com/cloudwego/base64x v0.1.6 // indirect
 	github.com/cloudwego/configmanager v0.2.3 // indirect
 	github.com/cloudwego/dynamicgo v0.6.2 // indirect
 	github.com/cloudwego/fastpb v0.0.5 // indirect
@@ -95,7 +95,7 @@ require (
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/jtolds/gls v4.20.0+incompatible // indirect
 	github.com/klauspost/compress v1.17.4 // indirect
-	github.com/klauspost/cpuid/v2 v2.2.9 // indirect
+	github.com/klauspost/cpuid/v2 v2.3.0 // indirect
 	github.com/mailru/easyjson v0.7.7 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
@@ -145,13 +145,13 @@ require (
 	go.opentelemetry.io/proto/otlp v1.1.0 // indirect
 	go.uber.org/multierr v1.11.0 // indirect
 	go.uber.org/zap v1.26.0 // indirect
-	golang.org/x/arch v0.14.0 // indirect
+	golang.org/x/arch v0.23.0 // indirect
 	golang.org/x/crypto v0.36.0 // indirect
 	golang.org/x/exp v0.0.0-20230817173708-d852ddb80c63 // indirect
 	golang.org/x/net v0.38.0 // indirect
 	golang.org/x/oauth2 v0.25.0 // indirect
 	golang.org/x/sync v0.12.0 // indirect
-	golang.org/x/sys v0.31.0 // indirect
+	golang.org/x/sys v0.38.0 // indirect
 	golang.org/x/text v0.23.0 // indirect
 	golang.org/x/time v0.8.0 // indirect
 	google.golang.org/api v0.215.0 // indirect

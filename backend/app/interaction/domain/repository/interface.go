@@ -14,7 +14,7 @@ type InteractionRepository interface {
 	IsVideoExist(ctx context.Context, videoID int64) (bool, error)
 	CreateComment(ctx context.Context, userID, videoID int64, content string, parentID *int64) error
 	GetComment(ctx context.Context, commentID int64) (*model.Comment, error)
-	GetCommentList(ctx context.Context, videoID int64, offset, limit int) ([]*model.Comment, int64, error)
+	GetCommentList(ctx context.Context, videoID int64, offset, limit int, commentID *int64) ([]*model.Comment, int64, error)
 	DeleteComment(ctx context.Context, comment *model.Comment) error
 	LikeComment(ctx context.Context, userID, commentID int64) error
 	UnlikeComment(ctx context.Context, userID, commentID int64) error

@@ -76,6 +76,10 @@ api_key:
   base_url: "https://api.openai.com/v1" # 官网
   proxy: "http://127.0.0.1:7897" # clash的
 
+gorse:
+  endpoint: "http://127.0.0.1:8088"
+  api_key: "videohub_gorse_key_2025"
+
 social:
   name: "social"
   rpc_addr: ":8893"
@@ -98,3 +102,7 @@ social:
 interactions:
   name: "interactions"
   rpc_addr: ":8895"
+
+note:
+  name: "note"
+  rpc_addr: ":8081"

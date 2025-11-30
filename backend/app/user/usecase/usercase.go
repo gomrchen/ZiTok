@@ -13,8 +13,17 @@ type UserUseCase interface {
 	Register(ctx context.Context, user *model.User) (uid int64, err error)
 	Login(ctx context.Context, user *model.User) (*model.User, error)
 	GetUserInfo(ctx context.Context, uid int64) (*model.User, error)
-	UploadAvatar(ctx context.Context, uid int64, avatarData []byte, contentType string) (string, error)
-	RefreshToken(ctx context.Context, uid int64) (string, error)
+	UpdateUserInfo(ctx context.Context, uid int64, user *model.User) error
+	UploadAvatar(ctx context.Context, uid int64, avatarData []byte, contentType string) (*model.User, error)
+	RefreshToken(ctx context.Context, uid int64, refreshToken string) (string, string, error)
+	UploadBackground(ctx context.Context, uid int64, backgroundData []byte, contentType string) (*model.User, error)
+	FindUserByEmail(ctx context.Context, email string) (int64, error)
+	FindUsersByUsername(ctx context.Context, username string) ([]*model.User, error)
+
+	// --- 收藏相关方法 ---
+	FavoriteVideo(ctx context.Context, uid int64, videoID int64) error
+	UnfavoriteVideo(ctx context.Context, uid int64, videoID int64) error
+	GetFavoriteVideos(ctx context.Context, uid int64, page, size int) ([]int64, int64, error)
 }
 
 type useCase struct {

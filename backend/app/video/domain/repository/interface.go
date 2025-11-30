@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"time"
 
 	"github.com/olivere/elastic/v7"
 	"github.com/yxrxy/videoHub/app/video/domain/model"
@@ -61,4 +62,10 @@ type EmbeddingService interface {
 type LLMService interface {
 	GenerateResponse(ctx context.Context, query string, documents []string) (string, error)
 	GenerateRelatedQueries(ctx context.Context, query string) ([]string, error)
+}
+
+type Recommender interface {
+	InsertItem(ctx context.Context, video *model.Video) error
+	InsertFeedback(ctx context.Context, userID int64, videoID int64, feedbackType string, ts time.Time) error
+	Recommend(ctx context.Context, userID int64, n int) ([]int64, error)
 }

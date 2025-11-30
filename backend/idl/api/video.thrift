@@ -9,6 +9,7 @@ service VideoAPI {
     video.VideoListResponse GetVideoList(1: video.VideoListRequest request) (api.get="/api/v1/video/list")
     video.DetailResponse GetVideoDetail(1: video.DetailRequest request) (api.get="/api/v1/video/:video_id")
     video.HotVideoResponse GetHotVideos(1: video.HotVideoRequest request) (api.get="/api/v1/video/hot")
+    video.HotVideoResponse Recommend(1: video.HotVideoRequest request) (api.get="/api/v1/video/recommend")
     video.DeleteResponse DeleteVideo(1: video.DeleteRequest request) (api.delete="/api/v1/video/:video_id")
     video.SearchResponse SearchVideo(1: video.SearchRequest request) (api.post="/api/v1/video/search")
     video.SemanticSearchResponse SemanticSearch(1: video.SemanticSearchRequest request) (api.post="/api/v1/video/semantic")
@@ -16,4 +17,7 @@ service VideoAPI {
     // 视频互动接口
     video.IncrementVisitCountResponse IncrementVisitCount(1: video.IncrementVisitCountRequest request) (api.post="/api/v1/video/:video_id/visit")
     video.IncrementLikeCountResponse IncrementLikeCount(1: video.IncrementLikeCountRequest request) (api.post="/api/v1/video/:video_id/like")
-} 
+
+    // 上传封面接口
+    video.UploadCoverResponse UploadCover(1: video.UploadCoverRequest request) (api.post="/api/v1/video/:video_id/cover")
+}

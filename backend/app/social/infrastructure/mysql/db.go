@@ -171,6 +171,7 @@ func (s *SocialDB) GetChatMessages(ctx context.Context, roomID int64, page, size
 			ID:       dbMsg.ID,
 			RoomID:   dbMsg.RoomID,
 			SenderID: dbMsg.SenderID,
+			CreateAt: dbMsg.CreatedAt.Unix(),
 			Content:  dbMsg.Content,
 			Type:     dbMsg.Type,
 		}
@@ -190,11 +191,20 @@ func (s *SocialDB) AddFriend(ctx context.Context, friendship *model.Friendship) 
 	return s.db.WithContext(ctx).Create(dbFriendship).Error
 }
 
+func (s *SocialDB) UpdateFriendship(ctx context.Context, friendship *model.Friendship) error {
+	return s.db.WithContext(ctx).Model(&Friendship{}).
+		Where("id = ?", friendship.ID).
+		Updates(map[string]interface{}{
+			"status": friendship.Status,
+			"remark": friendship.Remark,
+		}).Error
+}
+
 func (s *SocialDB) GetFriendship(ctx context.Context, userID, friendID int64) (*model.Friendship, error) {
 	var dbFriendship Friendship
 	if err := s.db.WithContext(ctx).
-		Where("(user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)",
-			userID, friendID, friendID, userID).
+		Where("(user_id = ? AND friend_id = ?)",
+			userID, friendID).
 		First(&dbFriendship).Error; err != nil {
 		return nil, err
 	}
@@ -211,8 +221,8 @@ func (s *SocialDB) GetFriendship(ctx context.Context, userID, friendID int64) (*
 func (s *SocialDB) GetUserFriends(ctx context.Context, userID int64) ([]model.Friendship, error) {
 	var dbFriendships []Friendship
 	if err := s.db.WithContext(ctx).
-		Where("(user_id = ? OR friend_id = ?)",
-			userID, userID).
+		Where("((user_id = ?) AND status = ?)",
+			userID, model.FriendStatusAccepted).
 		Find(&dbFriendships).Error; err != nil {
 		return nil, err
 	}
@@ -243,11 +253,14 @@ func (s *SocialDB) CreateFriendRequest(ctx context.Context, request *model.Frien
 }
 
 func (s *SocialDB) GetFriendRequests(ctx context.Context, userID int64, status int8) ([]model.FriendRequest, error) {
-	var dbRequests []FriendRequest
-	query := s.db.WithContext(ctx).Where("receiver_id = ?", userID)
-	if status >= 0 {
-		query = query.Where("status = ?", status)
+	var dbRequests []Friendship
+	query := s.db.WithContext(ctx)
+	if status == 0 {
+		query = s.db.WithContext(ctx).Where("user_id = ?", userID)
+	} else if status == model.FriendStatusAccepted {
+		query = s.db.WithContext(ctx).Where("friend_id = ?", userID)
 	}
+
 	if err := query.Order("created_at DESC").Find(&dbRequests).Error; err != nil {
 		return nil, err
 	}
@@ -256,9 +269,8 @@ func (s *SocialDB) GetFriendRequests(ctx context.Context, userID int64, status i
 	for i, dbRequest := range dbRequests {
 		requests[i] = model.FriendRequest{
 			ID:         dbRequest.ID,
-			SenderID:   dbRequest.SenderID,
-			ReceiverID: dbRequest.ReceiverID,
-			Message:    dbRequest.Message,
+			ReceiverID: dbRequest.UserID,
+			SenderID:   dbRequest.FriendID,
 			Status:     dbRequest.Status,
 		}
 	}
@@ -290,4 +302,15 @@ func (s *SocialDB) GetUnreadMessageCount(ctx context.Context, userID int64) (int
 		return 0, err
 	}
 	return count, nil
+}
+
+// IsUserExists 检查用户是否存在
+func (s *SocialDB) IsUserExists(ctx context.Context, userID int64) (bool, error) {
+	var count int64
+	if err := s.db.WithContext(ctx).Model(&User{}).
+		Where("id = ?", userID).
+		Count(&count).Error; err != nil {
+		return false, err
+	}
+	return count > 0, nil
 }

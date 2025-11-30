@@ -10,7 +10,11 @@ if [ -z "$RUN_NAME" ]; then
 fi
 
 # 进入模块列表
-cd "./cmd/${RUN_NAME}" || exit
+if [ "$RUN_NAME" = "note" ]; then
+    cd "./cmd/${RUN_NAME}" || exit
+else
+    cd "./cmd/${RUN_NAME}" || exit
+fi
 
 # 创建产物文件夹并提供权限
 mkdir -p ${ROOT_DIR}/output/${RUN_NAME}

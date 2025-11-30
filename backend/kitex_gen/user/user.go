@@ -9,8 +9,10 @@ import (
 )
 
 type RegisterRequest struct {
-	Username string `thrift:"username,1,required" frugal:"1,required,string" json:"username"`
-	Password string `thrift:"password,2,required" frugal:"2,required,string" json:"password"`
+	Username string  `thrift:"username,1,required" frugal:"1,required,string" json:"username"`
+	Password string  `thrift:"password,2,required" frugal:"2,required,string" json:"password"`
+	Email    *string `thrift:"email,3,optional" frugal:"3,optional,string" json:"email,omitempty"`
+	Code     string  `thrift:"code,4,required" frugal:"4,required,string" json:"code"`
 }
 
 func NewRegisterRequest() *RegisterRequest {
@@ -27,11 +29,34 @@ func (p *RegisterRequest) GetUsername() (v string) {
 func (p *RegisterRequest) GetPassword() (v string) {
 	return p.Password
 }
+
+var RegisterRequest_Email_DEFAULT string
+
+func (p *RegisterRequest) GetEmail() (v string) {
+	if !p.IsSetEmail() {
+		return RegisterRequest_Email_DEFAULT
+	}
+	return *p.Email
+}
+
+func (p *RegisterRequest) GetCode() (v string) {
+	return p.Code
+}
 func (p *RegisterRequest) SetUsername(val string) {
 	p.Username = val
 }
 func (p *RegisterRequest) SetPassword(val string) {
 	p.Password = val
+}
+func (p *RegisterRequest) SetEmail(val *string) {
+	p.Email = val
+}
+func (p *RegisterRequest) SetCode(val string) {
+	p.Code = val
+}
+
+func (p *RegisterRequest) IsSetEmail() bool {
+	return p.Email != nil
 }
 
 func (p *RegisterRequest) String() string {
@@ -44,6 +69,102 @@ func (p *RegisterRequest) String() string {
 var fieldIDToName_RegisterRequest = map[int16]string{
 	1: "username",
 	2: "password",
+	3: "email",
+	4: "code",
+}
+
+type PasswordRequest struct {
+	NewPwd_ string  `thrift:"newPwd,2,required" frugal:"2,required,string" json:"newPwd"`
+	Email   *string `thrift:"email,3,optional" frugal:"3,optional,string" json:"email,omitempty"`
+	Code    string  `thrift:"code,4,required" frugal:"4,required,string" json:"code"`
+}
+
+func NewPasswordRequest() *PasswordRequest {
+	return &PasswordRequest{}
+}
+
+func (p *PasswordRequest) InitDefault() {
+}
+
+func (p *PasswordRequest) GetNewPwd_() (v string) {
+	return p.NewPwd_
+}
+
+var PasswordRequest_Email_DEFAULT string
+
+func (p *PasswordRequest) GetEmail() (v string) {
+	if !p.IsSetEmail() {
+		return PasswordRequest_Email_DEFAULT
+	}
+	return *p.Email
+}
+
+func (p *PasswordRequest) GetCode() (v string) {
+	return p.Code
+}
+func (p *PasswordRequest) SetNewPwd_(val string) {
+	p.NewPwd_ = val
+}
+func (p *PasswordRequest) SetEmail(val *string) {
+	p.Email = val
+}
+func (p *PasswordRequest) SetCode(val string) {
+	p.Code = val
+}
+
+func (p *PasswordRequest) IsSetEmail() bool {
+	return p.Email != nil
+}
+
+func (p *PasswordRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PasswordRequest(%+v)", *p)
+}
+
+var fieldIDToName_PasswordRequest = map[int16]string{
+	2: "newPwd",
+	3: "email",
+	4: "code",
+}
+
+type PasswordResponse struct {
+	Base *model.BaseResp `thrift:"Base,1,required" frugal:"1,required,model.BaseResp" json:"Base"`
+}
+
+func NewPasswordResponse() *PasswordResponse {
+	return &PasswordResponse{}
+}
+
+func (p *PasswordResponse) InitDefault() {
+}
+
+var PasswordResponse_Base_DEFAULT *model.BaseResp
+
+func (p *PasswordResponse) GetBase() (v *model.BaseResp) {
+	if !p.IsSetBase() {
+		return PasswordResponse_Base_DEFAULT
+	}
+	return p.Base
+}
+func (p *PasswordResponse) SetBase(val *model.BaseResp) {
+	p.Base = val
+}
+
+func (p *PasswordResponse) IsSetBase() bool {
+	return p.Base != nil
+}
+
+func (p *PasswordResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("PasswordResponse(%+v)", *p)
+}
+
+var fieldIDToName_PasswordResponse = map[int16]string{
+	1: "Base",
 }
 
 type RegisterResponse struct {
@@ -281,6 +402,226 @@ var fieldIDToName_UserInfoResponse = map[int16]string{
 	2: "User",
 }
 
+type UpdateUserInfoRequest struct {
+	UserId        *int64  `thrift:"user_id,1,optional" frugal:"1,optional,i64" json:"user_id,omitempty"`
+	Username      *string `thrift:"username,2,optional" frugal:"2,optional,string" json:"username,omitempty"`
+	Password      *string `thrift:"password,3,optional" frugal:"3,optional,string" json:"password,omitempty"`
+	Signature     *string `thrift:"signature,4,optional" frugal:"4,optional,string" json:"signature,omitempty"`
+	Gender        *int64  `thrift:"gender,5,optional" frugal:"5,optional,i64" json:"gender,omitempty"`
+	Birthday      *string `thrift:"birthday,6,optional" frugal:"6,optional,string" json:"birthday,omitempty"`
+	Email         *string `thrift:"email,7,optional" frugal:"7,optional,string" json:"email,omitempty"`
+	BackgroundUrl *string `thrift:"background_url,8,optional" frugal:"8,optional,string" json:"background_url,omitempty"`
+	AvatarUrl     *string `thrift:"avatar_url,9,optional" frugal:"9,optional,string" json:"avatar_url,omitempty"`
+}
+
+func NewUpdateUserInfoRequest() *UpdateUserInfoRequest {
+	return &UpdateUserInfoRequest{}
+}
+
+func (p *UpdateUserInfoRequest) InitDefault() {
+}
+
+var UpdateUserInfoRequest_UserId_DEFAULT int64
+
+func (p *UpdateUserInfoRequest) GetUserId() (v int64) {
+	if !p.IsSetUserId() {
+		return UpdateUserInfoRequest_UserId_DEFAULT
+	}
+	return *p.UserId
+}
+
+var UpdateUserInfoRequest_Username_DEFAULT string
+
+func (p *UpdateUserInfoRequest) GetUsername() (v string) {
+	if !p.IsSetUsername() {
+		return UpdateUserInfoRequest_Username_DEFAULT
+	}
+	return *p.Username
+}
+
+var UpdateUserInfoRequest_Password_DEFAULT string
+
+func (p *UpdateUserInfoRequest) GetPassword() (v string) {
+	if !p.IsSetPassword() {
+		return UpdateUserInfoRequest_Password_DEFAULT
+	}
+	return *p.Password
+}
+
+var UpdateUserInfoRequest_Signature_DEFAULT string
+
+func (p *UpdateUserInfoRequest) GetSignature() (v string) {
+	if !p.IsSetSignature() {
+		return UpdateUserInfoRequest_Signature_DEFAULT
+	}
+	return *p.Signature
+}
+
+var UpdateUserInfoRequest_Gender_DEFAULT int64
+
+func (p *UpdateUserInfoRequest) GetGender() (v int64) {
+	if !p.IsSetGender() {
+		return UpdateUserInfoRequest_Gender_DEFAULT
+	}
+	return *p.Gender
+}
+
+var UpdateUserInfoRequest_Birthday_DEFAULT string
+
+func (p *UpdateUserInfoRequest) GetBirthday() (v string) {
+	if !p.IsSetBirthday() {
+		return UpdateUserInfoRequest_Birthday_DEFAULT
+	}
+	return *p.Birthday
+}
+
+var UpdateUserInfoRequest_Email_DEFAULT string
+
+func (p *UpdateUserInfoRequest) GetEmail() (v string) {
+	if !p.IsSetEmail() {
+		return UpdateUserInfoRequest_Email_DEFAULT
+	}
+	return *p.Email
+}
+
+var UpdateUserInfoRequest_BackgroundUrl_DEFAULT string
+
+func (p *UpdateUserInfoRequest) GetBackgroundUrl() (v string) {
+	if !p.IsSetBackgroundUrl() {
+		return UpdateUserInfoRequest_BackgroundUrl_DEFAULT
+	}
+	return *p.BackgroundUrl
+}
+
+var UpdateUserInfoRequest_AvatarUrl_DEFAULT string
+
+func (p *UpdateUserInfoRequest) GetAvatarUrl() (v string) {
+	if !p.IsSetAvatarUrl() {
+		return UpdateUserInfoRequest_AvatarUrl_DEFAULT
+	}
+	return *p.AvatarUrl
+}
+func (p *UpdateUserInfoRequest) SetUserId(val *int64) {
+	p.UserId = val
+}
+func (p *UpdateUserInfoRequest) SetUsername(val *string) {
+	p.Username = val
+}
+func (p *UpdateUserInfoRequest) SetPassword(val *string) {
+	p.Password = val
+}
+func (p *UpdateUserInfoRequest) SetSignature(val *string) {
+	p.Signature = val
+}
+func (p *UpdateUserInfoRequest) SetGender(val *int64) {
+	p.Gender = val
+}
+func (p *UpdateUserInfoRequest) SetBirthday(val *string) {
+	p.Birthday = val
+}
+func (p *UpdateUserInfoRequest) SetEmail(val *string) {
+	p.Email = val
+}
+func (p *UpdateUserInfoRequest) SetBackgroundUrl(val *string) {
+	p.BackgroundUrl = val
+}
+func (p *UpdateUserInfoRequest) SetAvatarUrl(val *string) {
+	p.AvatarUrl = val
+}
+
+func (p *UpdateUserInfoRequest) IsSetUserId() bool {
+	return p.UserId != nil
+}
+
+func (p *UpdateUserInfoRequest) IsSetUsername() bool {
+	return p.Username != nil
+}
+
+func (p *UpdateUserInfoRequest) IsSetPassword() bool {
+	return p.Password != nil
+}
+
+func (p *UpdateUserInfoRequest) IsSetSignature() bool {
+	return p.Signature != nil
+}
+
+func (p *UpdateUserInfoRequest) IsSetGender() bool {
+	return p.Gender != nil
+}
+
+func (p *UpdateUserInfoRequest) IsSetBirthday() bool {
+	return p.Birthday != nil
+}
+
+func (p *UpdateUserInfoRequest) IsSetEmail() bool {
+	return p.Email != nil
+}
+
+func (p *UpdateUserInfoRequest) IsSetBackgroundUrl() bool {
+	return p.BackgroundUrl != nil
+}
+
+func (p *UpdateUserInfoRequest) IsSetAvatarUrl() bool {
+	return p.AvatarUrl != nil
+}
+
+func (p *UpdateUserInfoRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UpdateUserInfoRequest(%+v)", *p)
+}
+
+var fieldIDToName_UpdateUserInfoRequest = map[int16]string{
+	1: "user_id",
+	2: "username",
+	3: "password",
+	4: "signature",
+	5: "gender",
+	6: "birthday",
+	7: "email",
+	8: "background_url",
+	9: "avatar_url",
+}
+
+type UpdateUserInfoResponse struct {
+	Base *model.BaseResp `thrift:"Base,1,required" frugal:"1,required,model.BaseResp" json:"Base"`
+}
+
+func NewUpdateUserInfoResponse() *UpdateUserInfoResponse {
+	return &UpdateUserInfoResponse{}
+}
+
+func (p *UpdateUserInfoResponse) InitDefault() {
+}
+
+var UpdateUserInfoResponse_Base_DEFAULT *model.BaseResp
+
+func (p *UpdateUserInfoResponse) GetBase() (v *model.BaseResp) {
+	if !p.IsSetBase() {
+		return UpdateUserInfoResponse_Base_DEFAULT
+	}
+	return p.Base
+}
+func (p *UpdateUserInfoResponse) SetBase(val *model.BaseResp) {
+	p.Base = val
+}
+
+func (p *UpdateUserInfoResponse) IsSetBase() bool {
+	return p.Base != nil
+}
+
+func (p *UpdateUserInfoResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UpdateUserInfoResponse(%+v)", *p)
+}
+
+var fieldIDToName_UpdateUserInfoResponse = map[int16]string{
+	1: "Base",
+}
+
 type UploadAvatarRequest struct {
 	AvatarData  []byte `thrift:"avatar_data,1,required" frugal:"1,required,binary" json:"avatar_data"`
 	ContentType string `thrift:"content_type,2,required" frugal:"2,required,string" json:"content_type"`
@@ -320,8 +661,8 @@ var fieldIDToName_UploadAvatarRequest = map[int16]string{
 }
 
 type UploadAvatarResponse struct {
-	Base      *model.BaseResp `thrift:"Base,1,required" frugal:"1,required,model.BaseResp" json:"Base"`
-	AvatarUrl string          `thrift:"avatar_url,2,required" frugal:"2,required,string" json:"avatar_url"`
+	Base *model.BaseResp `thrift:"Base,1,required" frugal:"1,required,model.BaseResp" json:"Base"`
+	User *model.User     `thrift:"User,2,required" frugal:"2,required,model.User" json:"User"`
 }
 
 func NewUploadAvatarResponse() *UploadAvatarResponse {
@@ -340,18 +681,27 @@ func (p *UploadAvatarResponse) GetBase() (v *model.BaseResp) {
 	return p.Base
 }
 
-func (p *UploadAvatarResponse) GetAvatarUrl() (v string) {
-	return p.AvatarUrl
+var UploadAvatarResponse_User_DEFAULT *model.User
+
+func (p *UploadAvatarResponse) GetUser() (v *model.User) {
+	if !p.IsSetUser() {
+		return UploadAvatarResponse_User_DEFAULT
+	}
+	return p.User
 }
 func (p *UploadAvatarResponse) SetBase(val *model.BaseResp) {
 	p.Base = val
 }
-func (p *UploadAvatarResponse) SetAvatarUrl(val string) {
-	p.AvatarUrl = val
+func (p *UploadAvatarResponse) SetUser(val *model.User) {
+	p.User = val
 }
 
 func (p *UploadAvatarResponse) IsSetBase() bool {
 	return p.Base != nil
+}
+
+func (p *UploadAvatarResponse) IsSetUser() bool {
+	return p.User != nil
 }
 
 func (p *UploadAvatarResponse) String() string {
@@ -363,11 +713,106 @@ func (p *UploadAvatarResponse) String() string {
 
 var fieldIDToName_UploadAvatarResponse = map[int16]string{
 	1: "Base",
-	2: "avatar_url",
+	2: "User",
+}
+
+type UploadBackgroundRequest struct {
+	BackgroundData []byte `thrift:"background_data,1,required" frugal:"1,required,binary" json:"background_data"`
+	ContentType    string `thrift:"content_type,2,required" frugal:"2,required,string" json:"content_type"`
+}
+
+func NewUploadBackgroundRequest() *UploadBackgroundRequest {
+	return &UploadBackgroundRequest{}
+}
+
+func (p *UploadBackgroundRequest) InitDefault() {
+}
+
+func (p *UploadBackgroundRequest) GetBackgroundData() (v []byte) {
+	return p.BackgroundData
+}
+
+func (p *UploadBackgroundRequest) GetContentType() (v string) {
+	return p.ContentType
+}
+func (p *UploadBackgroundRequest) SetBackgroundData(val []byte) {
+	p.BackgroundData = val
+}
+func (p *UploadBackgroundRequest) SetContentType(val string) {
+	p.ContentType = val
+}
+
+func (p *UploadBackgroundRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UploadBackgroundRequest(%+v)", *p)
+}
+
+var fieldIDToName_UploadBackgroundRequest = map[int16]string{
+	1: "background_data",
+	2: "content_type",
+}
+
+type UploadBackgroundResponse struct {
+	Base *model.BaseResp `thrift:"Base,1,required" frugal:"1,required,model.BaseResp" json:"Base"`
+	User *model.User     `thrift:"User,2,required" frugal:"2,required,model.User" json:"User"`
+}
+
+func NewUploadBackgroundResponse() *UploadBackgroundResponse {
+	return &UploadBackgroundResponse{}
+}
+
+func (p *UploadBackgroundResponse) InitDefault() {
+}
+
+var UploadBackgroundResponse_Base_DEFAULT *model.BaseResp
+
+func (p *UploadBackgroundResponse) GetBase() (v *model.BaseResp) {
+	if !p.IsSetBase() {
+		return UploadBackgroundResponse_Base_DEFAULT
+	}
+	return p.Base
+}
+
+var UploadBackgroundResponse_User_DEFAULT *model.User
+
+func (p *UploadBackgroundResponse) GetUser() (v *model.User) {
+	if !p.IsSetUser() {
+		return UploadBackgroundResponse_User_DEFAULT
+	}
+	return p.User
+}
+func (p *UploadBackgroundResponse) SetBase(val *model.BaseResp) {
+	p.Base = val
+}
+func (p *UploadBackgroundResponse) SetUser(val *model.User) {
+	p.User = val
+}
+
+func (p *UploadBackgroundResponse) IsSetBase() bool {
+	return p.Base != nil
+}
+
+func (p *UploadBackgroundResponse) IsSetUser() bool {
+	return p.User != nil
+}
+
+func (p *UploadBackgroundResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UploadBackgroundResponse(%+v)", *p)
+}
+
+var fieldIDToName_UploadBackgroundResponse = map[int16]string{
+	1: "Base",
+	2: "User",
 }
 
 type RefreshTokenRequest struct {
-	UserId int64 `thrift:"user_id,1,required" frugal:"1,required,i64" json:"user_id"`
+	UserId       int64  `thrift:"user_id,1,required" frugal:"1,required,i64" json:"user_id"`
+	RefreshToken string `thrift:"refresh_token,2,required" frugal:"2,required,string" json:"refresh_token"`
 }
 
 func NewRefreshTokenRequest() *RefreshTokenRequest {
@@ -380,8 +825,15 @@ func (p *RefreshTokenRequest) InitDefault() {
 func (p *RefreshTokenRequest) GetUserId() (v int64) {
 	return p.UserId
 }
+
+func (p *RefreshTokenRequest) GetRefreshToken() (v string) {
+	return p.RefreshToken
+}
 func (p *RefreshTokenRequest) SetUserId(val int64) {
 	p.UserId = val
+}
+func (p *RefreshTokenRequest) SetRefreshToken(val string) {
+	p.RefreshToken = val
 }
 
 func (p *RefreshTokenRequest) String() string {
@@ -393,11 +845,13 @@ func (p *RefreshTokenRequest) String() string {
 
 var fieldIDToName_RefreshTokenRequest = map[int16]string{
 	1: "user_id",
+	2: "refresh_token",
 }
 
 type RefreshTokenResponse struct {
-	Base  *model.BaseResp `thrift:"Base,1,required" frugal:"1,required,model.BaseResp" json:"Base"`
-	Token string          `thrift:"token,2,required" frugal:"2,required,string" json:"token"`
+	Base         *model.BaseResp `thrift:"Base,1,required" frugal:"1,required,model.BaseResp" json:"Base"`
+	Token        string          `thrift:"token,2,required" frugal:"2,required,string" json:"token"`
+	RefreshToken string          `thrift:"refresh_token,3,required" frugal:"3,required,string" json:"refresh_token"`
 }
 
 func NewRefreshTokenResponse() *RefreshTokenResponse {
@@ -419,11 +873,18 @@ func (p *RefreshTokenResponse) GetBase() (v *model.BaseResp) {
 func (p *RefreshTokenResponse) GetToken() (v string) {
 	return p.Token
 }
+
+func (p *RefreshTokenResponse) GetRefreshToken() (v string) {
+	return p.RefreshToken
+}
 func (p *RefreshTokenResponse) SetBase(val *model.BaseResp) {
 	p.Base = val
 }
 func (p *RefreshTokenResponse) SetToken(val string) {
 	p.Token = val
+}
+func (p *RefreshTokenResponse) SetRefreshToken(val string) {
+	p.RefreshToken = val
 }
 
 func (p *RefreshTokenResponse) IsSetBase() bool {
@@ -440,6 +901,434 @@ func (p *RefreshTokenResponse) String() string {
 var fieldIDToName_RefreshTokenResponse = map[int16]string{
 	1: "Base",
 	2: "token",
+	3: "refresh_token",
+}
+
+type UserBrief struct {
+	UserId    int64  `thrift:"user_id,1,required" frugal:"1,required,i64" json:"user_id"`
+	Username  string `thrift:"username,2,required" frugal:"2,required,string" json:"username"`
+	AvatarUrl string `thrift:"avatar_url,3,required" frugal:"3,required,string" json:"avatar_url"`
+}
+
+func NewUserBrief() *UserBrief {
+	return &UserBrief{}
+}
+
+func (p *UserBrief) InitDefault() {
+}
+
+func (p *UserBrief) GetUserId() (v int64) {
+	return p.UserId
+}
+
+func (p *UserBrief) GetUsername() (v string) {
+	return p.Username
+}
+
+func (p *UserBrief) GetAvatarUrl() (v string) {
+	return p.AvatarUrl
+}
+func (p *UserBrief) SetUserId(val int64) {
+	p.UserId = val
+}
+func (p *UserBrief) SetUsername(val string) {
+	p.Username = val
+}
+func (p *UserBrief) SetAvatarUrl(val string) {
+	p.AvatarUrl = val
+}
+
+func (p *UserBrief) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UserBrief(%+v)", *p)
+}
+
+var fieldIDToName_UserBrief = map[int16]string{
+	1: "user_id",
+	2: "username",
+	3: "avatar_url",
+}
+
+type FindUsersByUsernameRequest struct {
+	Username string `thrift:"username,1,required" frugal:"1,required,string" json:"username"`
+}
+
+func NewFindUsersByUsernameRequest() *FindUsersByUsernameRequest {
+	return &FindUsersByUsernameRequest{}
+}
+
+func (p *FindUsersByUsernameRequest) InitDefault() {
+}
+
+func (p *FindUsersByUsernameRequest) GetUsername() (v string) {
+	return p.Username
+}
+func (p *FindUsersByUsernameRequest) SetUsername(val string) {
+	p.Username = val
+}
+
+func (p *FindUsersByUsernameRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("FindUsersByUsernameRequest(%+v)", *p)
+}
+
+var fieldIDToName_FindUsersByUsernameRequest = map[int16]string{
+	1: "username",
+}
+
+type FindUsersByUsernameResponse struct {
+	Base  *model.BaseResp `thrift:"Base,1,required" frugal:"1,required,model.BaseResp" json:"Base"`
+	Users []*UserBrief    `thrift:"users,2,required" frugal:"2,required,list<UserBrief>" json:"users"`
+}
+
+func NewFindUsersByUsernameResponse() *FindUsersByUsernameResponse {
+	return &FindUsersByUsernameResponse{}
+}
+
+func (p *FindUsersByUsernameResponse) InitDefault() {
+}
+
+var FindUsersByUsernameResponse_Base_DEFAULT *model.BaseResp
+
+func (p *FindUsersByUsernameResponse) GetBase() (v *model.BaseResp) {
+	if !p.IsSetBase() {
+		return FindUsersByUsernameResponse_Base_DEFAULT
+	}
+	return p.Base
+}
+
+func (p *FindUsersByUsernameResponse) GetUsers() (v []*UserBrief) {
+	return p.Users
+}
+func (p *FindUsersByUsernameResponse) SetBase(val *model.BaseResp) {
+	p.Base = val
+}
+func (p *FindUsersByUsernameResponse) SetUsers(val []*UserBrief) {
+	p.Users = val
+}
+
+func (p *FindUsersByUsernameResponse) IsSetBase() bool {
+	return p.Base != nil
+}
+
+func (p *FindUsersByUsernameResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("FindUsersByUsernameResponse(%+v)", *p)
+}
+
+var fieldIDToName_FindUsersByUsernameResponse = map[int16]string{
+	1: "Base",
+	2: "users",
+}
+
+type FindUserByEmailRequest struct {
+	Email string `thrift:"email,1,required" frugal:"1,required,string" json:"email"`
+}
+
+func NewFindUserByEmailRequest() *FindUserByEmailRequest {
+	return &FindUserByEmailRequest{}
+}
+
+func (p *FindUserByEmailRequest) InitDefault() {
+}
+
+func (p *FindUserByEmailRequest) GetEmail() (v string) {
+	return p.Email
+}
+func (p *FindUserByEmailRequest) SetEmail(val string) {
+	p.Email = val
+}
+
+func (p *FindUserByEmailRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("FindUserByEmailRequest(%+v)", *p)
+}
+
+var fieldIDToName_FindUserByEmailRequest = map[int16]string{
+	1: "email",
+}
+
+type FindUserByEmailResponse struct {
+	Base   *model.BaseResp `thrift:"Base,1,required" frugal:"1,required,model.BaseResp" json:"Base"`
+	UserId int64           `thrift:"user_id,2,required" frugal:"2,required,i64" json:"user_id"`
+}
+
+func NewFindUserByEmailResponse() *FindUserByEmailResponse {
+	return &FindUserByEmailResponse{}
+}
+
+func (p *FindUserByEmailResponse) InitDefault() {
+}
+
+var FindUserByEmailResponse_Base_DEFAULT *model.BaseResp
+
+func (p *FindUserByEmailResponse) GetBase() (v *model.BaseResp) {
+	if !p.IsSetBase() {
+		return FindUserByEmailResponse_Base_DEFAULT
+	}
+	return p.Base
+}
+
+func (p *FindUserByEmailResponse) GetUserId() (v int64) {
+	return p.UserId
+}
+func (p *FindUserByEmailResponse) SetBase(val *model.BaseResp) {
+	p.Base = val
+}
+func (p *FindUserByEmailResponse) SetUserId(val int64) {
+	p.UserId = val
+}
+
+func (p *FindUserByEmailResponse) IsSetBase() bool {
+	return p.Base != nil
+}
+
+func (p *FindUserByEmailResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("FindUserByEmailResponse(%+v)", *p)
+}
+
+var fieldIDToName_FindUserByEmailResponse = map[int16]string{
+	1: "Base",
+	2: "user_id",
+}
+
+type FavoriteVideoRequest struct {
+	VideoId int64 `thrift:"video_id,1,required" frugal:"1,required,i64" json:"video_id"`
+}
+
+func NewFavoriteVideoRequest() *FavoriteVideoRequest {
+	return &FavoriteVideoRequest{}
+}
+
+func (p *FavoriteVideoRequest) InitDefault() {
+}
+
+func (p *FavoriteVideoRequest) GetVideoId() (v int64) {
+	return p.VideoId
+}
+func (p *FavoriteVideoRequest) SetVideoId(val int64) {
+	p.VideoId = val
+}
+
+func (p *FavoriteVideoRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("FavoriteVideoRequest(%+v)", *p)
+}
+
+var fieldIDToName_FavoriteVideoRequest = map[int16]string{
+	1: "video_id",
+}
+
+type FavoriteVideoResponse struct {
+	Base *model.BaseResp `thrift:"Base,1,required" frugal:"1,required,model.BaseResp" json:"Base"`
+}
+
+func NewFavoriteVideoResponse() *FavoriteVideoResponse {
+	return &FavoriteVideoResponse{}
+}
+
+func (p *FavoriteVideoResponse) InitDefault() {
+}
+
+var FavoriteVideoResponse_Base_DEFAULT *model.BaseResp
+
+func (p *FavoriteVideoResponse) GetBase() (v *model.BaseResp) {
+	if !p.IsSetBase() {
+		return FavoriteVideoResponse_Base_DEFAULT
+	}
+	return p.Base
+}
+func (p *FavoriteVideoResponse) SetBase(val *model.BaseResp) {
+	p.Base = val
+}
+
+func (p *FavoriteVideoResponse) IsSetBase() bool {
+	return p.Base != nil
+}
+
+func (p *FavoriteVideoResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("FavoriteVideoResponse(%+v)", *p)
+}
+
+var fieldIDToName_FavoriteVideoResponse = map[int16]string{
+	1: "Base",
+}
+
+type UnfavoriteVideoRequest struct {
+	VideoId int64 `thrift:"video_id,1,required" frugal:"1,required,i64" json:"video_id"`
+}
+
+func NewUnfavoriteVideoRequest() *UnfavoriteVideoRequest {
+	return &UnfavoriteVideoRequest{}
+}
+
+func (p *UnfavoriteVideoRequest) InitDefault() {
+}
+
+func (p *UnfavoriteVideoRequest) GetVideoId() (v int64) {
+	return p.VideoId
+}
+func (p *UnfavoriteVideoRequest) SetVideoId(val int64) {
+	p.VideoId = val
+}
+
+func (p *UnfavoriteVideoRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UnfavoriteVideoRequest(%+v)", *p)
+}
+
+var fieldIDToName_UnfavoriteVideoRequest = map[int16]string{
+	1: "video_id",
+}
+
+type UnfavoriteVideoResponse struct {
+	Base *model.BaseResp `thrift:"Base,1,required" frugal:"1,required,model.BaseResp" json:"Base"`
+}
+
+func NewUnfavoriteVideoResponse() *UnfavoriteVideoResponse {
+	return &UnfavoriteVideoResponse{}
+}
+
+func (p *UnfavoriteVideoResponse) InitDefault() {
+}
+
+var UnfavoriteVideoResponse_Base_DEFAULT *model.BaseResp
+
+func (p *UnfavoriteVideoResponse) GetBase() (v *model.BaseResp) {
+	if !p.IsSetBase() {
+		return UnfavoriteVideoResponse_Base_DEFAULT
+	}
+	return p.Base
+}
+func (p *UnfavoriteVideoResponse) SetBase(val *model.BaseResp) {
+	p.Base = val
+}
+
+func (p *UnfavoriteVideoResponse) IsSetBase() bool {
+	return p.Base != nil
+}
+
+func (p *UnfavoriteVideoResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UnfavoriteVideoResponse(%+v)", *p)
+}
+
+var fieldIDToName_UnfavoriteVideoResponse = map[int16]string{
+	1: "Base",
+}
+
+type GetFavoriteVideosRequest struct {
+	Page int32 `thrift:"page,1,required" frugal:"1,required,i32" json:"page"`
+	Size int32 `thrift:"size,2,required" frugal:"2,required,i32" json:"size"`
+}
+
+func NewGetFavoriteVideosRequest() *GetFavoriteVideosRequest {
+	return &GetFavoriteVideosRequest{}
+}
+
+func (p *GetFavoriteVideosRequest) InitDefault() {
+}
+
+func (p *GetFavoriteVideosRequest) GetPage() (v int32) {
+	return p.Page
+}
+
+func (p *GetFavoriteVideosRequest) GetSize() (v int32) {
+	return p.Size
+}
+func (p *GetFavoriteVideosRequest) SetPage(val int32) {
+	p.Page = val
+}
+func (p *GetFavoriteVideosRequest) SetSize(val int32) {
+	p.Size = val
+}
+
+func (p *GetFavoriteVideosRequest) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GetFavoriteVideosRequest(%+v)", *p)
+}
+
+var fieldIDToName_GetFavoriteVideosRequest = map[int16]string{
+	1: "page",
+	2: "size",
+}
+
+type GetFavoriteVideosResponse struct {
+	Base      *model.BaseResp `thrift:"Base,1,required" frugal:"1,required,model.BaseResp" json:"Base"`
+	VideoList []*model.Video  `thrift:"VideoList,2,required" frugal:"2,required,list<model.Video>" json:"VideoList"`
+	Total     int64           `thrift:"total,3,required" frugal:"3,required,i64" json:"total"`
+}
+
+func NewGetFavoriteVideosResponse() *GetFavoriteVideosResponse {
+	return &GetFavoriteVideosResponse{}
+}
+
+func (p *GetFavoriteVideosResponse) InitDefault() {
+}
+
+var GetFavoriteVideosResponse_Base_DEFAULT *model.BaseResp
+
+func (p *GetFavoriteVideosResponse) GetBase() (v *model.BaseResp) {
+	if !p.IsSetBase() {
+		return GetFavoriteVideosResponse_Base_DEFAULT
+	}
+	return p.Base
+}
+
+func (p *GetFavoriteVideosResponse) GetVideoList() (v []*model.Video) {
+	return p.VideoList
+}
+
+func (p *GetFavoriteVideosResponse) GetTotal() (v int64) {
+	return p.Total
+}
+func (p *GetFavoriteVideosResponse) SetBase(val *model.BaseResp) {
+	p.Base = val
+}
+func (p *GetFavoriteVideosResponse) SetVideoList(val []*model.Video) {
+	p.VideoList = val
+}
+func (p *GetFavoriteVideosResponse) SetTotal(val int64) {
+	p.Total = val
+}
+
+func (p *GetFavoriteVideosResponse) IsSetBase() bool {
+	return p.Base != nil
+}
+
+func (p *GetFavoriteVideosResponse) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("GetFavoriteVideosResponse(%+v)", *p)
+}
+
+var fieldIDToName_GetFavoriteVideosResponse = map[int16]string{
+	1: "Base",
+	2: "VideoList",
+	3: "total",
 }
 
 type UserService interface {
@@ -449,9 +1338,23 @@ type UserService interface {
 
 	GetUserInfo(ctx context.Context, req *UserInfoRequest) (r *UserInfoResponse, err error)
 
+	UpdateUserInfo(ctx context.Context, req *UpdateUserInfoRequest) (r *UpdateUserInfoResponse, err error)
+
 	UploadAvatar(ctx context.Context, req *UploadAvatarRequest) (r *UploadAvatarResponse, err error)
 
+	UploadBackground(ctx context.Context, req *UploadBackgroundRequest) (r *UploadBackgroundResponse, err error)
+
 	RefreshToken(ctx context.Context, req *RefreshTokenRequest) (r *RefreshTokenResponse, err error)
+
+	FindUsersByUsername(ctx context.Context, req *FindUsersByUsernameRequest) (r *FindUsersByUsernameResponse, err error)
+
+	FindUserByEmail(ctx context.Context, req *FindUserByEmailRequest) (r *FindUserByEmailResponse, err error)
+
+	FavoriteVideo(ctx context.Context, req *FavoriteVideoRequest) (r *FavoriteVideoResponse, err error)
+
+	UnfavoriteVideo(ctx context.Context, req *UnfavoriteVideoRequest) (r *UnfavoriteVideoResponse, err error)
+
+	GetFavoriteVideos(ctx context.Context, req *GetFavoriteVideosRequest) (r *GetFavoriteVideosResponse, err error)
 }
 
 type UserServiceRegisterArgs struct {
@@ -682,6 +1585,82 @@ var fieldIDToName_UserServiceGetUserInfoResult = map[int16]string{
 	0: "success",
 }
 
+type UserServiceUpdateUserInfoArgs struct {
+	Req *UpdateUserInfoRequest `thrift:"req,1" frugal:"1,default,UpdateUserInfoRequest" json:"req"`
+}
+
+func NewUserServiceUpdateUserInfoArgs() *UserServiceUpdateUserInfoArgs {
+	return &UserServiceUpdateUserInfoArgs{}
+}
+
+func (p *UserServiceUpdateUserInfoArgs) InitDefault() {
+}
+
+var UserServiceUpdateUserInfoArgs_Req_DEFAULT *UpdateUserInfoRequest
+
+func (p *UserServiceUpdateUserInfoArgs) GetReq() (v *UpdateUserInfoRequest) {
+	if !p.IsSetReq() {
+		return UserServiceUpdateUserInfoArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *UserServiceUpdateUserInfoArgs) SetReq(val *UpdateUserInfoRequest) {
+	p.Req = val
+}
+
+func (p *UserServiceUpdateUserInfoArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *UserServiceUpdateUserInfoArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UserServiceUpdateUserInfoArgs(%+v)", *p)
+}
+
+var fieldIDToName_UserServiceUpdateUserInfoArgs = map[int16]string{
+	1: "req",
+}
+
+type UserServiceUpdateUserInfoResult struct {
+	Success *UpdateUserInfoResponse `thrift:"success,0,optional" frugal:"0,optional,UpdateUserInfoResponse" json:"success,omitempty"`
+}
+
+func NewUserServiceUpdateUserInfoResult() *UserServiceUpdateUserInfoResult {
+	return &UserServiceUpdateUserInfoResult{}
+}
+
+func (p *UserServiceUpdateUserInfoResult) InitDefault() {
+}
+
+var UserServiceUpdateUserInfoResult_Success_DEFAULT *UpdateUserInfoResponse
+
+func (p *UserServiceUpdateUserInfoResult) GetSuccess() (v *UpdateUserInfoResponse) {
+	if !p.IsSetSuccess() {
+		return UserServiceUpdateUserInfoResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *UserServiceUpdateUserInfoResult) SetSuccess(x interface{}) {
+	p.Success = x.(*UpdateUserInfoResponse)
+}
+
+func (p *UserServiceUpdateUserInfoResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *UserServiceUpdateUserInfoResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UserServiceUpdateUserInfoResult(%+v)", *p)
+}
+
+var fieldIDToName_UserServiceUpdateUserInfoResult = map[int16]string{
+	0: "success",
+}
+
 type UserServiceUploadAvatarArgs struct {
 	Req *UploadAvatarRequest `thrift:"req,1" frugal:"1,default,UploadAvatarRequest" json:"req"`
 }
@@ -758,6 +1737,82 @@ var fieldIDToName_UserServiceUploadAvatarResult = map[int16]string{
 	0: "success",
 }
 
+type UserServiceUploadBackgroundArgs struct {
+	Req *UploadBackgroundRequest `thrift:"req,1" frugal:"1,default,UploadBackgroundRequest" json:"req"`
+}
+
+func NewUserServiceUploadBackgroundArgs() *UserServiceUploadBackgroundArgs {
+	return &UserServiceUploadBackgroundArgs{}
+}
+
+func (p *UserServiceUploadBackgroundArgs) InitDefault() {
+}
+
+var UserServiceUploadBackgroundArgs_Req_DEFAULT *UploadBackgroundRequest
+
+func (p *UserServiceUploadBackgroundArgs) GetReq() (v *UploadBackgroundRequest) {
+	if !p.IsSetReq() {
+		return UserServiceUploadBackgroundArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *UserServiceUploadBackgroundArgs) SetReq(val *UploadBackgroundRequest) {
+	p.Req = val
+}
+
+func (p *UserServiceUploadBackgroundArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *UserServiceUploadBackgroundArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UserServiceUploadBackgroundArgs(%+v)", *p)
+}
+
+var fieldIDToName_UserServiceUploadBackgroundArgs = map[int16]string{
+	1: "req",
+}
+
+type UserServiceUploadBackgroundResult struct {
+	Success *UploadBackgroundResponse `thrift:"success,0,optional" frugal:"0,optional,UploadBackgroundResponse" json:"success,omitempty"`
+}
+
+func NewUserServiceUploadBackgroundResult() *UserServiceUploadBackgroundResult {
+	return &UserServiceUploadBackgroundResult{}
+}
+
+func (p *UserServiceUploadBackgroundResult) InitDefault() {
+}
+
+var UserServiceUploadBackgroundResult_Success_DEFAULT *UploadBackgroundResponse
+
+func (p *UserServiceUploadBackgroundResult) GetSuccess() (v *UploadBackgroundResponse) {
+	if !p.IsSetSuccess() {
+		return UserServiceUploadBackgroundResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *UserServiceUploadBackgroundResult) SetSuccess(x interface{}) {
+	p.Success = x.(*UploadBackgroundResponse)
+}
+
+func (p *UserServiceUploadBackgroundResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *UserServiceUploadBackgroundResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UserServiceUploadBackgroundResult(%+v)", *p)
+}
+
+var fieldIDToName_UserServiceUploadBackgroundResult = map[int16]string{
+	0: "success",
+}
+
 type UserServiceRefreshTokenArgs struct {
 	Req *RefreshTokenRequest `thrift:"req,1" frugal:"1,default,RefreshTokenRequest" json:"req"`
 }
@@ -831,5 +1886,385 @@ func (p *UserServiceRefreshTokenResult) String() string {
 }
 
 var fieldIDToName_UserServiceRefreshTokenResult = map[int16]string{
+	0: "success",
+}
+
+type UserServiceFindUsersByUsernameArgs struct {
+	Req *FindUsersByUsernameRequest `thrift:"req,1" frugal:"1,default,FindUsersByUsernameRequest" json:"req"`
+}
+
+func NewUserServiceFindUsersByUsernameArgs() *UserServiceFindUsersByUsernameArgs {
+	return &UserServiceFindUsersByUsernameArgs{}
+}
+
+func (p *UserServiceFindUsersByUsernameArgs) InitDefault() {
+}
+
+var UserServiceFindUsersByUsernameArgs_Req_DEFAULT *FindUsersByUsernameRequest
+
+func (p *UserServiceFindUsersByUsernameArgs) GetReq() (v *FindUsersByUsernameRequest) {
+	if !p.IsSetReq() {
+		return UserServiceFindUsersByUsernameArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *UserServiceFindUsersByUsernameArgs) SetReq(val *FindUsersByUsernameRequest) {
+	p.Req = val
+}
+
+func (p *UserServiceFindUsersByUsernameArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *UserServiceFindUsersByUsernameArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UserServiceFindUsersByUsernameArgs(%+v)", *p)
+}
+
+var fieldIDToName_UserServiceFindUsersByUsernameArgs = map[int16]string{
+	1: "req",
+}
+
+type UserServiceFindUsersByUsernameResult struct {
+	Success *FindUsersByUsernameResponse `thrift:"success,0,optional" frugal:"0,optional,FindUsersByUsernameResponse" json:"success,omitempty"`
+}
+
+func NewUserServiceFindUsersByUsernameResult() *UserServiceFindUsersByUsernameResult {
+	return &UserServiceFindUsersByUsernameResult{}
+}
+
+func (p *UserServiceFindUsersByUsernameResult) InitDefault() {
+}
+
+var UserServiceFindUsersByUsernameResult_Success_DEFAULT *FindUsersByUsernameResponse
+
+func (p *UserServiceFindUsersByUsernameResult) GetSuccess() (v *FindUsersByUsernameResponse) {
+	if !p.IsSetSuccess() {
+		return UserServiceFindUsersByUsernameResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *UserServiceFindUsersByUsernameResult) SetSuccess(x interface{}) {
+	p.Success = x.(*FindUsersByUsernameResponse)
+}
+
+func (p *UserServiceFindUsersByUsernameResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *UserServiceFindUsersByUsernameResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UserServiceFindUsersByUsernameResult(%+v)", *p)
+}
+
+var fieldIDToName_UserServiceFindUsersByUsernameResult = map[int16]string{
+	0: "success",
+}
+
+type UserServiceFindUserByEmailArgs struct {
+	Req *FindUserByEmailRequest `thrift:"req,1" frugal:"1,default,FindUserByEmailRequest" json:"req"`
+}
+
+func NewUserServiceFindUserByEmailArgs() *UserServiceFindUserByEmailArgs {
+	return &UserServiceFindUserByEmailArgs{}
+}
+
+func (p *UserServiceFindUserByEmailArgs) InitDefault() {
+}
+
+var UserServiceFindUserByEmailArgs_Req_DEFAULT *FindUserByEmailRequest
+
+func (p *UserServiceFindUserByEmailArgs) GetReq() (v *FindUserByEmailRequest) {
+	if !p.IsSetReq() {
+		return UserServiceFindUserByEmailArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *UserServiceFindUserByEmailArgs) SetReq(val *FindUserByEmailRequest) {
+	p.Req = val
+}
+
+func (p *UserServiceFindUserByEmailArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *UserServiceFindUserByEmailArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UserServiceFindUserByEmailArgs(%+v)", *p)
+}
+
+var fieldIDToName_UserServiceFindUserByEmailArgs = map[int16]string{
+	1: "req",
+}
+
+type UserServiceFindUserByEmailResult struct {
+	Success *FindUserByEmailResponse `thrift:"success,0,optional" frugal:"0,optional,FindUserByEmailResponse" json:"success,omitempty"`
+}
+
+func NewUserServiceFindUserByEmailResult() *UserServiceFindUserByEmailResult {
+	return &UserServiceFindUserByEmailResult{}
+}
+
+func (p *UserServiceFindUserByEmailResult) InitDefault() {
+}
+
+var UserServiceFindUserByEmailResult_Success_DEFAULT *FindUserByEmailResponse
+
+func (p *UserServiceFindUserByEmailResult) GetSuccess() (v *FindUserByEmailResponse) {
+	if !p.IsSetSuccess() {
+		return UserServiceFindUserByEmailResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *UserServiceFindUserByEmailResult) SetSuccess(x interface{}) {
+	p.Success = x.(*FindUserByEmailResponse)
+}
+
+func (p *UserServiceFindUserByEmailResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *UserServiceFindUserByEmailResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UserServiceFindUserByEmailResult(%+v)", *p)
+}
+
+var fieldIDToName_UserServiceFindUserByEmailResult = map[int16]string{
+	0: "success",
+}
+
+type UserServiceFavoriteVideoArgs struct {
+	Req *FavoriteVideoRequest `thrift:"req,1" frugal:"1,default,FavoriteVideoRequest" json:"req"`
+}
+
+func NewUserServiceFavoriteVideoArgs() *UserServiceFavoriteVideoArgs {
+	return &UserServiceFavoriteVideoArgs{}
+}
+
+func (p *UserServiceFavoriteVideoArgs) InitDefault() {
+}
+
+var UserServiceFavoriteVideoArgs_Req_DEFAULT *FavoriteVideoRequest
+
+func (p *UserServiceFavoriteVideoArgs) GetReq() (v *FavoriteVideoRequest) {
+	if !p.IsSetReq() {
+		return UserServiceFavoriteVideoArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *UserServiceFavoriteVideoArgs) SetReq(val *FavoriteVideoRequest) {
+	p.Req = val
+}
+
+func (p *UserServiceFavoriteVideoArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *UserServiceFavoriteVideoArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UserServiceFavoriteVideoArgs(%+v)", *p)
+}
+
+var fieldIDToName_UserServiceFavoriteVideoArgs = map[int16]string{
+	1: "req",
+}
+
+type UserServiceFavoriteVideoResult struct {
+	Success *FavoriteVideoResponse `thrift:"success,0,optional" frugal:"0,optional,FavoriteVideoResponse" json:"success,omitempty"`
+}
+
+func NewUserServiceFavoriteVideoResult() *UserServiceFavoriteVideoResult {
+	return &UserServiceFavoriteVideoResult{}
+}
+
+func (p *UserServiceFavoriteVideoResult) InitDefault() {
+}
+
+var UserServiceFavoriteVideoResult_Success_DEFAULT *FavoriteVideoResponse
+
+func (p *UserServiceFavoriteVideoResult) GetSuccess() (v *FavoriteVideoResponse) {
+	if !p.IsSetSuccess() {
+		return UserServiceFavoriteVideoResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *UserServiceFavoriteVideoResult) SetSuccess(x interface{}) {
+	p.Success = x.(*FavoriteVideoResponse)
+}
+
+func (p *UserServiceFavoriteVideoResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *UserServiceFavoriteVideoResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UserServiceFavoriteVideoResult(%+v)", *p)
+}
+
+var fieldIDToName_UserServiceFavoriteVideoResult = map[int16]string{
+	0: "success",
+}
+
+type UserServiceUnfavoriteVideoArgs struct {
+	Req *UnfavoriteVideoRequest `thrift:"req,1" frugal:"1,default,UnfavoriteVideoRequest" json:"req"`
+}
+
+func NewUserServiceUnfavoriteVideoArgs() *UserServiceUnfavoriteVideoArgs {
+	return &UserServiceUnfavoriteVideoArgs{}
+}
+
+func (p *UserServiceUnfavoriteVideoArgs) InitDefault() {
+}
+
+var UserServiceUnfavoriteVideoArgs_Req_DEFAULT *UnfavoriteVideoRequest
+
+func (p *UserServiceUnfavoriteVideoArgs) GetReq() (v *UnfavoriteVideoRequest) {
+	if !p.IsSetReq() {
+		return UserServiceUnfavoriteVideoArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *UserServiceUnfavoriteVideoArgs) SetReq(val *UnfavoriteVideoRequest) {
+	p.Req = val
+}
+
+func (p *UserServiceUnfavoriteVideoArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *UserServiceUnfavoriteVideoArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UserServiceUnfavoriteVideoArgs(%+v)", *p)
+}
+
+var fieldIDToName_UserServiceUnfavoriteVideoArgs = map[int16]string{
+	1: "req",
+}
+
+type UserServiceUnfavoriteVideoResult struct {
+	Success *UnfavoriteVideoResponse `thrift:"success,0,optional" frugal:"0,optional,UnfavoriteVideoResponse" json:"success,omitempty"`
+}
+
+func NewUserServiceUnfavoriteVideoResult() *UserServiceUnfavoriteVideoResult {
+	return &UserServiceUnfavoriteVideoResult{}
+}
+
+func (p *UserServiceUnfavoriteVideoResult) InitDefault() {
+}
+
+var UserServiceUnfavoriteVideoResult_Success_DEFAULT *UnfavoriteVideoResponse
+
+func (p *UserServiceUnfavoriteVideoResult) GetSuccess() (v *UnfavoriteVideoResponse) {
+	if !p.IsSetSuccess() {
+		return UserServiceUnfavoriteVideoResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *UserServiceUnfavoriteVideoResult) SetSuccess(x interface{}) {
+	p.Success = x.(*UnfavoriteVideoResponse)
+}
+
+func (p *UserServiceUnfavoriteVideoResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *UserServiceUnfavoriteVideoResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UserServiceUnfavoriteVideoResult(%+v)", *p)
+}
+
+var fieldIDToName_UserServiceUnfavoriteVideoResult = map[int16]string{
+	0: "success",
+}
+
+type UserServiceGetFavoriteVideosArgs struct {
+	Req *GetFavoriteVideosRequest `thrift:"req,1" frugal:"1,default,GetFavoriteVideosRequest" json:"req"`
+}
+
+func NewUserServiceGetFavoriteVideosArgs() *UserServiceGetFavoriteVideosArgs {
+	return &UserServiceGetFavoriteVideosArgs{}
+}
+
+func (p *UserServiceGetFavoriteVideosArgs) InitDefault() {
+}
+
+var UserServiceGetFavoriteVideosArgs_Req_DEFAULT *GetFavoriteVideosRequest
+
+func (p *UserServiceGetFavoriteVideosArgs) GetReq() (v *GetFavoriteVideosRequest) {
+	if !p.IsSetReq() {
+		return UserServiceGetFavoriteVideosArgs_Req_DEFAULT
+	}
+	return p.Req
+}
+func (p *UserServiceGetFavoriteVideosArgs) SetReq(val *GetFavoriteVideosRequest) {
+	p.Req = val
+}
+
+func (p *UserServiceGetFavoriteVideosArgs) IsSetReq() bool {
+	return p.Req != nil
+}
+
+func (p *UserServiceGetFavoriteVideosArgs) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UserServiceGetFavoriteVideosArgs(%+v)", *p)
+}
+
+var fieldIDToName_UserServiceGetFavoriteVideosArgs = map[int16]string{
+	1: "req",
+}
+
+type UserServiceGetFavoriteVideosResult struct {
+	Success *GetFavoriteVideosResponse `thrift:"success,0,optional" frugal:"0,optional,GetFavoriteVideosResponse" json:"success,omitempty"`
+}
+
+func NewUserServiceGetFavoriteVideosResult() *UserServiceGetFavoriteVideosResult {
+	return &UserServiceGetFavoriteVideosResult{}
+}
+
+func (p *UserServiceGetFavoriteVideosResult) InitDefault() {
+}
+
+var UserServiceGetFavoriteVideosResult_Success_DEFAULT *GetFavoriteVideosResponse
+
+func (p *UserServiceGetFavoriteVideosResult) GetSuccess() (v *GetFavoriteVideosResponse) {
+	if !p.IsSetSuccess() {
+		return UserServiceGetFavoriteVideosResult_Success_DEFAULT
+	}
+	return p.Success
+}
+func (p *UserServiceGetFavoriteVideosResult) SetSuccess(x interface{}) {
+	p.Success = x.(*GetFavoriteVideosResponse)
+}
+
+func (p *UserServiceGetFavoriteVideosResult) IsSetSuccess() bool {
+	return p.Success != nil
+}
+
+func (p *UserServiceGetFavoriteVideosResult) String() string {
+	if p == nil {
+		return "<nil>"
+	}
+	return fmt.Sprintf("UserServiceGetFavoriteVideosResult(%+v)", *p)
+}
+
+var fieldIDToName_UserServiceGetFavoriteVideosResult = map[int16]string{
 	0: "success",
 }

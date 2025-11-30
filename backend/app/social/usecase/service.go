@@ -135,6 +135,7 @@ func (s *useCase) GetChatMessages(ctx context.Context, roomID int64, page, size 
 			ID:       msg.ID,
 			RoomID:   msg.RoomID,
 			SenderID: msg.SenderID,
+			CreateAt: msg.CreateAt,
 			Content:  msg.Content,
 			Type:     msg.Type,
 		}
@@ -145,18 +146,76 @@ func (s *useCase) GetChatMessages(ctx context.Context, roomID int64, page, size 
 }
 
 // 好友关系相关
-func (s *useCase) AddFriend(ctx context.Context, userID, friendID int64) error {
-	// 检查是否已经是好友
-	if friendship, err := s.db.GetFriendship(ctx, userID, friendID); err == nil && friendship != nil {
-		return errors.New("already friends")
+func (s *useCase) AddFriend(ctx context.Context, userID, friendID int64) (*model.Friendship, error) {
+	// 检查用户是否存在
+	exists, err := s.db.IsUserExists(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.New("user not found")
 	}
 
+	exists, err = s.db.IsUserExists(ctx, friendID)
+	if err != nil {
+		return nil, err
+	}
+	if !exists {
+		return nil, errors.New("friend not found")
+	}
+
+	// 检查是否已经是好友
+	if friendship, err := s.db.GetFriendship(ctx, userID, friendID); err == nil && friendship != nil {
+		return nil, errors.New("已经关注对方，对方回关就是好友啦")
+	}
+
+	// 检查对方是否已经关注自己
+	reverseFriendship, err := s.db.GetFriendship(ctx, friendID, userID)
+	if err == nil && reverseFriendship != nil {
+		// 如果对方已经关注自己，将两者的状态都设置为已接受
+		if reverseFriendship.Status == model.FriendStatusPending {
+			// 创建当前用户关注对方的记录
+			friendship := &model.Friendship{
+				UserID:   userID,
+				FriendID: friendID,
+				Status:   model.FriendStatusAccepted,
+			}
+			if err := s.db.AddFriend(ctx, friendship); err != nil {
+				return nil, err
+			}
+
+			// 更新对方的关注状态为已接受
+			reverseFriendship.Status = model.FriendStatusAccepted
+			if err := s.db.UpdateFriendship(ctx, reverseFriendship); err != nil {
+				return nil, err
+			}
+
+			// 返回新创建的友谊对象
+			createdFriendship, err := s.db.GetFriendship(ctx, userID, friendID)
+			if err != nil {
+				return nil, err
+			}
+			return createdFriendship, nil
+		}
+	}
+
+	// 创建关注请求
 	friendship := &model.Friendship{
 		UserID:   userID,
 		FriendID: friendID,
 		Status:   model.FriendStatusPending,
 	}
-	return s.db.AddFriend(ctx, friendship)
+	if err := s.db.AddFriend(ctx, friendship); err != nil {
+		return nil, err
+	}
+
+	// 获取创建的友谊对象
+	createdFriendship, err := s.db.GetFriendship(ctx, userID, friendID)
+	if err != nil {
+		return nil, err
+	}
+
+	return createdFriendship, nil
 }
 
 func (s *useCase) GetFriendship(ctx context.Context, userID, friendID int64) (*model.Friendship, error) {
@@ -165,15 +224,12 @@ func (s *useCase) GetFriendship(ctx context.Context, userID, friendID int64) (*m
 		return nil, err
 	}
 
-	// 转换为domain类型
-	domainFriendship := &model.Friendship{
-		ID:       friendship.ID,
-		UserID:   friendship.UserID,
-		FriendID: friendship.FriendID,
-		Status:   friendship.Status,
+	// 只返回状态为已接受的好友关系
+	if friendship.Status != model.FriendStatusAccepted {
+		return nil, errors.New("好友关系不存在或未确认")
 	}
 
-	return domainFriendship, nil
+	return friendship, nil
 }
 
 func (s *useCase) GetUserFriends(ctx context.Context, userID int64) ([]*model.Friendship, error) {
@@ -182,16 +238,20 @@ func (s *useCase) GetUserFriends(ctx context.Context, userID int64) ([]*model.Fr
 		return nil, err
 	}
 
-	// 转换为domain类型
-	domainFriendships := make([]*model.Friendship, 0, len(friendships))
+	// 只返回状态为已接受的好友关系
+	domainFriendships := make([]*model.Friendship, 0)
 	for _, friendship := range friendships {
-		domainFriendship := &model.Friendship{
-			ID:       friendship.ID,
-			UserID:   friendship.UserID,
-			FriendID: friendship.FriendID,
-			Status:   friendship.Status,
+		// 只添加状态为已接受的好友关系
+		if friendship.Status == model.FriendStatusAccepted {
+			domainFriendship := &model.Friendship{
+				ID:       friendship.ID,
+				UserID:   friendship.UserID,
+				FriendID: friendship.FriendID,
+				Status:   friendship.Status,
+				Remark:   friendship.Remark,
+			}
+			domainFriendships = append(domainFriendships, domainFriendship)
 		}
-		domainFriendships = append(domainFriendships, domainFriendship)
 	}
 
 	return domainFriendships, nil
@@ -223,9 +283,8 @@ func (s *useCase) GetFriendRequests(ctx context.Context, userID int64, status in
 	for _, request := range requests {
 		domainRequest := &model.FriendRequest{
 			ID:         request.ID,
-			SenderID:   request.SenderID,
 			ReceiverID: request.ReceiverID,
-			Message:    request.Message,
+			SenderID:   request.SenderID,
 			Status:     request.Status,
 		}
 		domainRequests = append(domainRequests, domainRequest)

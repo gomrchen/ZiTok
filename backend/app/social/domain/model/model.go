@@ -64,6 +64,7 @@ type ChatMessage struct {
 	RoomID   int64  // 聊天室ID
 	SenderID int64  // 发送者ID
 	Content  string // 消息内容
+	CreateAt int64
 	Type     int8   // 消息类型：0=文本,1=图片,2=视频,3=文件
 }
 

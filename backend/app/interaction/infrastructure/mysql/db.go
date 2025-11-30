@@ -36,10 +36,20 @@ func (i *Interaction) GetLikeList(ctx context.Context, videoID int64, offset, li
 
 // CreateLike 创建点赞
 func (i *Interaction) CreateLike(ctx context.Context, userID, videoID int64) error {
-	return i.db.WithContext(ctx).Create(&Like{
+	if err := i.db.WithContext(ctx).Create(&Like{
 		UserID:  userID,
 		VideoID: videoID,
-	}).Error
+	}).Error; err != nil {
+		return err
+	}
+	result := i.db.WithContext(ctx).Model(&Video{}).
+		Where("id = ?", videoID).
+		UpdateColumn("like_count", gorm.Expr("like_count + ?", 1))
+
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
 }
 
 // GetLike 获取点赞记录
@@ -85,11 +95,12 @@ func (i *Interaction) GetComment(ctx context.Context, commentID int64) (*model.C
 		return nil, err
 	}
 	return &model.Comment{
-		ID:       comment.ID,
-		UserID:   comment.UserID,
-		VideoID:  comment.VideoID,
-		Content:  comment.Content,
-		ParentID: comment.ParentID,
+		ID:        comment.ID,
+		UserID:    comment.UserID,
+		VideoID:   comment.VideoID,
+		Content:   comment.Content,
+		ParentID:  comment.ParentID,
+		LikeCount: comment.LikeCount,
 	}, nil
 }
 
@@ -106,24 +117,28 @@ func (i *Interaction) IsVideoExist(ctx context.Context, videoID int64) (bool, er
 }
 
 // GetCommentList 获取评论列表
-func (i *Interaction) GetCommentList(ctx context.Context, videoID int64, offset, limit int) ([]*model.Comment, int64, error) {
+func (i *Interaction) GetCommentList(ctx context.Context, videoID int64, offset, limit int, commentID *int64) ([]*model.Comment, int64, error) {
 	var comments []*Comment
 	var total int64
 
+	// 构建查询条件
+	query := i.db.WithContext(ctx).Model(&Comment{}).Where("video_id = ? AND deleted_at IS NULL", videoID)
+	countQuery := i.db.WithContext(ctx).Model(&Comment{}).Where("video_id = ? AND deleted_at IS NULL", videoID)
+
+	// 如果提供了commentID，则添加筛选条件
+	if commentID != nil {
+		query = query.Where("user_id = ?", *commentID)
+		countQuery = countQuery.Where("user_id = ?", *commentID)
+	}
+
 	// 获取总数
-	err := i.db.WithContext(ctx).Model(&Comment{}).
-		Where("video_id = ? AND deleted_at IS NULL", videoID).
-		Count(&total).Error
+	err := countQuery.Count(&total).Error
 	if err != nil {
 		return nil, 0, err
 	}
 
 	// 获取评论列表
-	err = i.db.WithContext(ctx).
-		Where("video_id = ? AND deleted_at IS NULL", videoID).
-		Offset(offset).
-		Limit(limit).
-		Find(&comments).Error
+	err = query.Offset(offset).Limit(limit).Find(&comments).Error
 	if err != nil {
 		return nil, 0, err
 	}

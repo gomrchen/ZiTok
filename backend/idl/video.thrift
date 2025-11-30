@@ -129,14 +129,31 @@ struct SemanticSearchResponse {
     5: optional string summary          // 搜索结果摘要
 }
 
+// 上传封面请求
+struct UploadCoverRequest {
+    1: required i64 video_id            // 视频ID
+    2: required binary cover_data       // 封面二进制数据
+    3: required string content_type     // 文件类型 (image/png, image/jpeg)
+}
+
+// 上传封面响应
+struct UploadCoverResponse {
+    1: required model.BaseResp Base     // 基本响应信息
+    2: required string cover_url        // 封面URL
+}
+
 service VideoService {
     PublishResponse Publish(1: PublishRequest req)
     VideoListResponse List(1: VideoListRequest req)
     DetailResponse Detail(1: DetailRequest req)
     HotVideoResponse GetHotVideos(1: HotVideoRequest req)
+    HotVideoResponse Recommend(1: HotVideoRequest req)
     DeleteResponse Delete(1: DeleteRequest req)
     IncrementVisitCountResponse IncrementVisitCount(1: IncrementVisitCountRequest req)
     IncrementLikeCountResponse IncrementLikeCount(1: IncrementLikeCountRequest req)
     SearchResponse Search(1: SearchRequest req)
     SemanticSearchResponse SemanticSearch(1: SemanticSearchRequest req)
+
+    // 上传封面
+    UploadCoverResponse UploadCover(1: UploadCoverRequest req)
 }

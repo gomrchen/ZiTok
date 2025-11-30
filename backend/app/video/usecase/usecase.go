@@ -26,6 +26,10 @@ type VideoUseCase interface {
 		category string,
 		lastVisit, lastLike, lastID int64,
 	) ([]*model.Video, int64, int64, int64, int64, error)
+	RecommendVideos(
+		ctx context.Context,
+		limit int32,
+	) ([]*model.Video, error)
 	DeleteVideo(ctx context.Context, videoID, userID int64) error
 	IncrementVisitCount(ctx context.Context, videoID int64) error
 	IncrementLikeCount(ctx context.Context, videoID int64) error
@@ -42,6 +46,7 @@ type VideoUseCase interface {
 		pageSize, pageNum int32,
 		threshold float64,
 	) ([]*model.SemanticSearchResultItem, error)
+	UploadCover(ctx context.Context, videoID int64, coverData []byte, contentType string) (string, error)
 }
 
 type useCase struct {

@@ -7,12 +7,14 @@ import (
 	"errors"
 	"io"
 	"strconv"
+	"strings"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	api "github.com/yxrxy/videoHub/app/gateway/model/video"
 	"github.com/yxrxy/videoHub/app/gateway/pack"
 	"github.com/yxrxy/videoHub/app/gateway/rpc"
 	"github.com/yxrxy/videoHub/kitex_gen/video"
+	pkgcontext "github.com/yxrxy/videoHub/pkg/base/context"
 	"github.com/yxrxy/videoHub/pkg/errno"
 )
 
@@ -29,6 +31,8 @@ func Publish(ctx context.Context, c *app.RequestContext) {
 
 	title := c.PostForm("title") // 从表单数据中获取标题
 	description := c.PostForm("description")
+	category := c.PostForm("category")
+	tagsStr := c.PostForm("tags")
 
 	file, err := fileHeader.Open()
 	if err != nil {
@@ -42,12 +46,34 @@ func Publish(ctx context.Context, c *app.RequestContext) {
 		pack.RespError(c, errno.ParamVerifyError.WithError(err))
 		return
 	}
-	err = rpc.PublishVideoRPC(ctx, &video.PublishRequest{
+	uid, _ := pkgcontext.GetUserID(ctx)
+
+	var tags []string
+	if tagsStr != "" {
+		for _, t := range strings.Split(tagsStr, ",") {
+			tt := strings.TrimSpace(t)
+			if tt != "" {
+				tags = append(tags, tt)
+			}
+		}
+	}
+
+	req := &video.PublishRequest{
+		UserId:      uid,
 		VideoData:   videoData,
 		Title:       title,
 		ContentType: fileHeader.Header.Get("Content-Type"),
 		Description: &description,
-	})
+	}
+	if category != "" {
+		cat := category
+		req.Category = &cat
+	}
+	if len(tags) > 0 {
+		req.Tags = tags
+	}
+
+	err = rpc.PublishVideoRPC(ctx, req)
 	if err != nil {
 		pack.RespError(c, err)
 		return
@@ -250,5 +276,83 @@ func SemanticSearch(ctx context.Context, c *app.RequestContext) {
 		pack.RespError(c, err)
 		return
 	}
+	pack.RespData(c, resp)
+}
+
+// Recommend .
+// @router /api/v1/video/recommend [GET]
+func Recommend(ctx context.Context, c *app.RequestContext) {
+	var err error
+	var req api.HotVideoRequest
+	err = c.BindAndValidate(&req)
+	if err != nil {
+		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+		return
+	}
+
+	resp, err := rpc.RecommendRPC(ctx, &video.HotVideoRequest{
+		Limit:     req.Limit,
+		Category:  req.Category,
+		LastVisit: req.LastVisit,
+		LastLike:  req.LastLike,
+		LastId:    req.LastID,
+	})
+	if err != nil {
+		pack.RespError(c, err)
+		return
+	}
+	pack.RespData(c, resp)
+}
+
+// UploadCover .
+// @router /api/v1/video/:video_id/cover [POST]
+func UploadCover(ctx context.Context, c *app.RequestContext) {
+	var err error
+
+	// 获取视频ID
+	videoIDStr := c.Param("video_id")
+	if videoIDStr == "" {
+		pack.RespError(c, errno.ParamVerifyError.WithError(errors.New("video_id is required")))
+		return
+	}
+	videoID, err := strconv.ParseInt(videoIDStr, 10, 64)
+	if err != nil {
+		pack.RespError(c, errno.ParamVerifyError.WithError(errors.New("invalid video_id")))
+		return
+	}
+
+	// 获取封面文件
+	fileHeader, err := c.FormFile("cover")
+	if err != nil {
+		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+		return
+	}
+
+	// 打开文件
+	file, err := fileHeader.Open()
+	if err != nil {
+		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+		return
+	}
+	defer file.Close()
+
+	// 读取文件内容
+	coverData, err := io.ReadAll(file)
+	if err != nil {
+		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+		return
+	}
+
+	// 调用RPC服务上传封面
+	resp, err := rpc.UploadCoverRPC(ctx, &video.UploadCoverRequest{
+		VideoId:     videoID,
+		CoverData:   coverData,
+		ContentType: fileHeader.Header.Get("Content-Type"),
+	})
+	if err != nil {
+		pack.RespError(c, err)
+		return
+	}
+
 	pack.RespData(c, resp)
 }

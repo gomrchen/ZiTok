@@ -23,7 +23,7 @@ IDL_PATH = $(DIR)/idl
 OUTPUT_PATH = $(DIR)/output
 
 # 服务名
-SERVICES := gateway user social interaction video
+SERVICES := gateway user social interaction video note
 service = $(word 1, $@)
 
 all:
@@ -49,7 +49,7 @@ help:
 # 启动必要的环境，比如 etcd、mysql
 .PHONY: env-up
 env-up:
-	@ docker compose -f ./docker/docker-compose.yml up -d videohub-mysql videohub-redis videohub-etcd kafka otel-collector elasticsearch kibana jaeger prometheus grafana
+	@ docker compose -f ./docker/docker-compose.yml up -d videohub-mysql videohub-redis videohub-etcd kafka otel-collector elasticsearch kibana jaeger prometheus grafana gorse
 	@echo "$(PREFIX) - Jaeger UI: http://localhost:16686"
 	@echo "$(PREFIX) - Prometheus: http://localhost:9090"
 	@echo "$(PREFIX) - Grafana: http://localhost:3080 (admin/admin)"

@@ -56,10 +56,7 @@ func (h *VideoHandler) Publish(ctx context.Context, req *video.PublishRequest) (
 
 func (h *VideoHandler) List(ctx context.Context, req *video.VideoListRequest) (r *video.VideoListResponse, err error) {
 	r = new(video.VideoListResponse)
-	userID, err := pkgcontext.GetUserID(ctx)
-	if err != nil {
-		return
-	}
+	userID := req.UserId
 	var videoList []*model.Video
 	var total int64
 	if videoList, total, err = h.useCase.GetVideoList(ctx, userID, req.Page, req.Size, req.Category); err != nil {
@@ -133,6 +130,31 @@ func (h *VideoHandler) GetHotVideos(ctx context.Context, req *video.HotVideoRequ
 	return r, err
 }
 
+func (h *VideoHandler) Recommend(ctx context.Context, req *video.HotVideoRequest) (r *video.HotVideoResponse, err error) {
+	r = new(video.HotVideoResponse)
+	var videoList []*model.Video
+	limit := int32(constants.DefaultPageSize)
+	if req.Limit != nil {
+		limit = *req.Limit
+	}
+
+	// 调用推荐接口（包含个性化 + 热门兜底）
+	if videoList, err = h.useCase.RecommendVideos(ctx, limit); err != nil {
+		return r, err
+	}
+
+	// 构造响应
+	// 注意：推荐接口目前不返回分页游标，因此置为0
+	zero := int64(0)
+	r.Videos = pack.Videos(videoList)
+	r.Total = int64(len(videoList))
+	r.NextVisit = &zero
+	r.NextLike = &zero
+	r.NextId = &zero
+	r.Base = base.BuildBaseResp(err)
+	return r, err
+}
+
 func (h *VideoHandler) Delete(ctx context.Context, req *video.DeleteRequest) (r *video.DeleteResponse, err error) {
 	r = new(video.DeleteResponse)
 
@@ -191,4 +213,17 @@ func (h *VideoHandler) SemanticSearch(ctx context.Context, req *video.SemanticSe
 	r.Results = pack.SemanticSearchResultItems(result)
 	r.Base = base.BuildBaseResp(err)
 	return
+}
+
+func (h *VideoHandler) UploadCover(ctx context.Context, req *video.UploadCoverRequest) (r *video.UploadCoverResponse, err error) {
+	r = new(video.UploadCoverResponse)
+
+	coverURL, err := h.useCase.UploadCover(ctx, req.VideoId, req.CoverData, req.ContentType)
+	if err != nil {
+		return r, err
+	}
+
+	r.Base = base.BuildBaseResp(nil)
+	r.CoverUrl = coverURL
+	return r, nil
 }
