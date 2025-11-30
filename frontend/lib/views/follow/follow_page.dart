@@ -9,6 +9,7 @@ import '../../models/video.dart';
 import '../../theme/theme_tokens.dart';
 import '../../widgets/comment_sheet.dart';
 import '../../widgets/video_stats.dart';
+import '../../widgets/animated_like_button.dart';
 import '../../utils/url_utils.dart';
 import '../../services/user_service.dart';
 import '../../app.dart';
@@ -146,7 +147,6 @@ class _FollowPageState extends State<FollowPage> with AutomaticKeepAliveClientMi
             video: video,
             isRecommended: isRecommended,
             onTap: () => context.go('/video/${video.id}'),
-            onLike: () => vp.like(video.id),
             onComment: () => showCommentsSheet(context, videoId: video.id),
             onShare: () => _copyVideoId(context, video.id),
           );
@@ -191,14 +191,12 @@ class _FollowListItem extends StatefulWidget {
   final Video video;
   final bool isRecommended;
   final VoidCallback onTap;
-  final VoidCallback onLike;
   final VoidCallback onComment;
   final VoidCallback onShare;
   const _FollowListItem({
     required this.video,
     required this.isRecommended,
     required this.onTap,
-    required this.onLike,
     required this.onComment,
     required this.onShare,
   });
@@ -209,15 +207,15 @@ class _FollowListItem extends StatefulWidget {
 
 class _FollowListItemState extends State<_FollowListItem> {
   String? _authorAvatarUrl;
-  bool _fetchingAvatar = false;
+  String? _authorName;
+  bool _fetchingAuthor = false;
 
   @override
   void initState() {
     super.initState();
-    // 如果视频没有作者头像，则根据uid获取
-    if ((widget.video.authorAvatarUrl == null || widget.video.authorAvatarUrl!.isEmpty) &&
-        widget.video.uid != null) {
-      _fetchAuthorAvatar();
+    // 如果视频没有作者信息，则根据uid获取
+    if (widget.video.uid != null) {
+      _fetchAuthorInfo();
     }
   }
 
@@ -226,16 +224,24 @@ class _FollowListItemState extends State<_FollowListItem> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.video.uid != widget.video.uid) {
       _authorAvatarUrl = null;
-      if ((widget.video.authorAvatarUrl == null || widget.video.authorAvatarUrl!.isEmpty) &&
-          widget.video.uid != null) {
-        _fetchAuthorAvatar();
+      _authorName = null;
+      if (widget.video.uid != null) {
+        _fetchAuthorInfo();
       }
     }
   }
 
-  Future<void> _fetchAuthorAvatar() async {
-    if (_fetchingAvatar || widget.video.uid == null) return;
-    _fetchingAvatar = true;
+  Future<void> _fetchAuthorInfo() async {
+    if (_fetchingAuthor || widget.video.uid == null) return;
+    // 如果已经有头像和名称，不需要再获取
+    if (widget.video.authorAvatarUrl != null &&
+        widget.video.authorAvatarUrl!.isNotEmpty &&
+        widget.video.authorName != null &&
+        widget.video.authorName!.isNotEmpty) {
+      return;
+    }
+
+    _fetchingAuthor = true;
 
     try {
       final userService = UserService(AppBootstrap.apiClient.dio);
@@ -245,16 +251,23 @@ class _FollowListItemState extends State<_FollowListItem> {
       if (data['code']?.toString() == '10000' && data['data'] != null) {
         final userData = data['data'] as Map<String, dynamic>;
         final avatarUrl = (userData['avatar'] ?? userData['avatar_url'])?.toString();
-        if (avatarUrl != null && avatarUrl.isNotEmpty && mounted) {
+        final userName = (userData['username'] ?? userData['nickname'] ?? userData['name'])?.toString();
+
+        if (mounted) {
           setState(() {
-            _authorAvatarUrl = UrlUtils.resolveStorageUrl(avatarUrl, defaultDir: 'avatars');
+            if (avatarUrl != null && avatarUrl.isNotEmpty) {
+              _authorAvatarUrl = UrlUtils.resolveStorageUrl(avatarUrl, defaultDir: 'avatars');
+            }
+            if (userName != null && userName.isNotEmpty) {
+              _authorName = userName;
+            }
           });
         }
       }
     } catch (e) {
-      debugPrint('_FollowListItem: fetch avatar error: $e');
+      debugPrint('_FollowListItem: fetch author error: $e');
     } finally {
-      _fetchingAvatar = false;
+      _fetchingAuthor = false;
     }
   }
 
@@ -264,6 +277,17 @@ class _FollowListItemState extends State<_FollowListItem> {
       return UrlUtils.resolveStorageUrl(widget.video.authorAvatarUrl, defaultDir: 'avatars');
     }
     return _authorAvatarUrl;
+  }
+
+  /// 获取有效的作者名称
+  String get _effectiveAuthorName {
+    if (widget.video.authorName != null && widget.video.authorName!.isNotEmpty) {
+      return widget.video.authorName!;
+    }
+    if (_authorName != null && _authorName!.isNotEmpty) {
+      return _authorName!;
+    }
+    return widget.video.uid ?? '未知作者';
   }
 
   void _goToAuthorProfile() {
@@ -277,8 +301,8 @@ class _FollowListItemState extends State<_FollowListItem> {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
-    // 作者名称：优先使用uid，没有则用title的第一部分
-    final authorName = widget.video.uid ?? '用户${widget.video.id.substring(0, 4)}';
+    // 作者名称：使用获取到的名称
+    final authorName = _effectiveAuthorName;
     final authorInitial = authorName.isNotEmpty ? authorName.substring(0, 1).toUpperCase() : '?';
     final avatarUrl = _effectiveAvatarUrl;
 
@@ -431,11 +455,17 @@ class _FollowListItemState extends State<_FollowListItem> {
                 ],
               ),
               const SizedBox(width: Spacing.md),
-              // 点赞
+              // 点赞（带动画，水平布局）
               Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  _IconAction(icon: Icons.favorite_border, onPressed: widget.onLike),
+                  AnimatedLikeButton(
+                    videoId: widget.video.id,
+                    likeCount: widget.video.likes,
+                    size: 22,
+                    showCount: false,
+                    darkMode: false,
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     formatCount(widget.video.likes ?? 0),

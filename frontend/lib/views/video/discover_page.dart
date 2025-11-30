@@ -10,6 +10,7 @@ import '../../services/user_service.dart';
 import '../../app.dart';
 import '../../utils/url_utils.dart';
 import '../../widgets/video_stats.dart';
+import '../../widgets/animated_like_button.dart';
 import 'featured_page.dart';
 import 'widgets/md_notes_sheet.dart';
 import '../../widgets/comment_sheet.dart';
@@ -259,6 +260,10 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
+  // 作者信息（通过API获取）
+  String? _fetchedAuthorName;
+  bool _fetchingAuthor = false;
+
   // 附件：打开笔记弹窗
   void _openNotesSheet() {
     showModalBottomSheet<void>(
@@ -287,6 +292,49 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
     );
 
     _initController();
+    _fetchAuthorInfo();
+  }
+
+  /// 获取作者信息
+  Future<void> _fetchAuthorInfo() async {
+    if (_fetchingAuthor || widget.video.uid == null) return;
+    // 如果视频已有作者名称，不需要再获取
+    if (widget.video.authorName != null && widget.video.authorName!.isNotEmpty) {
+      return;
+    }
+
+    _fetchingAuthor = true;
+    try {
+      final userService = UserService(AppBootstrap.apiClient.dio);
+      final resp = await userService.info(userId: widget.video.uid);
+      final data = resp.data as Map<String, dynamic>? ?? {};
+
+      if (data['code']?.toString() == '10000' && data['data'] != null) {
+        final userData = data['data'] as Map<String, dynamic>;
+        final userName = (userData['username'] ?? userData['nickname'] ?? userData['name'])?.toString();
+
+        if (userName != null && userName.isNotEmpty && mounted && !_isDisposed) {
+          setState(() {
+            _fetchedAuthorName = userName;
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('_FullScreenVideoItem: fetch author error: $e');
+    } finally {
+      _fetchingAuthor = false;
+    }
+  }
+
+  /// 获取有效的作者名称
+  String get _effectiveAuthorName {
+    if (widget.video.authorName != null && widget.video.authorName!.isNotEmpty) {
+      return widget.video.authorName!;
+    }
+    if (_fetchedAuthorName != null && _fetchedAuthorName!.isNotEmpty) {
+      return _fetchedAuthorName!;
+    }
+    return widget.video.uid ?? '未知作者';
   }
 
   Future<void> _initController() async {
@@ -570,9 +618,9 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
                   avatarUrl: widget.video.authorAvatarUrl,
                 ),
                 const SizedBox(height: 20),
-                _LikeActionIcon(
-                  initialCount: widget.video.likes ?? 0,
-                  onTap: () => context.read<VideoProvider>().like(widget.video.id),
+                FullScreenLikeButton(
+                  videoId: widget.video.id,
+                  likeCount: widget.video.likes,
                 ),
                 const SizedBox(height: 16),
                 _ActionIcon(
@@ -603,7 +651,7 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
                     }
                   },
                   child: Text(
-                    '@${widget.video.uid ?? '未知作者'}',
+                    '@$_effectiveAuthorName',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
@@ -1037,125 +1085,6 @@ class _CollectActionIconState extends State<_CollectActionIcon> with SingleTicke
   }
 }
 
-/// 点赞图标（红心）带动画与计数（300~450ms）
-class _LikeActionIcon extends StatefulWidget {
-  final int initialCount;
-  final VoidCallback? onTap;
-  const _LikeActionIcon({required this.initialCount, this.onTap});
-  @override
-  State<_LikeActionIcon> createState() => _LikeActionIconState();
-}
-
-class _LikeActionIconState extends State<_LikeActionIcon>
-    with TickerProviderStateMixin {
-  late int count;
-  bool liked = false;
-  late AnimationController pulse; // 心形缩放
-  late AnimationController burst; // 粒子爆裂
-
-  @override
-  void initState() {
-    super.initState();
-    count = widget.initialCount;
-    pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 220),
-    );
-    burst = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 420),
-    );
-  }
-
-  @override
-  void dispose() {
-    pulse.dispose();
-    burst.dispose();
-    super.dispose();
-  }
-
-  void _toggle() {
-    setState(() {
-      liked = !liked;
-      count += liked ? 1 : -1;
-    });
-    pulse.forward(from: 0);
-    if (liked) {
-      burst.forward(from: 0);
-    }
-    if (widget.onTap != null) widget.onTap!();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        GestureDetector(
-          onTap: _toggle,
-          child: SizedBox(
-            width: 40,
-            height: 40,
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                // 粒子心形（6个方向）
-                AnimatedBuilder(
-                  animation: burst,
-                  builder: (context, child) {
-                    final t = burst.value; // 0~1
-                    final radius = 18 * t;
-                    final opacity = (1 - t).clamp(0.0, 1.0);
-                    Color c = Colors.red.withValues(alpha: opacity);
-                    return Stack(children: [
-                      _particle(Offset(0, -radius), c),
-                      _particle(Offset(0, radius), c),
-                      _particle(Offset(radius, 0), c),
-                      _particle(Offset(-radius, 0), c),
-                      _particle(Offset(radius * 0.7, -radius * 0.7), c),
-                      _particle(Offset(-radius * 0.7, -radius * 0.7), c),
-                    ]);
-                  },
-                ),
-                // 圆形半透明底
-                Container(
-                  decoration: const BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Color(0x33000000),
-                  ),
-                ),
-                // 心形图标（缩放/颜色过渡）
-                ScaleTransition(
-                  scale: Tween<double>(begin: 1.0, end: 1.25).animate(
-                    CurvedAnimation(parent: pulse, curve: Curves.easeOut),
-                  ),
-                  child: Icon(
-                    liked ? Icons.favorite : Icons.favorite_border,
-                    color: liked ? Colors.red : Colors.white,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 6),
-        Text(_formatCount(count), style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white)),
-      ],
-    );
-  }
-
-  Widget _particle(Offset offset, Color color) {
-    return Transform.translate(
-      offset: offset,
-      child: Icon(Icons.favorite, color: color, size: 10),
-    );
-  }
-
-  String _formatCount(int c) {
-    if (c >= 1000000) return '${(c / 1000000).toStringAsFixed(1)}M';
-    if (c >= 1000) return '${(c / 1000).toStringAsFixed(1)}k';
-    return '$c';
-  }
-}
 
 /// 视频进度条组件
 class _VideoProgressBar extends StatefulWidget {

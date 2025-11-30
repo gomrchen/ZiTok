@@ -70,26 +70,25 @@ class _SearchPageState extends State<SearchPage> {
                   Expanded(
                     child: Container(
                       height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
                       decoration: BoxDecoration(
                         color: const Color(0xFFF2F2F2),
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: Spacing.sm,
-                            ),
-                            child: Icon(
-                              Icons.search,
-                              size: 18,
-                              color: Color(0xFF999999),
-                            ),
+                          const Icon(
+                            Icons.search,
+                            size: 18,
+                            color: Color(0xFF999999),
                           ),
+                          const SizedBox(width: Spacing.xs),
                           Expanded(
                             child: TextField(
                               controller: _searchController,
                               focusNode: _searchFocusNode,
+                              textAlignVertical: TextAlignVertical.center,
                               decoration: const InputDecoration(
                                 hintText: '搜索视频、用户或话题',
                                 hintStyle: TextStyle(
@@ -97,7 +96,10 @@ class _SearchPageState extends State<SearchPage> {
                                   color: Color(0xFF999999),
                                 ),
                                 border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
                                 contentPadding: EdgeInsets.zero,
+                                isDense: true,
                               ),
                               style: const TextStyle(fontSize: 14),
                               onSubmitted: (_) => _handleSearch(),

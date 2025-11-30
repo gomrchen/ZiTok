@@ -4,7 +4,12 @@
       "Bash(flutter analyze:*)",
       "Bash(flutter run:*)",
       "Bash(flutter test:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(flutter pub add:*)",
+      "Bash(flutter build:*)",
+      "Bash(dart analyze:*)",
+      "Bash(dart format:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

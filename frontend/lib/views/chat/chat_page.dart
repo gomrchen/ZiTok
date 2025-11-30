@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:intl/intl.dart';
 import 'package:emoji_picker_flutter/emoji_picker_flutter.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/messaging_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../utils/url_utils.dart';
@@ -214,7 +215,7 @@ class _ChatPageState extends State<ChatPage> {
                           mainAxisAlignment: isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
                           children: [
                             if (!isMine) ...[
-                              _buildAvatar(UrlUtils.resolveStorageUrl(senderAvatar, defaultDir: 'avatars')),
+                              _buildAvatar(UrlUtils.resolveStorageUrl(senderAvatar, defaultDir: 'avatars'), userId: m.senderId.toString()),
                               const SizedBox(width: 8),
                             ],
                             Flexible(
@@ -236,7 +237,7 @@ class _ChatPageState extends State<ChatPage> {
                             ),
                             if (isMine) ...[
                               const SizedBox(width: 8),
-                              _buildAvatar(UrlUtils.resolveStorageUrl(myAvatarUrl, defaultDir: 'avatars')),
+                              _buildAvatar(UrlUtils.resolveStorageUrl(myAvatarUrl, defaultDir: 'avatars'), userId: myId),
                             ],
                           ],
                         ),
@@ -293,20 +294,27 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  Widget _buildAvatar(String? url) {
-    return CircleAvatar(
-      radius: 16,
-      backgroundColor: Colors.grey.shade200,
-      child: ClipOval(
-        child: (url != null && url.isNotEmpty)
-            ? CachedNetworkImage(
-          imageUrl: url,
-          width: 32,
-          height: 32,
-          fit: BoxFit.cover,
-          errorWidget: (context, url, error) => const Icon(Icons.person, size: 18, color: Colors.grey),
-        )
-            : const Icon(Icons.person, size: 18, color: Colors.grey),
+  Widget _buildAvatar(String? url, {String? userId}) {
+    return GestureDetector(
+      onTap: () {
+        if (userId != null && userId.isNotEmpty) {
+          context.push('/user/$userId');
+        }
+      },
+      child: CircleAvatar(
+        radius: 16,
+        backgroundColor: Colors.grey.shade200,
+        child: ClipOval(
+          child: (url != null && url.isNotEmpty)
+              ? CachedNetworkImage(
+            imageUrl: url,
+            width: 32,
+            height: 32,
+            fit: BoxFit.cover,
+            errorWidget: (context, url, error) => const Icon(Icons.person, size: 18, color: Colors.grey),
+          )
+              : const Icon(Icons.person, size: 18, color: Colors.grey),
+        ),
       ),
     );
   }

@@ -5,7 +5,11 @@ import 'package:zitok/providers/video_provider.dart';
 import '../models/comment.dart';
 import '../models/video.dart';
 import '../theme/theme_tokens.dart';
+import '../services/user_service.dart';
+import '../utils/url_utils.dart';
+import '../app.dart';
 import 'video_stats.dart';
+import 'package:go_router/go_router.dart';
 
 enum CommentSort { timeDesc, timeAsc, hot }
 
@@ -329,6 +333,12 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
   CommentItem? _replyingTo;
   final FocusNode _focusNode = FocusNode();
 
+  // 作者信息缓存
+  String? _authorName;
+  String? _authorAvatarUrl;
+  bool _fetchingAuthor = false;
+  String? _lastFetchedUid;
+
   @override
   void initState() {
     super.initState();
@@ -353,6 +363,40 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
         );
       }
     };
+  }
+
+  /// 获取视频作者信息
+  Future<void> _fetchAuthorInfo(String? uid) async {
+    if (_fetchingAuthor || uid == null || uid == _lastFetchedUid) return;
+    _fetchingAuthor = true;
+    _lastFetchedUid = uid;
+
+    try {
+      final userService = UserService(AppBootstrap.apiClient.dio);
+      final resp = await userService.info(userId: uid);
+      final data = resp.data as Map<String, dynamic>? ?? {};
+
+      if (data['code']?.toString() == '10000' && data['data'] != null) {
+        final userData = data['data'] as Map<String, dynamic>;
+        final avatarUrl = (userData['avatar'] ?? userData['avatar_url'])?.toString();
+        final userName = (userData['username'] ?? userData['nickname'] ?? userData['name'])?.toString();
+
+        if (mounted) {
+          setState(() {
+            if (avatarUrl != null && avatarUrl.isNotEmpty) {
+              _authorAvatarUrl = UrlUtils.resolveStorageUrl(avatarUrl, defaultDir: 'avatars');
+            }
+            if (userName != null && userName.isNotEmpty) {
+              _authorName = userName;
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('_CommentSheetContent: fetch author error: $e');
+    } finally {
+      _fetchingAuthor = false;
+    }
   }
 
   @override
@@ -511,6 +555,21 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
       );
     }
 
+    // 触发作者信息获取
+    if (video.uid != null && video.uid != _lastFetchedUid) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _fetchAuthorInfo(video?.uid);
+      });
+    }
+
+    // 获取有效的作者名称和头像
+    final effectiveAuthorName = _authorName ?? video.authorName ?? video.uid ?? '未知作者';
+    final effectiveAvatarUrl = _authorAvatarUrl ??
+        (video.authorAvatarUrl != null && video.authorAvatarUrl!.isNotEmpty
+            ? UrlUtils.resolveStorageUrl(video.authorAvatarUrl, defaultDir: 'avatars')
+            : null);
+    final authorInitial = effectiveAuthorName.isNotEmpty ? effectiveAuthorName.substring(0, 1).toUpperCase() : '?';
+
     return SingleChildScrollView(
       controller: controller,
       padding: const EdgeInsets.all(Spacing.md),
@@ -518,57 +577,69 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 作者卡片
-          Container(
-            padding: const EdgeInsets.all(Spacing.md),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Row(
-              children: [
-                CircleAvatar(
-                  radius: 24,
-                  backgroundColor: cs.primaryContainer,
-                  child: Text(
-                    (video.uid ?? '?').substring(0, 1).toUpperCase(),
-                    style: TextStyle(
-                      color: cs.onPrimaryContainer,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
+          GestureDetector(
+            onTap: () {
+              if (video?.uid != null) {
+                context.push('/user/${video!.uid}');
+              }
+            },
+            child: Container(
+              padding: const EdgeInsets.all(Spacing.md),
+              decoration: BoxDecoration(
+                color: cs.surfaceContainerLow,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: cs.primaryContainer,
+                    backgroundImage: effectiveAvatarUrl != null && effectiveAvatarUrl.isNotEmpty
+                        ? NetworkImage(effectiveAvatarUrl)
+                        : null,
+                    child: effectiveAvatarUrl == null || effectiveAvatarUrl.isEmpty
+                        ? Text(
+                            authorInitial,
+                            style: TextStyle(
+                              color: cs.onPrimaryContainer,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 18,
+                            ),
+                          )
+                        : null,
+                  ),
+                  const SizedBox(width: Spacing.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          effectiveAuthorName,
+                          style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.favorite_border, size: 14, color: cs.onSurfaceVariant),
+                            const SizedBox(width: 4),
+                            Text(
+                              formatCount(video.likes),
+                              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                            const SizedBox(width: Spacing.md),
+                            Icon(Icons.chat_bubble_outline, size: 14, color: cs.onSurfaceVariant),
+                            const SizedBox(width: 4),
+                            Text(
+                              formatCount(video.commentCount),
+                              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
                   ),
-                ),
-                const SizedBox(width: Spacing.md),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        '@${video.uid ?? '未知作者'}',
-                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(Icons.favorite_border, size: 14, color: cs.onSurfaceVariant),
-                          const SizedBox(width: 4),
-                          Text(
-                            formatCount(video.likes),
-                            style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                          ),
-                          const SizedBox(width: Spacing.md),
-                          Icon(Icons.chat_bubble_outline, size: 14, color: cs.onSurfaceVariant),
-                          const SizedBox(width: 4),
-                          Text(
-                            formatCount(video.commentCount),
-                            style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+                ],
+              ),
             ),
           ),
           const SizedBox(height: Spacing.lg),
@@ -678,7 +749,7 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
   }
 }
 
-class _CommentTile extends StatelessWidget {
+class _CommentTile extends StatefulWidget {
   final CommentItem item;
   final bool expanded;
   final VoidCallback onToggleExpand;
@@ -695,6 +766,66 @@ class _CommentTile extends StatelessWidget {
     this.onDeleteReply,
   });
 
+  @override
+  State<_CommentTile> createState() => _CommentTileState();
+}
+
+class _CommentTileState extends State<_CommentTile> {
+  String? _avatarUrl;
+  String? _authorName;
+  bool _fetching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserInfo();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CommentTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item.authorId != widget.item.authorId) {
+      _avatarUrl = null;
+      _authorName = null;
+      _fetchUserInfo();
+    }
+  }
+
+  Future<void> _fetchUserInfo() async {
+    if (_fetching || widget.item.authorId.isEmpty) return;
+    _fetching = true;
+
+    try {
+      final userService = UserService(AppBootstrap.apiClient.dio);
+      final resp = await userService.info(userId: widget.item.authorId);
+      final data = resp.data as Map<String, dynamic>? ?? {};
+
+      if (data['code']?.toString() == '10000' && data['data'] != null) {
+        final userData = data['data'] as Map<String, dynamic>;
+        final avatarUrl = (userData['avatar'] ?? userData['avatar_url'])?.toString();
+        final userName = (userData['username'] ?? userData['nickname'] ?? userData['name'])?.toString();
+
+        if (mounted) {
+          setState(() {
+            if (avatarUrl != null && avatarUrl.isNotEmpty) {
+              _avatarUrl = UrlUtils.resolveStorageUrl(avatarUrl, defaultDir: 'avatars');
+            }
+            if (userName != null && userName.isNotEmpty) {
+              _authorName = userName;
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('_CommentTile: fetch user info error: $e');
+    } finally {
+      _fetching = false;
+    }
+  }
+
+  String get _effectiveAuthorName => _authorName ?? widget.item.author;
+  String? get _effectiveAvatarUrl => _avatarUrl ?? (widget.item.avatar.isNotEmpty ? widget.item.avatar : null);
+
   String _fmt(DateTime t) {
     final m = t.minute.toString().padLeft(2, '0');
     return '${t.month}/${t.day} ${t.hour}:$m';
@@ -703,8 +834,10 @@ class _CommentTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final children = item.replies;
-    final visibleChildren = expanded ? children : (children.length > 2 ? children.sublist(0, 2) : children);
+    final cs = theme.colorScheme;
+    final children = widget.item.replies;
+    final visibleChildren = widget.expanded ? children : (children.length > 2 ? children.sublist(0, 2) : children);
+    final authorInitial = _effectiveAuthorName.isNotEmpty ? _effectiveAuthorName.substring(0, 1).toUpperCase() : '?';
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -714,26 +847,42 @@ class _CommentTile extends StatelessWidget {
           Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              CircleAvatar(radius: 16, child: Text(item.author.isNotEmpty ? item.author.substring(0, 1) : '?')),
+              GestureDetector(
+                onTap: () {
+                  if (widget.item.authorId.isNotEmpty) {
+                    context.push('/user/${widget.item.authorId}');
+                  }
+                },
+                child: CircleAvatar(
+                  radius: 16,
+                  backgroundColor: cs.primaryContainer,
+                  backgroundImage: _effectiveAvatarUrl != null && _effectiveAvatarUrl!.isNotEmpty
+                      ? NetworkImage(_effectiveAvatarUrl!)
+                      : null,
+                  child: _effectiveAvatarUrl == null || _effectiveAvatarUrl!.isEmpty
+                      ? Text(authorInitial, style: TextStyle(color: cs.onPrimaryContainer, fontSize: 12))
+                      : null,
+                ),
+              ),
               const SizedBox(width: 8),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(item.author.isNotEmpty ? item.author : '匿名用户', style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+                    Text(_effectiveAuthorName.isNotEmpty ? _effectiveAuthorName : '匿名用户', style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
                     const SizedBox(height: 4),
-                    Text(item.content),
+                    Text(widget.item.content),
                     const SizedBox(height: 8),
                     Row(
                       children: [
-                        Text(_fmt(item.time), style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+                        Text(_fmt(widget.item.time), style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
                         const SizedBox(width: 16),
                         Material(
                           color: Colors.transparent,
                           child: InkWell(
                             borderRadius: BorderRadius.circular(4),
                             onTap: () {
-                              onReply?.call(item);
+                              widget.onReply?.call(widget.item);
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 10.0),
@@ -766,7 +915,7 @@ class _CommentTile extends StatelessWidget {
                   tooltip: '删除评论',
                   iconSize: 16,
                   icon: const Icon(Icons.delete_outline, color: Colors.grey),
-                  onPressed: onDelete,
+                  onPressed: widget.onDelete,
                 ),
               ),
             ],
@@ -781,16 +930,16 @@ class _CommentTile extends StatelessWidget {
                 children: [
                   ...visibleChildren.map((reply) => _ReplyTile(
                     item: reply,
-                    onReply: onReply, // 把 onReply 传下去
-                    onDelete: () => onDeleteReply?.call(reply),
+                    onReply: widget.onReply, // 把 onReply 传下去
+                    onDelete: () => widget.onDeleteReply?.call(reply),
                   )),
                   if (children.length > 2)
                     InkWell(
-                      onTap: onToggleExpand,
+                      onTap: widget.onToggleExpand,
                       child: Padding(
                         padding: const EdgeInsets.only(top: 8.0),
                         child: Text(
-                          expanded ? '收起' : '展开 ${children.length - visibleChildren.length} 条回复',
+                          widget.expanded ? '收起' : '展开 ${children.length - visibleChildren.length} 条回复',
                           style: theme.textTheme.bodySmall?.copyWith(color: Colors.blue),
                         ),
                       ),
@@ -805,8 +954,8 @@ class _CommentTile extends StatelessWidget {
   }
 }
 
-// 【关键修改】_ReplyTile 现在有了自己的“回复”按钮
-class _ReplyTile extends StatelessWidget {
+// 【关键修改】_ReplyTile 现在有了自己的"回复"按钮和用户信息获取
+class _ReplyTile extends StatefulWidget {
   final CommentItem item;
   final ValueSetter<CommentItem>? onReply;
   final VoidCallback? onDelete;
@@ -817,7 +966,66 @@ class _ReplyTile extends StatelessWidget {
     this.onDelete
   });
 
-  // 新增一个和父评论一样的 _fmt 方法
+  @override
+  State<_ReplyTile> createState() => _ReplyTileState();
+}
+
+class _ReplyTileState extends State<_ReplyTile> {
+  String? _avatarUrl;
+  String? _authorName;
+  bool _fetching = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchUserInfo();
+  }
+
+  @override
+  void didUpdateWidget(covariant _ReplyTile oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.item.authorId != widget.item.authorId) {
+      _avatarUrl = null;
+      _authorName = null;
+      _fetchUserInfo();
+    }
+  }
+
+  Future<void> _fetchUserInfo() async {
+    if (_fetching || widget.item.authorId.isEmpty) return;
+    _fetching = true;
+
+    try {
+      final userService = UserService(AppBootstrap.apiClient.dio);
+      final resp = await userService.info(userId: widget.item.authorId);
+      final data = resp.data as Map<String, dynamic>? ?? {};
+
+      if (data['code']?.toString() == '10000' && data['data'] != null) {
+        final userData = data['data'] as Map<String, dynamic>;
+        final avatarUrl = (userData['avatar'] ?? userData['avatar_url'])?.toString();
+        final userName = (userData['username'] ?? userData['nickname'] ?? userData['name'])?.toString();
+
+        if (mounted) {
+          setState(() {
+            if (avatarUrl != null && avatarUrl.isNotEmpty) {
+              _avatarUrl = UrlUtils.resolveStorageUrl(avatarUrl, defaultDir: 'avatars');
+            }
+            if (userName != null && userName.isNotEmpty) {
+              _authorName = userName;
+            }
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('_ReplyTile: fetch user info error: $e');
+    } finally {
+      _fetching = false;
+    }
+  }
+
+  String get _effectiveAuthorName => _authorName ?? widget.item.author;
+  String? get _effectiveAvatarUrl => _avatarUrl ?? (widget.item.avatar.isNotEmpty ? widget.item.avatar : null);
+
   String _fmt(DateTime t) {
     final m = t.minute.toString().padLeft(2, '0');
     return '${t.month}/${t.day} ${t.hour}:$m';
@@ -826,25 +1034,45 @@ class _ReplyTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final parentAuthor = item.parent?.author;
+    final cs = theme.colorScheme;
+    final parentAuthor = widget.item.parent?.author;
+    final authorInitial = _effectiveAuthorName.isNotEmpty ? _effectiveAuthorName.substring(0, 1).toUpperCase() : '?';
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 回复者头像
+          GestureDetector(
+            onTap: () {
+              if (widget.item.authorId.isNotEmpty) {
+                context.push('/user/${widget.item.authorId}');
+              }
+            },
+            child: CircleAvatar(
+              radius: 12,
+              backgroundColor: cs.primaryContainer,
+              backgroundImage: _effectiveAvatarUrl != null && _effectiveAvatarUrl!.isNotEmpty
+                  ? NetworkImage(_effectiveAvatarUrl!)
+                  : null,
+              child: _effectiveAvatarUrl == null || _effectiveAvatarUrl!.isEmpty
+                  ? Text(authorInitial, style: TextStyle(color: cs.onPrimaryContainer, fontSize: 10))
+                  : null,
+            ),
+          ),
+          const SizedBox(width: 8),
           Expanded(
-            // 使用Column来组织内容和操作行
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // 评论内容部分
                 RichText(
                   text: TextSpan(
-                    style: theme.textTheme.bodyMedium, // 默认文字样式
+                    style: theme.textTheme.bodyMedium,
                     children: [
                       TextSpan(
-                        text: item.author.isNotEmpty ? item.author : '匿名用户',
+                        text: _effectiveAuthorName.isNotEmpty ? _effectiveAuthorName : '匿名用户',
                         style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                       ),
                       if (parentAuthor != null && parentAuthor.isNotEmpty) ...[
@@ -857,22 +1085,22 @@ class _ReplyTile extends StatelessWidget {
                           style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.bold),
                         ),
                       ],
-                      TextSpan(text: ': ${item.content}'),
+                      TextSpan(text: ': ${widget.item.content}'),
                     ],
                   ),
                 ),
                 const SizedBox(height: 8),
-                // 新增的操作行，和父评论的样式一致
+                // 操作行
                 Row(
                   children: [
-                    Text(_fmt(item.time), style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
+                    Text(_fmt(widget.item.time), style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
                     const SizedBox(width: 16),
                     Material(
                       color: Colors.transparent,
                       child: InkWell(
                         borderRadius: BorderRadius.circular(4),
                         onTap: () {
-                          onReply?.call(item);
+                          widget.onReply?.call(widget.item);
                         },
                         child: Container(
                           padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 10.0),
@@ -896,7 +1124,7 @@ class _ReplyTile extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 8),
-          // 删除按钮保持不变
+          // 删除按钮
           SizedBox(
             height: 20,
             width: 20,
@@ -906,7 +1134,7 @@ class _ReplyTile extends StatelessWidget {
               tooltip: '删除回复',
               iconSize: 14,
               icon: const Icon(Icons.delete_outline, color: Colors.grey),
-              onPressed: onDelete,
+              onPressed: widget.onDelete,
             ),
           ),
         ],

@@ -472,9 +472,49 @@ class _CreatePageState extends State<CreatePage> {
     }
   }
 
+  /// 显示退出确认弹窗
+  Future<bool> _showExitConfirmDialog() async {
+    final result = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) {
+        final cs = Theme.of(context).colorScheme;
+        return AlertDialog(
+          title: const Text('确认退出'),
+          content: const Text('您有未保存的内容，退出后将丢失所有编辑数据，确定要退出吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext, false),
+              child: const Text('继续编辑'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(dialogContext, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: cs.error,
+                foregroundColor: cs.onError,
+              ),
+              child: const Text('确认退出'),
+            ),
+          ],
+        );
+      },
+    );
+    return result ?? false;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: !_hasFilledData(),
+      onPopInvokedWithResult: (bool didPop, Object? result) async {
+        if (didPop) return;
+        // 有未保存的数据，显示确认弹窗
+        final navigator = Navigator.of(context);
+        final confirmed = await _showExitConfirmDialog();
+        if (confirmed && mounted) {
+          navigator.pop();
+        }
+      },
+      child: Scaffold(
       appBar: null,
       body: LayoutBuilder(
         builder: (context, constraints) {
@@ -528,6 +568,7 @@ class _CreatePageState extends State<CreatePage> {
             ),
           );
         },
+      ),
       ),
     );
   }

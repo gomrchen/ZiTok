@@ -40,6 +40,9 @@ class VideoProvider extends ChangeNotifier {
   // 收藏状态缓存 - 记录已收藏的视频ID
   final Set<String> _favoritedIds = {};
 
+  // 点赞状态缓存 - 记录已点赞的视频ID
+  final Set<String> _likedIds = {};
+
   // 投稿相关状态
   PublishProgress _publishProgress = PublishProgress.idle();
 
@@ -77,6 +80,9 @@ class VideoProvider extends ChangeNotifier {
     _favoritesPage = 1;
     _favoritesHasMore = true;
     _loadingFavorites = false;
+
+    // 清理点赞缓存
+    _likedIds.clear();
 
     // 清理关注流
     _follow = [];
@@ -209,23 +215,52 @@ class VideoProvider extends ChangeNotifier {
     _followScrollOffset = offset;
   }
 
-  Future<void> like(String videoId) async {
-    await repo.like(videoId);
+  /// 检查视频是否已点赞
+  bool isLiked(String videoId) => _likedIds.contains(videoId);
+
+  /// 切换点赞状态
+  Future<bool> toggleLike(String videoId) async {
+    final isCurrentlyLiked = _likedIds.contains(videoId);
+
+    // 乐观更新UI
+    if (isCurrentlyLiked) {
+      _likedIds.remove(videoId);
+    } else {
+      _likedIds.add(videoId);
+    }
+    _updateLikeInLists(videoId, !isCurrentlyLiked);
+    notifyListeners();
+
+    // 调用API（目前只有点赞，没有取消点赞接口）
+    try {
+      if (!isCurrentlyLiked) {
+        await repo.like(videoId);
+      }
+      // 如果是取消点赞，后端暂不支持，只在本地更新
+      return true;
+    } catch (e) {
+      // API调用失败，回滚状态
+      if (isCurrentlyLiked) {
+        _likedIds.add(videoId);
+      } else {
+        _likedIds.remove(videoId);
+      }
+      _updateLikeInLists(videoId, isCurrentlyLiked);
+      notifyListeners();
+      return false;
+    }
+  }
+
+  /// 更新所有列表中视频的点赞状态
+  void _updateLikeInLists(String videoId, bool isLiked) {
     void updateList(List<Video> list) {
       final i = list.indexWhere((v) => v.id == videoId);
       if (i >= 0) {
         final v = list[i];
-        list[i] = Video(
-          id: v.id,
-          uid: v.uid,
-          title: v.title,
-          intro: v.intro,
-          coverUrl: v.coverUrl,
-          videoUrl: v.videoUrl,
-          stars: v.stars,
-          likes: (v.likes ?? 0) + 1,
-          views: v.views,
-          tags: v.tags,
+        final likeDelta = isLiked ? 1 : -1;
+        list[i] = v.copyWith(
+          isLiked: isLiked,
+          likes: ((v.likes ?? 0) + likeDelta).clamp(0, double.maxFinite.toInt()),
         );
       }
     }
@@ -233,7 +268,13 @@ class VideoProvider extends ChangeNotifier {
     updateList(_follow);
     updateList(_discover);
     updateList(_featured);
-    notifyListeners();
+    updateList(_recommend);
+    updateList(_searchResults);
+  }
+
+  /// 旧版点赞方法（兼容，建议使用 toggleLike）
+  Future<void> like(String videoId) async {
+    await toggleLike(videoId);
   }
 
   /// 收藏或取消收藏视频
