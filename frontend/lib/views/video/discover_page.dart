@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/video_provider.dart';
 import '../../theme/theme_tokens.dart';
 import '../../services/video/video_preload_manager.dart';
@@ -75,7 +76,7 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
   }
 
   void _onSearchTap() {
-    Navigator.pushNamed(context, '/search');
+    context.push('/search');
   }
 
   @override
@@ -96,14 +97,13 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
     return Scaffold(
       backgroundColor: cs.surface,
       appBar: AppBar(
-        toolbarHeight: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 0,
         elevation: 0,
         backgroundColor: cs.surface,
-        // 添加搜索输入框
+        // 搜索输入框
         title: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           child: GestureDetector(
             onTap: _onSearchTap,
             child: Container(
@@ -118,10 +118,10 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
                     Icons.search,
                     color: cs.onSurfaceVariant,
                     size: 18,
-                  ), // 搜索图标
+                  ),
                   const SizedBox(width: 8),
                   Text(
-                    '搜索视频、用户或话题', // placeholder
+                    '搜索视频、用户或话题',
                     style: TextStyle(color: cs.onSurfaceVariant, fontSize: 14),
                   ),
                 ],
