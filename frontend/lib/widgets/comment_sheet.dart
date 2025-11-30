@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:zitok/providers/comment_provider.dart';
+import 'package:zitok/providers/video_provider.dart';
 import '../models/comment.dart';
+import '../models/video.dart';
 import '../theme/theme_tokens.dart';
+import 'video_stats.dart';
 
 enum CommentSort { timeDesc, timeAsc, hot }
 
@@ -473,7 +476,184 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
   }
 
   Widget _videoIntro(ScrollController controller) {
-    return Container(alignment: Alignment.center, child: const Text('视频简介区'));
+    final vp = context.watch<VideoProvider>();
+    // 从各个列表中查找视频
+    Video? video = vp.recommend.cast<Video?>().firstWhere(
+      (v) => v?.id == widget.videoId,
+      orElse: () => null,
+    );
+    video ??= vp.discover.cast<Video?>().firstWhere(
+      (v) => v?.id == widget.videoId,
+      orElse: () => null,
+    );
+    video ??= vp.featured.cast<Video?>().firstWhere(
+      (v) => v?.id == widget.videoId,
+      orElse: () => null,
+    );
+    video ??= vp.follow.cast<Video?>().firstWhere(
+      (v) => v?.id == widget.videoId,
+      orElse: () => null,
+    );
+
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    if (video == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.videocam_off_outlined, size: 48, color: cs.onSurfaceVariant),
+            const SizedBox(height: Spacing.sm),
+            Text('视频信息加载中...', style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+          ],
+        ),
+      );
+    }
+
+    return SingleChildScrollView(
+      controller: controller,
+      padding: const EdgeInsets.all(Spacing.md),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 作者卡片
+          Container(
+            padding: const EdgeInsets.all(Spacing.md),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 24,
+                  backgroundColor: cs.primaryContainer,
+                  child: Text(
+                    (video.uid ?? '?').substring(0, 1).toUpperCase(),
+                    style: TextStyle(
+                      color: cs.onPrimaryContainer,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 18,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: Spacing.md),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '@${video.uid ?? '未知作者'}',
+                        style: theme.textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w600),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(Icons.favorite_border, size: 14, color: cs.onSurfaceVariant),
+                          const SizedBox(width: 4),
+                          Text(
+                            formatCount(video.likes),
+                            style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                          const SizedBox(width: Spacing.md),
+                          Icon(Icons.chat_bubble_outline, size: 14, color: cs.onSurfaceVariant),
+                          const SizedBox(width: 4),
+                          Text(
+                            formatCount(video.commentCount),
+                            style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: Spacing.lg),
+          // 视频标题
+          Text(
+            video.title ?? '未命名视频',
+            style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
+          ),
+          const SizedBox(height: Spacing.md),
+          // 视频简介区块
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(Spacing.md),
+            decoration: BoxDecoration(
+              color: cs.surfaceContainerLow,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.info_outline, size: 16, color: cs.primary),
+                    const SizedBox(width: Spacing.xs),
+                    Text(
+                      '视频简介',
+                      style: theme.textTheme.labelLarge?.copyWith(
+                        fontWeight: FontWeight.w600,
+                        color: cs.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: Spacing.sm),
+                Text(
+                  (video.intro?.isNotEmpty == true) ? video.intro! : '作者暂未添加视频简介',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: video.intro?.isNotEmpty == true ? cs.onSurface : cs.onSurfaceVariant,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 标签
+          if (video.tags.isNotEmpty) ...[
+            const SizedBox(height: Spacing.lg),
+            Row(
+              children: [
+                Icon(Icons.tag, size: 16, color: cs.onSurfaceVariant),
+                const SizedBox(width: Spacing.xs),
+                Text(
+                  '相关标签',
+                  style: theme.textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: cs.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: Spacing.sm),
+            Wrap(
+              spacing: Spacing.xs,
+              runSpacing: Spacing.xs,
+              children: video.tags.map((tag) => Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer.withValues(alpha: 0.5),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Text(
+                  '#$tag',
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: cs.primary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              )).toList(),
+            ),
+          ],
+          const SizedBox(height: Spacing.xl),
+        ],
+      ),
+    );
   }
 
   Widget _commentsPane(ScrollController controller) {

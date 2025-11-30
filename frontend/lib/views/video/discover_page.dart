@@ -255,26 +255,6 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
   late AnimationController _fadeController;
   late Animation<double> _fadeAnimation;
 
-  // 顶部栏：菜单展开占位
-  void _onMenu() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('菜单功能待接入'),
-        duration: Duration(milliseconds: 1200),
-      ),
-    );
-  }
-
-  // 顶部栏：搜索占位
-  void _onSearch() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('搜索功能待接入'),
-        duration: Duration(milliseconds: 1200),
-      ),
-    );
-  }
-
   // 附件：打开笔记弹窗
   void _openNotesSheet() {
     showModalBottomSheet<void>(
@@ -531,7 +511,7 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
               ),
             ),
           ),
-        // 顶部功能栏（左：附件；右：搜索、菜单）
+        // 顶部功能栏（仅保留附件icon）
         Positioned(
           left: Spacing.md,
           right: Spacing.md,
@@ -550,36 +530,6 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
                   icon: const Icon(Icons.attach_file, color: Colors.white),
                   tooltip: '查看笔记',
                   onPressed: _openNotesSheet,
-                ),
-              ),
-              const Spacer(),
-              // 搜索 icon
-              Container(
-                width: 40,
-                height: 40,
-                margin: const EdgeInsets.only(right: 8),
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0x33000000),
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.search, color: Colors.white),
-                  tooltip: '搜索',
-                  onPressed: _onSearch,
-                ),
-              ),
-              // 菜单 icon
-              Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0x33000000),
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.more_vert, color: Colors.white),
-                  tooltip: '菜单',
-                  onPressed: _onMenu,
                 ),
               ),
             ],
@@ -784,16 +734,9 @@ class _PublisherAvatarState extends State<_PublisherAvatar> {
     }
     _lastClickTime = now;
 
-    // TODO: 跳转到创作者主页 /publisher/:id
+    // 跳转到创作者主页
     if (widget.uid != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('跳转到创作者主页: ${widget.uid}'),
-          duration: const Duration(milliseconds: 1500),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-      // context.go('/publisher/${widget.uid}');
+      context.push('/user/${widget.uid}');
     }
   }
 

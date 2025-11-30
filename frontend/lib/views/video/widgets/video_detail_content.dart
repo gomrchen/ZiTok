@@ -136,7 +136,14 @@ class _IntroSection extends StatelessWidget {
         Text(video.title ?? '未知视频', style: theme.textTheme.titleMedium),
         const SizedBox(height: 6),
         Row(children: [
-          Text('👍 ${video.likes ?? 0} · 👁️ ${video.views ?? 0}', style: theme.textTheme.bodySmall),
+          // 点赞数和评论数
+          Icon(Icons.favorite_border, size: 14, color: Colors.grey.shade600),
+          const SizedBox(width: 4),
+          Text('${video.likes ?? 0}', style: theme.textTheme.bodySmall),
+          const SizedBox(width: 12),
+          Icon(Icons.chat_bubble_outline, size: 14, color: Colors.grey.shade600),
+          const SizedBox(width: 4),
+          Text('${video.commentCount ?? 0}', style: theme.textTheme.bodySmall),
           const Spacer(),
           // 点赞按钮
           IconButton(

@@ -267,20 +267,6 @@ class _FollowListItem extends StatelessWidget {
           // 操作栏
           Row(
             children: [
-              // 播放量
-              if (video.views != null && video.views! > 0)
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.play_arrow, size: 16, color: Colors.grey.shade600),
-                    const SizedBox(width: 2),
-                    Text(
-                      formatCount(video.views),
-                      style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey.shade600),
-                    ),
-                    const SizedBox(width: Spacing.md),
-                  ],
-                ),
               const Spacer(),
               // 分享按钮
               _IconAction(

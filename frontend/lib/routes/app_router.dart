@@ -22,6 +22,7 @@ import '../views/video/video_list_page.dart';
 import '../views/settings/change_password_page.dart';
 import '../views/settings/account_switcher_page.dart';
 import '../views/settings/account_settings_page.dart';
+import '../views/profile/visitor_profile_page.dart';
 
 class AppRouter {
   static GoRouter buildRouter(AuthProvider auth) {
@@ -99,6 +100,13 @@ class AppRouter {
           path: '/profile/edit',
           builder: _builder((_) => const EditProfilePage()),
         ),
+        // 访客个人主页
+        GoRoute(
+          path: '/user/:id',
+          builder: _builder(
+            (state) => VisitorProfilePage(userId: state.pathParameters['id']!),
+          ),
+        ),
         GoRoute(
           path: '/settings',
           builder: _builder((_) => const SettingsPage()),
@@ -143,6 +151,7 @@ class AppRouter {
           '/messages',
           '/chat',
           '/profile',
+          '/user',
         ];
         final wantsProtected = protectedPrefixes.any(
           (p) => state.matchedLocation.startsWith(p),
