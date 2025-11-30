@@ -302,39 +302,43 @@ class _VideoDetailPageState extends State<VideoDetailPage> with WidgetsBindingOb
       },
       child: Scaffold(
         backgroundColor: Colors.black,
-        body: SafeArea(
-          top: false,
-          bottom: false,
-          child: Column(
-            children: [
-              // 状态栏占位
-              SizedBox(height: statusBarHeight),
+        body: _isFullscreen
+            // 全屏模式：只显示视频播放器
+            ? _buildVideoPlayer()
+            // 普通模式：显示视频+互动区
+            : SafeArea(
+                top: false,
+                bottom: false,
+                child: Column(
+                  children: [
+                    // 状态栏占位
+                    SizedBox(height: statusBarHeight),
 
-              // 视频播放区域（包含自定义控制层，控制层内有返回按钮）
-              SizedBox(
-                height: videoHeight,
-                child: _buildVideoPlayer(),
-              ),
+                    // 视频播放区域（包含自定义控制层，控制层内有返回按钮）
+                    SizedBox(
+                      height: videoHeight,
+                      child: _buildVideoPlayer(),
+                    ),
 
-              // 可拖拽分隔条
-              _buildDragHandle(availableHeight),
+                    // 可拖拽分隔条
+                    _buildDragHandle(availableHeight),
 
-              // 互动内容区域
-              Expanded(
-                child: Container(
-                  color: Theme.of(context).colorScheme.surface,
-                  child: _initialized
-                      ? VideoDetailContentWithKeyboard(
-                          video: _displayVideo,
-                          keyboardHeight: keyboardHeight,
-                          bottomPadding: bottomPadding,
-                        )
-                      : const Center(child: CircularProgressIndicator()),
+                    // 互动内容区域
+                    Expanded(
+                      child: Container(
+                        color: Theme.of(context).colorScheme.surface,
+                        child: _initialized
+                            ? VideoDetailContentWithKeyboard(
+                                video: _displayVideo,
+                                keyboardHeight: keyboardHeight,
+                                bottomPadding: bottomPadding,
+                              )
+                            : const Center(child: CircularProgressIndicator()),
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ],
-          ),
-        ),
       ),
     );
   }
