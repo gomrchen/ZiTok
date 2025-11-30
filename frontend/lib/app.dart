@@ -72,13 +72,12 @@ class AppBootstrap {
   /// 如果本地有token和userId，向服务端验证用户是否仍然存在。
   /// 验证失败时清除本地缓存，确保用户需要重新登录。
   static Future<void> _validateSession() async {
-    // 如果没有登录信息，无需验证
-    if (!userSession.isLoggedIn) return;
-
-    final token = prefs.getString('access_token');
-    if (token == null || token.isEmpty) {
-      // 有userId但没有token，清除会话
-      await _clearSession();
+    // 如果没有登录信息或没有有效token，无需验证
+    if (!userSession.isLoggedIn || !userSession.hasValidToken) {
+      if (userSession.userId != null && !userSession.hasValidToken) {
+        // 有userId但没有token，清除会话
+        await _clearSession();
+      }
       return;
     }
 
@@ -175,7 +174,10 @@ class ZitokApp extends StatelessWidget {
           create: (_) => SettingsProvider(prefs: AppBootstrap.prefs),
         ),
         ChangeNotifierProvider<VideoProvider>(
-          create: (_) => VideoProvider(repo: videoRepository),
+          create: (_) => VideoProvider(
+            repo: videoRepository,
+            userSession: AppBootstrap.userSession,
+          ),
         ),
         ChangeNotifierProvider<MessagingProvider>(
           create: (_) => MessagingProvider(

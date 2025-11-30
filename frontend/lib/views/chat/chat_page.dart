@@ -173,18 +173,46 @@ class _ChatPageState extends State<ChatPage> {
                   final date = DateTime.fromMillisecondsSinceEpoch(m.createdAt);
                   final timeText = DateFormat('MM/dd HH:mm').format(date);
 
+                  // 获取发送者名称（群聊时显示不同成员名称，私聊时显示对方名称）
+                  String? senderName;
+                  String? senderAvatar;
+                  if (!isMine) {
+                    if (widget.isGroup) {
+                      // 群聊：查找发送者信息
+                      final sender = mp.friendById(m.senderId.toString());
+                      senderName = sender?.name ?? '用户${m.senderId}';
+                      senderAvatar = sender?.avatarUrl;
+                    } else {
+                      // 私聊：使用会话对象的名称
+                      senderName = conversation?.name;
+                      senderAvatar = conversation?.avatarUrl;
+                    }
+                  }
+
                   return Padding(
                     padding: const EdgeInsets.symmetric(vertical: 6),
                     child: Column(
                       crossAxisAlignment: isMine ? CrossAxisAlignment.end : CrossAxisAlignment.start,
                       children: [
+                        // 显示发送者名称（仅对方消息）
+                        if (!isMine && senderName != null) ...[
+                          Padding(
+                            padding: const EdgeInsets.only(left: 40, bottom: 4),
+                            child: Text(
+                              senderName,
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
                         Row(
                           crossAxisAlignment: CrossAxisAlignment.end,
                           mainAxisAlignment: isMine ? MainAxisAlignment.end : MainAxisAlignment.start,
                           children: [
                             if (!isMine) ...[
-                              // 这里的头像也正确了
-                              _buildAvatar(conversation?.avatarUrl),
+                              _buildAvatar(senderAvatar),
                               const SizedBox(width: 8),
                             ],
                             Flexible(
@@ -211,8 +239,9 @@ class _ChatPageState extends State<ChatPage> {
                           ],
                         ),
                         const SizedBox(height: 4),
+                        // 调试：显示原始时间戳和格式化时间
                         Text(
-                            timeText,
+                            '$timeText ',
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
                                 color: Theme.of(context).textTheme.bodySmall?.color?.withValues(alpha: 0.6)
                             )

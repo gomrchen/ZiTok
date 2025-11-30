@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/theme_tokens.dart';
 import '../../utils/validators.dart';
+import '../../utils/error_handler.dart';
 
 class RegisterPage extends StatefulWidget {
   const RegisterPage({super.key});
@@ -113,15 +114,11 @@ class _RegisterPageState extends State<RegisterPage> {
       _startCountdown();
 
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('验证码已发送，请查收邮箱')));
+        ErrorHandler.showSuccess(context, '验证码已发送，请查收邮箱');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('发送失败: ${e.toString()}')));
+        ErrorHandler.showError(context, e, prefix: '发送失败');
       }
     } finally {
       if (mounted) {

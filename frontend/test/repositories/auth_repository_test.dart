@@ -114,7 +114,7 @@ void main() {
     test('login returns User and persists id', () async {
       final user = await repo.login(username: 'u', password: 'p');
       expect(user.username, 'u');
-      expect(prefs.getString('auth_user_id'), '1');
+      expect(prefs.getString('user_id'), '1');
       expect(userSession.userId, '1');
     });
 
@@ -126,7 +126,7 @@ void main() {
         verificationCode: '123456',
       );
       expect(user.username, 'u2');
-      expect(prefs.getString('auth_user_id'), '2');
+      expect(prefs.getString('user_id'), '2');
       expect(userSession.userId, '2');
     });
   });

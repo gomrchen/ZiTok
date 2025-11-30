@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
+import '../../services/user_session.dart';
+import '../../utils/error_handler.dart';
 import '../../theme/theme_tokens.dart';
 import 'dart:convert';
 import 'dart:developer';
@@ -278,10 +280,9 @@ class _AccountSwitcherPageState extends State<AccountSwitcherPage> {
       log('执行登出操作');
       await authProvider.logout();
 
-      // 验证登出是否成功
-      final prefs = await SharedPreferences.getInstance();
-      final token = prefs.getString('access_token');
-      log('登出后验证: token = $token');
+      // 验证登出是否成功（统一从 UserSession 获取）
+      final userSession = UserSession.instance;
+      log('登出后验证: token = ${userSession.accessToken}');
       log('登出后登录状态: ${authProvider.isAuthenticated}');
 
       // 延迟一小段时间，确保登出操作完成
@@ -291,9 +292,8 @@ class _AccountSwitcherPageState extends State<AccountSwitcherPage> {
       log('执行登录操作: ${account.username}');
       await authProvider.login(account.username, account.password);
 
-      // 验证登录是否成功
-      final newToken = prefs.getString('access_token');
-      log('登录后验证: token = $newToken');
+      // 验证登录是否成功（统一从 UserSession 获取）
+      log('登录后验证: token = ${userSession.accessToken}');
       log('登录后登录状态: ${authProvider.isAuthenticated}');
 
       // 登录成功后，关闭所有页面并导航到主页
@@ -307,9 +307,7 @@ class _AccountSwitcherPageState extends State<AccountSwitcherPage> {
       log('账号切换失败: $e');
       if (context.mounted) {
         Navigator.of(context).pop(); // 关闭加载对话框
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('切换账号失败: ${e.toString()}')));
+        ErrorHandler.showError(context, e, prefix: '切换账号失败');
       }
     }
   }

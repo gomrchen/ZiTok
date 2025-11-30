@@ -15,7 +15,8 @@ class AuthRepository {
     required this.userSession,
   });
 
-  String? get accessToken => prefs.getString('access_token');
+  /// 获取当前访问令牌（统一从 UserSession 获取）
+  String? get accessToken => userSession.accessToken;
 
   /// 登录并返回用户
   Future<User> login({
@@ -50,18 +51,10 @@ class AuthRepository {
     }
     final refresh =
         (raw['refresh_token'] ?? raw['refreshToken'])?.toString();
-    if (token != null && token.isNotEmpty) {
-      await prefs.setString('access_token', token);
-    }
-    if (refresh != null && refresh.isNotEmpty) {
-      await prefs.setString('refresh_token', refresh);
-    }
 
-    // 通过 UserSession 统一管理用户 ID
-    await userSession.setUser(user, prefs);
-
-    // 兼容旧代码：同时保存到旧的 key
-    await prefs.setString('auth_user_id', user.id);
+    // 通过 UserSession 统一管理用户和令牌
+    await userSession.setUser(user, prefs,
+        accessToken: token, refreshToken: refresh);
 
     return user;
   }
@@ -87,21 +80,30 @@ class AuthRepository {
         : topCode is int
             ? topCode
             : int.tryParse('$topCode') ?? 0);
-    if (code == 0 && (res.statusCode == 200)) {
-      final raw = (body['data'] as Map<String, dynamic>?) ?? body;
-      final user = User.fromJson(raw);
-      await userSession.setUser(user, prefs);
-      await prefs.setString('auth_user_id', user.id);
-      return user;
-    }
-    if (code != 10000 && code != 200) {
+    if (code != 10000 && code != 200 && !(code == 0 && res.statusCode == 200)) {
       final msg = (base['msg'] ?? body['message'] ?? '注册失败').toString();
       throw AuthException(message: msg, code: code);
     }
+
     final raw = (body['data'] as Map<String, dynamic>?) ?? body;
     final user = User.fromJson(raw);
-    await userSession.setUser(user, prefs);
-    await prefs.setString('auth_user_id', user.id);
+
+    // 处理注册响应中可能包含的 token
+    String? token = (raw['token'] ?? raw['access_token'])?.toString();
+    if (token == null || token.isEmpty) {
+      final headerAuth = res.headers['authorization']?.first;
+      if (headerAuth != null &&
+          headerAuth.toLowerCase().startsWith('bearer ')) {
+        token = headerAuth.substring(7);
+      }
+    }
+    final refresh =
+        (raw['refresh_token'] ?? raw['refreshToken'])?.toString();
+
+    // 通过 UserSession 统一管理用户和令牌
+    await userSession.setUser(user, prefs,
+        accessToken: token, refreshToken: refresh);
+
     return user;
   }
 
@@ -116,21 +118,20 @@ class AuthRepository {
         : topCode is int
             ? topCode
             : int.tryParse('$topCode') ?? 0);
-    if (code == 0 && (res.statusCode == 200)) {
-      final raw = (body['data'] as Map<String, dynamic>?) ?? body;
-      final user = User.fromJson(raw);
-      await userSession.setUser(user, prefs);
-      await prefs.setString('auth_user_id', user.id);
-      return user;
-    }
-    if (code != 10000 && code != 200) {
+    if (code != 10000 && code != 200 && !(code == 0 && res.statusCode == 200)) {
       final msg = (base['msg'] ?? body['message'] ?? '获取资料失败').toString();
       throw AuthException(message: msg, code: code);
     }
     final raw = (body['data'] as Map<String, dynamic>?) ?? body;
     final user = User.fromJson(raw);
-    await userSession.setUser(user, prefs);
-    await prefs.setString('auth_user_id', user.id);
+
+    // 更新 UserSession 中的用户信息（不改变 token）
+    if (userSession.userId == user.id) {
+      userSession.updateUser(user);
+    } else {
+      await userSession.setUser(user, prefs);
+    }
+
     return user;
   }
 
@@ -169,13 +170,8 @@ class AuthRepository {
     } catch (_) {
       // 即使后端接口调用失败，也继续清除本地数据
     } finally {
-      // 通过 UserSession 清除用户信息
+      // 通过 UserSession 统一清除所有用户信息和令牌
       await userSession.clear(prefs);
-
-      // 清除本地存储的认证信息
-      await prefs.remove('access_token');
-      await prefs.remove('refresh_token');
-      await prefs.remove('auth_user_id');
     }
   }
 

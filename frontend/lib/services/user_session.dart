@@ -4,8 +4,8 @@ import '../models/user_models.dart';
 
 /// 统一的用户会话管理服务
 ///
-/// 这是获取当前用户 ID 的唯一真实来源 (Single Source of Truth)。
-/// 所有需要用户 ID 的地方都应该通过此服务获取。
+/// 这是获取当前用户 ID 和 Token 的唯一真实来源 (Single Source of Truth)。
+/// 所有需要用户 ID 或 Token 的地方都应该通过此服务获取。
 class UserSession extends ChangeNotifier {
   static UserSession? _instance;
 
@@ -25,6 +25,8 @@ class UserSession extends ChangeNotifier {
 
   String? _userId;
   User? _user;
+  String? _accessToken;
+  String? _refreshToken;
   bool _isInitialized = false;
 
   /// 当前用户 ID（唯一获取方式）
@@ -33,8 +35,18 @@ class UserSession extends ChangeNotifier {
   /// 当前用户信息
   User? get user => _user;
 
-  /// 是否已登录
-  bool get isLoggedIn => _userId != null && _userId!.isNotEmpty;
+  /// 当前访问令牌
+  String? get accessToken => _accessToken;
+
+  /// 当前刷新令牌
+  String? get refreshToken => _refreshToken;
+
+  /// 是否已登录（必须同时有用户ID和有效token）
+  bool get isLoggedIn =>
+      _userId != null && _userId!.isNotEmpty && _accessToken != null && _accessToken!.isNotEmpty;
+
+  /// 是否有有效的访问令牌
+  bool get hasValidToken => _accessToken != null && _accessToken!.isNotEmpty;
 
   /// 是否已初始化
   bool get isInitialized => _isInitialized;
@@ -54,15 +66,40 @@ class UserSession extends ChangeNotifier {
   /// 应在应用启动时调用
   Future<void> restoreSession(SharedPreferences prefs) async {
     _userId = prefs.getString('user_id');
+    _accessToken = prefs.getString('access_token');
+    _refreshToken = prefs.getString('refresh_token');
     _isInitialized = true;
     notifyListeners();
   }
 
   /// 设置当前用户（登录成功后调用）
-  Future<void> setUser(User user, SharedPreferences prefs) async {
+  Future<void> setUser(User user, SharedPreferences prefs,
+      {String? accessToken, String? refreshToken}) async {
     _userId = user.id;
     _user = user;
     await prefs.setString('user_id', user.id);
+
+    // 如果提供了 token，同时保存
+    if (accessToken != null && accessToken.isNotEmpty) {
+      _accessToken = accessToken;
+      await prefs.setString('access_token', accessToken);
+    }
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      _refreshToken = refreshToken;
+      await prefs.setString('refresh_token', refreshToken);
+    }
+    notifyListeners();
+  }
+
+  /// 设置令牌（用于刷新令牌后更新）
+  Future<void> setTokens(SharedPreferences prefs,
+      {required String accessToken, String? refreshToken}) async {
+    _accessToken = accessToken;
+    await prefs.setString('access_token', accessToken);
+    if (refreshToken != null && refreshToken.isNotEmpty) {
+      _refreshToken = refreshToken;
+      await prefs.setString('refresh_token', refreshToken);
+    }
     notifyListeners();
   }
 
@@ -86,7 +123,11 @@ class UserSession extends ChangeNotifier {
   Future<void> clear(SharedPreferences prefs) async {
     _userId = null;
     _user = null;
+    _accessToken = null;
+    _refreshToken = null;
     await prefs.remove('user_id');
+    await prefs.remove('access_token');
+    await prefs.remove('refresh_token');
     notifyListeners();
   }
 

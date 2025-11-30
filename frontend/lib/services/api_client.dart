@@ -5,6 +5,7 @@ import '../config/env.dart';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'mock/mock_video_service.dart';
+import 'user_session.dart';
 
 /// 统一网络客户端
 ///
@@ -14,11 +15,13 @@ import 'mock/mock_video_service.dart';
 class ApiClient {
   final Dio _dio;
   final SharedPreferences prefs;
+  final UserSession userSession;
   final Logger _logger = Logger();
   bool _refreshing = false;
 
-  ApiClient({required String baseUrl, required this.prefs})
-      : _dio = Dio(
+  ApiClient({required String baseUrl, required this.prefs, UserSession? userSession})
+      : userSession = userSession ?? UserSession.instance,
+        _dio = Dio(
           BaseOptions(
             baseUrl: baseUrl,
             connectTimeout: const Duration(seconds: 10),
@@ -83,15 +86,11 @@ class ApiClient {
 
   /// 注入鉴权头（若存在）
   void _injectAuthHeaders(RequestOptions options) {
-    final token = prefs.getString('access_token');
+    // 统一从 UserSession 获取 token
+    final token = userSession.accessToken;
     if (token != null && token.isNotEmpty) {
       options.headers['Authorization'] = 'Bearer $token';
-      // 移除Access-Token以避免CORS问题，仅保留标准Bearer认证
     }
-   /*final refresh = prefs.getString('refresh_token');
-    if (refresh != null && refresh.isNotEmpty) {
-      options.headers['Refresh-Token'] = refresh;
-    }*/
   }
 
   /// 解析业务码，兼容顶层 `code` 与 `base.code`
@@ -145,12 +144,11 @@ class ApiClient {
     _refreshing = true;
     try {
       _logger.i('Attempting token refresh for ${failed.uri}');
-      final userId = prefs.getString('auth_user_id');
-      final refresh = prefs.getString('refresh_token');
+      final userId = userSession.userId;
+      final refresh = userSession.refreshToken;
       if (userId == null || refresh == null) {
         _logger.w('Token refresh skipped: missing user_id or refresh_token');
-        prefs.remove('access_token');
-        prefs.remove('refresh_token');
+        await userSession.clear(prefs);
         return null;
       }
       final refreshDio = Dio(BaseOptions(baseUrl: _dio.options.baseUrl));
@@ -169,16 +167,14 @@ class ApiClient {
         _logger.w('Token refresh failed: empty token');
         return null;
       }
-      await prefs.setString('access_token', newToken);
-      if (newRefresh != null && newRefresh.isNotEmpty) {
-        await prefs.setString('refresh_token', newRefresh);
-      }
+      // 通过 UserSession 统一更新令牌
+      await userSession.setTokens(prefs,
+          accessToken: newToken, refreshToken: newRefresh);
       failed.headers['Authorization'] = 'Bearer $newToken';
       return await _dio.fetch(failed);
     } catch (err, st) {
       _logger.e('Token refresh error', error: err, stackTrace: st);
-      prefs.remove('access_token');
-      prefs.remove('refresh_token');
+      await userSession.clear(prefs);
       return null;
     } finally {
       _refreshing = false;

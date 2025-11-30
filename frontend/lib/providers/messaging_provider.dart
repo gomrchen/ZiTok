@@ -6,8 +6,10 @@ import 'package:hive_flutter/hive_flutter.dart';
 import '../repositories/relation_repository.dart';
 import '../services/socket_service.dart';
 import '../services/user_session.dart';
-import '../app.dart';
 import '../models/social_models.dart';
+
+/// 消息去重和管理的日志标签
+const String _logTag = 'MsgDedup';
 
 class MessagingProvider extends ChangeNotifier {
   final RelationRepository? relationRepository;
@@ -63,6 +65,50 @@ class MessagingProvider extends ChangeNotifier {
   List<ChatRoom> _chatRooms = [];
 
   final Map<String, List<ChatMessage>> _messages = {};
+
+  // ==================== 消息去重辅助方法 ====================
+
+  /// 生成消息的内容签名（不依赖时间戳，用于去重）
+  /// 格式：发送者ID_接收者或房间ID_内容哈希
+  String _contentSignature(ChatMessage msg) {
+    final target = msg.roomId ?? msg.receiverId;
+    // 使用内容的简单哈希避免过长
+    final contentHash = msg.content.hashCode.abs();
+    return '${msg.senderId}_${target}_$contentHash';
+  }
+
+  /// 合并消息列表，去重并按时间排序
+  /// 服务器消息（正数ID）优先于本地临时消息（负数ID）
+  List<ChatMessage> _mergeAndDedup(List<ChatMessage> serverMsgs, List<ChatMessage> localMsgs) {
+    final Map<String, ChatMessage> merged = {};
+
+    // 先添加服务器消息（优先级高）
+    for (var msg in serverMsgs) {
+      final sig = _contentSignature(msg);
+      merged[sig] = msg;
+      developer.log('[$_logTag] 添加服务器消息: id=${msg.id}, sig=$sig, content="${msg.content.substring(0, msg.content.length > 20 ? 20 : msg.content.length)}"', name: _logTag);
+    }
+
+    // 再添加本地消息（只有没有对应服务器消息时才添加）
+    for (var msg in localMsgs) {
+      final sig = _contentSignature(msg);
+      if (!merged.containsKey(sig)) {
+        merged[sig] = msg;
+        developer.log('[$_logTag] 添加本地消息: id=${msg.id}, sig=$sig', name: _logTag);
+      } else {
+        developer.log('[$_logTag] 跳过重复本地消息: id=${msg.id}, sig=$sig（已有服务器消息）', name: _logTag);
+      }
+    }
+
+    // 转为列表并按时间排序
+    final result = merged.values.toList();
+    result.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+
+    developer.log('[$_logTag] 合并结果: 服务器=${serverMsgs.length}, 本地=${localMsgs.length}, 合并后=${result.length}', name: _logTag);
+    return result;
+  }
+
+  // ==================== 以上是消息去重辅助方法 ====================
 
   List<Friend> get following => List.unmodifiable(_following);
   List<Friend> get followers => List.unmodifiable(_followers);
@@ -200,7 +246,8 @@ class MessagingProvider extends ChangeNotifier {
   void _connect({required String roomId, String? targetId}) {
     if (currentUid == null || relationRepository == null) return;
 
-    final token = AppBootstrap.prefs.getString('access_token');
+    // 统一从 UserSession 获取 token
+    final token = userSession.accessToken;
     if (token == null || token.isEmpty) return;
 
     final baseUrl = _getWsBaseUrl();
@@ -299,8 +346,8 @@ class MessagingProvider extends ChangeNotifier {
 
         if (msg != null) {
           developer.log(
-            '[_handleHistoryMessage] 消息[$i] tryParse成功: content="${msg.content}", from=${msg.senderId}',
-            name: 'Chat',
+            '[_handleHistoryMessage] 消息[$i] tryParse成功: content="${msg.content}", from=${msg.senderId}, createdAt=${msg.createdAt}',
+            name: 'MsgTime',
           );
         } else {
           developer.log('[_handleHistoryMessage] 消息[$i] tryParse返回null', name: 'Chat');
@@ -310,8 +357,8 @@ class MessagingProvider extends ChangeNotifier {
         if (msg == null && item is Map) {
           msg = ChatMessage.fromJson(Map<String, dynamic>.from(item));
           developer.log(
-            '[_handleHistoryMessage] 消息[$i] fromJson成功: content="${msg.content}"',
-            name: 'Chat',
+            '[_handleHistoryMessage] 消息[$i] fromJson成功: content="${msg.content}", createdAt=${msg.createdAt}',
+            name: 'MsgTime',
           );
         }
 
@@ -338,22 +385,27 @@ class MessagingProvider extends ChangeNotifier {
     }
 
     developer.log('[_handleHistoryMessage] 解析完成，共 ${serverMsgMap.length} 个会话', name: 'Chat');
+    developer.log('[$_logTag] ========== 开始合并历史消息 ==========', name: _logTag);
 
+    // 使用新的去重方法合并消息
     serverMsgMap.forEach((key, serverMsgs) {
       final localMsgs = _messages[key] ?? [];
-      final List<ChatMessage> mergedList = [...serverMsgs];
+      developer.log('[$_logTag] 会话[$key]: 服务器消息=${serverMsgs.length}, 本地消息=${localMsgs.length}', name: _logTag);
 
-      for (var localMsg in localMsgs) {
-        if (localMsg.id > 1000000000000) {
-          final exists = serverMsgs.any((sm) =>
-              sm.createdAt == localMsg.createdAt &&
-              sm.content == localMsg.content);
-          if (!exists) mergedList.add(localMsg);
-        }
-      }
-      mergedList.sort((a, b) => a.createdAt.compareTo(b.createdAt));
-      _messages[key] = mergedList;
+      // 使用统一的合并去重方法
+      _messages[key] = _mergeAndDedup(serverMsgs, localMsgs);
     });
+
+    // 处理本地有但服务器没有返回的会话（保留本地消息并排序）
+    for (var key in _messages.keys.toList()) {
+      if (!serverMsgMap.containsKey(key)) {
+        final localMsgs = _messages[key]!;
+        developer.log('[$_logTag] 会话[$key]: 服务器无数据，保留本地消息=${localMsgs.length}', name: _logTag);
+        localMsgs.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+      }
+    }
+
+    developer.log('[$_logTag] ========== 合并历史消息完成 ==========', name: _logTag);
 
     notifyListeners();
     _saveHistoryToHive();
@@ -375,20 +427,43 @@ class MessagingProvider extends ChangeNotifier {
       }
       final list = _messages[key]!;
 
-      final isDuplicate = list.any((m) =>
-          (m.id == msg.id) ||
-          (m.senderId == msg.senderId &&
-              m.content == msg.content &&
-              (m.createdAt - msg.createdAt).abs() < 1000));
+      // 使用统一的内容签名进行去重
+      final newMsgSig = _contentSignature(msg);
+      developer.log('[$_logTag] 收到单条消息: id=${msg.id}, sig=$newMsgSig', name: _logTag);
 
-      if (!isDuplicate) {
+      // 查找是否有匹配的临时消息（负数ID）或重复消息
+      final existingIndex = list.indexWhere((m) {
+        // 精确ID匹配（仅当两者都是服务器消息时）
+        if (m.id > 0 && msg.id > 0 && m.id == msg.id) return true;
+        // 内容签名匹配（用于临时消息替换和去重）
+        return _contentSignature(m) == newMsgSig;
+      });
+
+      if (existingIndex >= 0) {
+        final existing = list[existingIndex];
+        developer.log('[$_logTag] 找到匹配消息: existingId=${existing.id}, newId=${msg.id}', name: _logTag);
+
+        // 如果已存在的是临时消息（负数ID），用服务器消息替换
+        if (existing.id < 0 && msg.id > 0) {
+          developer.log('[$_logTag] 替换临时消息为服务器消息', name: _logTag);
+          list[existingIndex] = msg;
+          list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
+          notifyListeners();
+          _saveHistoryToHive();
+        } else {
+          developer.log('[$_logTag] 跳过重复消息', name: _logTag);
+        }
+        // 否则是重复消息，忽略
+      } else {
+        // 新消息，添加并排序
+        developer.log('[$_logTag] 添加新消息到列表', name: _logTag);
         list.add(msg);
         list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
         notifyListeners();
         _saveHistoryToHive();
       }
-    } catch (_) {
-      // Socket message error, ignore
+    } catch (e) {
+      developer.log('[$_logTag] 处理单条消息异常: $e', name: _logTag);
     }
   }
 
@@ -397,13 +472,14 @@ class MessagingProvider extends ChangeNotifier {
     if (uid == null) return;
 
     final int targetId = int.tryParse(conversationId) ?? 0;
+    final now = DateTime.now().millisecondsSinceEpoch;
 
     final Map<String, dynamic> socketPayload = {
       'content': text,
       'room_id': _activeIsGroup ? targetId : -1,
       'type': _activeIsGroup ? 'group' : 'private',
       'from': uid,
-      'timestamp': DateTime.now().millisecondsSinceEpoch ~/ 1000,
+      'timestamp': now ~/ 1000,
     };
 
     if (!_activeIsGroup) {
@@ -412,18 +488,21 @@ class MessagingProvider extends ChangeNotifier {
 
     _socketService.send(socketPayload);
 
+    // 使用负数ID标记临时消息，避免与服务器ID冲突
     final tempMsg = ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch,
+      id: -now, // 负数ID表示本地临时消息
       senderId: uid,
       receiverId: _activeIsGroup ? 0 : targetId,
       roomId: _activeIsGroup ? targetId : null,
       content: text,
       isRead: true,
-      createdAt: DateTime.now().millisecondsSinceEpoch,
+      createdAt: now,
     );
 
     final list = _messages.putIfAbsent(conversationId, () => []);
     list.add(tempMsg);
+    // 发送后也要排序，保持时间顺序
+    list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
     notifyListeners();
     _saveHistoryToHive();
@@ -494,6 +573,8 @@ class MessagingProvider extends ChangeNotifier {
           }
         }
 
+        // 加载后排序，确保时间顺序正确
+        msgs.sort((a, b) => a.createdAt.compareTo(b.createdAt));
         _messages[key.toString()] = msgs;
       }
       notifyListeners();

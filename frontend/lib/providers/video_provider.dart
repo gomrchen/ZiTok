@@ -2,9 +2,15 @@ import 'package:flutter/material.dart';
 import '../repositories/video_repository.dart';
 import '../models/video.dart';
 import '../models/video_publish.dart';
+import '../services/user_session.dart';
 
 class VideoProvider extends ChangeNotifier {
   final VideoRepository repo;
+  final UserSession userSession;
+
+  /// 上一次的用户 ID，用于检测用户切换
+  String? _lastUserId;
+
   List<Video> _discover = [];
   List<Video> _featured = [];
   List<Video> _follow = [];
@@ -44,7 +50,67 @@ class VideoProvider extends ChangeNotifier {
   int _searchPage = 1;
   String? _searchKeyword;
 
-  VideoProvider({required this.repo});
+  VideoProvider({required this.repo, UserSession? userSession})
+      : userSession = userSession ?? UserSession.instance {
+    // 监听 UserSession 变化，当用户切换时清理数据
+    this.userSession.addListener(_onUserSessionChanged);
+    _lastUserId = this.userSession.userId;
+  }
+
+  /// 当 UserSession 变化时调用
+  void _onUserSessionChanged() {
+    final currentUserId = userSession.userId;
+
+    // 检测用户 ID 是否变化（包括登出变为 null）
+    if (currentUserId != _lastUserId) {
+      debugPrint('VideoProvider: 用户切换 $_lastUserId -> $currentUserId，清理缓存数据');
+      _lastUserId = currentUserId;
+      clearUserData();
+    }
+  }
+
+  /// 清理所有用户相关的数据（用户切换或登出时调用）
+  void clearUserData() {
+    // 清理收藏相关
+    _favorites = [];
+    _favoritedIds.clear();
+    _favoritesPage = 1;
+    _favoritesHasMore = true;
+    _loadingFavorites = false;
+
+    // 清理关注流
+    _follow = [];
+    _followPage = 1;
+    _followHasMore = true;
+    _loadingFollow = false;
+    _followError = null;
+    _followScrollOffset = 0.0;
+
+    // 清理推荐（用户相关的推荐）
+    _recommend = [];
+    _lastVisit = null;
+    _recommendHasMore = true;
+    _loadingRecommend = false;
+    _recommendStartIndexInFollow = null;
+
+    // 清理搜索结果
+    _searchResults = [];
+    _searchPage = 1;
+    _searchHasMore = true;
+    _loadingSearch = false;
+    _searchKeyword = null;
+
+    // 清理投稿进度
+    _publishProgress = PublishProgress.idle();
+
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    userSession.removeListener(_onUserSessionChanged);
+    super.dispose();
+  }
 
   List<Video> get discover => _discover;
   List<Video> get featured => _featured;

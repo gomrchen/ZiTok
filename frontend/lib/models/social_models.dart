@@ -87,11 +87,14 @@ Map<String, dynamic>? parseGoMapString(dynamic input) {
     if (valueStart <= valueEnd && valueStart < inner.length) {
       final value = inner.substring(valueStart, valueEnd).trim();
       result[key] = value;
-      developer.log('[parseGoMapString] 解析字段: $key = "$value"', name: 'Parse');
+      // 特别记录时间戳字段
+      if (key == 'timestamp' || key == 'created_at') {
+        developer.log('[parseGoMapString] 时间戳字段: $key = "$value"', name: 'MsgTime');
+      }
     }
   }
 
-  developer.log('[parseGoMapString] 最终结果: $result', name: 'Parse');
+  developer.log('[parseGoMapString] 最终结果keys: ${result.keys.toList()}', name: 'Parse');
   return result.isNotEmpty ? result : null;
 }
 
@@ -209,22 +212,47 @@ class ChatMessage {
   /// 从WebSocket消息创建ChatMessage
   /// 支持标准JSON格式和Go map格式字符串
   factory ChatMessage.fromSocketJson(Map<String, dynamic> json) {
+    developer.log('[ChatMessage.fromSocketJson] 输入json: $json', name: 'MsgTime');
+
+    // 解析消息ID（优先使用服务器ID）
+    int msgId = 0;
+    if (json['id'] != null) {
+      msgId = int.tryParse(json['id'].toString()) ?? 0;
+    }
+
     // 解析timestamp，支持科学计数法
-    int ts = 0;
-    if (json['timestamp'] != null) {
-      final tsValue = json['timestamp'];
+    int createdAtMs = 0;
+    final tsValue = json['timestamp'];
+    developer.log('[ChatMessage.fromSocketJson] timestamp原始值: $tsValue (${tsValue.runtimeType})', name: 'MsgTime');
+
+    if (tsValue != null) {
+      int ts = 0;
       if (tsValue is int) {
         ts = tsValue;
+        developer.log('[ChatMessage.fromSocketJson] timestamp是int: $ts', name: 'MsgTime');
       } else if (tsValue is double) {
         ts = tsValue.toInt();
+        developer.log('[ChatMessage.fromSocketJson] timestamp是double: $ts', name: 'MsgTime');
       } else {
         // 支持科学计数法字符串，如 "1.764435002e+09"
-        final parsed = double.tryParse(tsValue.toString());
+        final tsStr = tsValue.toString();
+        final parsed = double.tryParse(tsStr);
+        developer.log('[ChatMessage.fromSocketJson] timestamp是String "$tsStr", 解析为double: $parsed', name: 'MsgTime');
         if (parsed != null) {
           ts = parsed.toInt();
         }
       }
+      // 将秒级时间戳转为毫秒级
+      createdAtMs = _normalizeTimestamp(ts);
+      developer.log('[ChatMessage.fromSocketJson] ts=$ts, 规范化后createdAtMs=$createdAtMs', name: 'MsgTime');
     }
+    // 也检查 created_at 字段
+    if (createdAtMs == 0 && json['created_at'] != null) {
+      createdAtMs = _normalizeTimestamp(_parseIntField(json['created_at']));
+      developer.log('[ChatMessage.fromSocketJson] 使用created_at: $createdAtMs', name: 'MsgTime');
+    }
+
+    developer.log('[ChatMessage.fromSocketJson] 最终: id=$msgId, createdAtMs=$createdAtMs', name: 'MsgTime');
 
     // 解析fromId
     int fromId = 0;
@@ -259,14 +287,34 @@ class ChatMessage {
     }
 
     return ChatMessage(
-      id: DateTime.now().millisecondsSinceEpoch,
+      id: msgId > 0 ? msgId : -DateTime.now().millisecondsSinceEpoch, // 无服务器ID时使用负数临时ID
       senderId: fromId,
       receiverId: 0,
       roomId: parsedRoomId,
       content: rawContent,
       isRead: false,
-      createdAt: ts > 0 ? ts * 1000 : DateTime.now().millisecondsSinceEpoch,
+      createdAt: createdAtMs > 0 ? createdAtMs : DateTime.now().millisecondsSinceEpoch,
     );
+  }
+
+  /// 解析整数字段（支持int、double、String）
+  static int _parseIntField(dynamic value) {
+    if (value == null) return 0;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    final parsed = double.tryParse(value.toString());
+    return parsed?.toInt() ?? 0;
+  }
+
+  /// 将时间戳规范化为毫秒级
+  /// 如果时间戳小于 10^12（约2001年），认为是秒级时间戳，需要乘以1000
+  static int _normalizeTimestamp(int ts) {
+    if (ts <= 0) return 0;
+    // 10^12 毫秒 = 2001-09-09，如果小于这个值，认为是秒级时间戳
+    if (ts < 1000000000000) {
+      return ts * 1000;
+    }
+    return ts;
   }
 
   /// 从任意数据创建ChatMessage（自动检测格式）
@@ -323,24 +371,59 @@ class ChatMessage {
 
     // 处理content字段，可能是Go map格式的字符串
     String rawContent = json['content']?.toString() ?? json['message']?.toString() ?? '';
+    int contentTimestamp = 0; // 从content的Go map中提取的时间戳
+
     if (rawContent.trim().startsWith('map[')) {
       final parsed = parseGoMapString(rawContent);
-      if (parsed != null && parsed['content'] != null) {
-        rawContent = parsed['content'].toString();
-        developer.log('[ChatMessage.fromJson] content是Go map格式，解析后: $rawContent', name: 'Parse');
+      if (parsed != null) {
+        // 提取真正的内容
+        if (parsed['content'] != null) {
+          rawContent = parsed['content'].toString();
+        }
+        // 从Go map中提取时间戳
+        if (parsed['timestamp'] != null) {
+          final tsStr = parsed['timestamp'].toString();
+          final tsDouble = double.tryParse(tsStr);
+          if (tsDouble != null) {
+            contentTimestamp = tsDouble.toInt();
+          }
+        }
+        developer.log('[ChatMessage.fromJson] content是Go map格式，解析后: content="$rawContent", timestamp=$contentTimestamp', name: 'MsgTime');
       }
     }
 
+    // 解析消息ID
+    int msgId = _parseIntField(json['id']);
+
+    // 解析时间戳（优先级：content内的timestamp > json的created_at > json的timestamp）
+    int createdAtMs = 0;
+
+    // 1. 优先使用从content Go map中提取的timestamp
+    if (contentTimestamp > 0) {
+      createdAtMs = _normalizeTimestamp(contentTimestamp);
+      developer.log('[ChatMessage.fromJson] 使用content内的timestamp: $contentTimestamp -> $createdAtMs', name: 'MsgTime');
+    }
+
+    // 2. 其次使用json的created_at
+    if (createdAtMs == 0) {
+      createdAtMs = _normalizeTimestamp(_parseIntField(json['created_at']));
+    }
+
+    // 3. 最后检查json的timestamp字段
+    if (createdAtMs == 0 && json['timestamp'] != null) {
+      createdAtMs = _normalizeTimestamp(_parseIntField(json['timestamp']));
+    }
+
+    developer.log('[ChatMessage.fromJson] 最终: id=$msgId, createdAtMs=$createdAtMs', name: 'MsgTime');
+
     return ChatMessage(
-      id: json['id'] ?? DateTime.now().millisecondsSinceEpoch,
+      id: msgId > 0 ? msgId : -DateTime.now().millisecondsSinceEpoch, // 无服务器ID时使用负数临时ID
       senderId: sId,
       receiverId: rId,
       roomId: rmId,
       content: rawContent,
       isRead: json['is_read'] ?? false,
-      createdAt: (json['created_at'] != null && json['created_at'] > 0)
-          ? json['created_at']
-          : DateTime.now().millisecondsSinceEpoch,
+      createdAt: createdAtMs > 0 ? createdAtMs : DateTime.now().millisecondsSinceEpoch,
     );
   }
 

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../theme/theme_tokens.dart';
 import '../../utils/validators.dart';
+import '../../utils/error_handler.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -122,19 +123,15 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
     try {
       final authProvider = Provider.of<AuthProvider>(context, listen: false);
       await authProvider.sendVerificationCode(_emailCtrl.text);
-      
+
       _startCountdown();
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('验证码已发送，请查收邮箱')),
-        );
+        ErrorHandler.showSuccess(context, '验证码已发送，请查收邮箱');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('发送失败: ${e.toString()}')),
-        );
+        ErrorHandler.showError(context, e, prefix: '发送失败');
       }
     }
   }
@@ -151,12 +148,10 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
          _codeCtrl.text.trim(),
          _newPasswordCtrl.text.trim(),
       );
-      
+
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('密码重置成功，请登录')),
-        );
-        
+        ErrorHandler.showSuccess(context, '密码重置成功，请登录');
+
         // 返回登录页面
         Future.delayed(const Duration(seconds: 1), () {
           if (mounted) {
@@ -166,9 +161,7 @@ class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('重置失败: ${e.toString()}')),
-        );
+        ErrorHandler.showError(context, e, prefix: '重置失败');
       }
     }
   }

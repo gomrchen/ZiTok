@@ -122,9 +122,9 @@ class _ProfilePageState extends State<ProfilePage> {
         return hiveUserId;
       }
 
-      // 然后尝试从 SharedPreferences 获取
+      // 然后尝试从 SharedPreferences 获取（统一使用 user_id）
       final prefs = await SharedPreferences.getInstance();
-      final String? prefsUserId = prefs.getString('auth_user_id');
+      final String? prefsUserId = prefs.getString('user_id');
 
       if (prefsUserId != null && prefsUserId.isNotEmpty) {
         return prefsUserId;
@@ -601,9 +601,9 @@ class _StatsRowState extends State<_StatsRow> {
         return;
       }
 
-      // 然后尝试从 SharedPreferences 获取
+      // 然后尝试从 SharedPreferences 获取（统一使用 user_id）
       final prefs = await SharedPreferences.getInstance();
-      final String? prefsUserId = prefs.getString('auth_user_id');
+      final String? prefsUserId = prefs.getString('user_id');
 
       if (prefsUserId != null && prefsUserId.isNotEmpty) {
         setState(() {
@@ -1016,9 +1016,9 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
         return;
       }
 
-      // 然后尝试从 SharedPreferences 获取
+      // 然后尝试从 SharedPreferences 获取（统一使用 user_id）
       final prefs = await SharedPreferences.getInstance();
-      final String? prefsUserId = prefs.getString('auth_user_id');
+      final String? prefsUserId = prefs.getString('user_id');
 
       if (prefsUserId != null && prefsUserId.isNotEmpty) {
         setState(() {

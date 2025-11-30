@@ -13,6 +13,7 @@ import '../../providers/auth_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../services/user_service.dart';
 import '../../utils/image_utils.dart';
+import '../../utils/error_handler.dart';
 import 'widgets/edit_field_dialog.dart';
 import '../../models/user_models.dart'; // 导入用户模型以使用 Gender 枚举
 
@@ -40,9 +41,12 @@ class _EditProfilePageState extends State<EditProfilePage> {
   // 资料完成度
   int _completion = 40;
 
+  // 提示文字常量
+  static const String _bioPlaceholder = '介绍喜好、个性或@你的亲友';
+
   // 可编辑字段
-  String _nickname = '哒哒哒哒对对对';
-  String _bio = '介绍喜好、个性或@你的亲友';
+  String _nickname = '';
+  String _bio = ''; // 实际值，空字符串表示未设置
   Gender _gender = Gender.unknown; // 修改：使用 Gender 枚举
   DateTime? _birthday;
   String _email = '';
@@ -88,7 +92,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
       setState(() {
         _nickname = user.username;
         _email = user.email ?? '未设置邮箱';
-        _bio = user.bio ?? '介绍喜好、个性或@你的亲友';
+        _bio = user.bio ?? ''; // 保存实际值，空字符串表示未设置
         _avatarUrl = user.avatarUrl;
         _gender = user.gender; // 直接使用 Gender 枚举
 
@@ -387,7 +391,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
             enabled: false,
           ),
           // 可编辑字段
-          _item(title: '简介', value: _bio, titleStyle: titleStyle, valueStyle: valueStyle, onTap: _onEditBio),
+          _item(title: '简介', value: _bio.isEmpty ? _bioPlaceholder : _bio, titleStyle: titleStyle, valueStyle: valueStyle, onTap: _onEditBio),
           _item(title: '性别', value: _genderText(), titleStyle: titleStyle, valueStyle: valueStyle, onTap: _onEditGender),
           _item(title: '生日', value: _birthdayText(), titleStyle: titleStyle, valueStyle: valueStyle, onTap: _onEditBirthday),
           const SizedBox(height: Spacing.lg),
@@ -481,7 +485,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   String _birthdayText() {
-    if (_birthday == null) return '生日当天会收到抖音的祝福';
+    if (_birthday == null) return '生日当天会收到知音的祝福';
     return '${_birthday!.year}-${_birthday!.month.toString().padLeft(2, '0')}-${_birthday!.day.toString().padLeft(2, '0')}';
   }
 
@@ -505,7 +509,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   Future<void> _onEditBio() async {
-    final v = await EditTextDialog.show(context, title: '编辑简介', initial: _bio, hint: '一句话介绍自己', maxLines: 3, maxLength: 80);
+    // 传入实际值，空字符串让用户从空白开始输入
+    final v = await EditTextDialog.show(context, title: '编辑简介', initial: _bio, hint: _bioPlaceholder, maxLines: 3, maxLength: 80);
     if (v != null) {
       setState(() => _bio = v);
       Hive.box('user_box').put('bio', v);
@@ -518,8 +523,8 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
   void _recalcCompletion() {
     int score = 40; // 初始完成度
-    // 简介非默认值：增加20分
-    if (_bio.isNotEmpty && _bio != '介绍喜好、个性或@你的亲友') {
+    // 简介非空：增加20分
+    if (_bio.isNotEmpty) {
       score += 20;
     }
     // 性别非默认值（非null）：增加20分
@@ -615,7 +620,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
     } catch (e) {
       if (mounted) {
-        _showError('选择头像失败：$e');
+        ErrorHandler.showError(context, e, prefix: '选择头像失败');
       }
     }
   }
@@ -642,7 +647,9 @@ class _EditProfilePageState extends State<EditProfilePage> {
       setState(() => _backdropPreview = preview);
       await _uploadBackdrop(preview);
     } catch (e) {
-      _showError('选择封面失败：$e');
+      if (mounted) {
+        ErrorHandler.showError(context, e, prefix: '选择封面失败');
+      }
     }
   }
 
@@ -728,11 +735,11 @@ class _EditProfilePageState extends State<EditProfilePage> {
         setState(() {
           _avatarUrl = profileProvider.user?.avatarUrl;
         });
-        _showToast('头像已更新');
+        ErrorHandler.showSuccess(context, '头像已更新');
       }
     } catch (e) {
       if (mounted) {
-        _showError('头像上传失败：$e');
+        ErrorHandler.showError(context, e, prefix: '头像上传失败');
       }
     } finally {
       if (mounted) setState(() => _uploadingAvatar = false);
@@ -756,22 +763,14 @@ class _EditProfilePageState extends State<EditProfilePage> {
       await profileProvider.load(userId: _userId);
 
       if (mounted) {
-        _showToast('封面已更新');
+        ErrorHandler.showSuccess(context, '封面已更新');
       }
     } catch (e) {
       if (mounted) {
-        _showError('封面上传失败：$e');
+        ErrorHandler.showError(context, e, prefix: '封面上传失败');
       }
     } finally {
       if (mounted) setState(() => _uploadingBackdrop = false);
     }
-  }
-
-  void _showToast(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-  }
-
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg), backgroundColor: Colors.redAccent));
   }
 }
