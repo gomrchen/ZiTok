@@ -1,0 +1,938 @@
+openapi: 3.0.3
+info:
+  title: ZiTok 笔记模块 API
+  description: |
+    笔记模块提供视频笔记的创建、查询、删除、点赞和收藏功能。
+
+    ## 认证说明
+    - 所有接口需要携带 Authorization 请求头进行身份验证
+    - 格式: `Authorization: Bearer <token>`
+    - 如果未提供有效token，系统将使用默认用户ID(1)
+
+    ## 参数兼容性
+    - 所有接口同时支持驼峰命名(camelCase)和下划线命名(snake_case)
+    - 例如: `video_id` 和 `videoId` 均可使用
+  version: 1.0.0
+  contact:
+    name: ZiTok Team
+
+servers:
+  - url: http://localhost:8080
+    description: 本地开发服务器
+  - url: https://api.zitok.com
+    description: 生产服务器
+
+tags:
+  - name: 笔记管理
+    description: 笔记的创建、查询、删除操作
+  - name: 笔记互动
+    description: 笔记的点赞、收藏操作
+
+paths:
+  /api/v1/note/create:
+    post:
+      tags:
+        - 笔记管理
+      summary: 创建笔记
+      description: |
+        为指定视频创建一条笔记。
+
+        **必填字段**: video_id, title, content
+
+        **可选字段**: seconds (视频时间戳)
+      operationId: createNote
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateNoteRequest'
+            examples:
+              基础示例:
+                summary: 创建基础笔记
+                value:
+                  video_id: 10001
+                  title: "React Hooks 学习笔记"
+                  content: "useState是React中最常用的Hook，用于在函数组件中添加状态..."
+              带时间戳示例:
+                summary: 创建带视频时间戳的笔记
+                value:
+                  video_id: 10001
+                  title: "useEffect详解"
+                  content: "useEffect用于处理副作用，第二个参数是依赖数组..."
+                  seconds: 180
+              驼峰命名示例:
+                summary: 使用驼峰命名参数
+                value:
+                  videoId: 10001
+                  title: "自定义Hook实现"
+                  content: "自定义Hook可以复用状态逻辑..."
+      responses:
+        '200':
+          description: 创建成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateNoteResponse'
+              examples:
+                成功响应:
+                  value:
+                    code: 0
+                    msg: "success"
+                    data:
+                      note_id: 1001
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              examples:
+                缺少video_id:
+                  value:
+                    code: 10001
+                    msg: "video_id参数不能为空"
+                    data: null
+                缺少title:
+                  value:
+                    code: 10001
+                    msg: "title参数不能为空"
+                    data: null
+
+  /api/v1/note/delete:
+    post:
+      tags:
+        - 笔记管理
+      summary: 删除笔记
+      description: |
+        删除指定的笔记。只能删除自己创建的笔记。
+
+        **必填字段**: note_id
+      operationId: deleteNote
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DeleteNoteRequest'
+            examples:
+              删除笔记:
+                value:
+                  note_id: 1001
+              驼峰命名:
+                value:
+                  noteId: 1001
+      responses:
+        '200':
+          description: 删除成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                code: 0
+                msg: "success"
+                data: null
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 10001
+                msg: "note_id is required"
+                data: null
+        '403':
+          description: 无权限删除
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 10003
+                msg: "无权限删除该笔记"
+                data: null
+
+  /api/v1/note/video:
+    get:
+      tags:
+        - 笔记管理
+      summary: 获取视频笔记列表
+      description: |
+        获取指定视频下的所有笔记，支持分页。
+
+        **必填参数**: video_id 或 videoId
+
+        **分页参数**: page(页码，默认1), pageSize/size(每页大小，默认10)
+      operationId: getVideoNotes
+      parameters:
+        - name: video_id
+          in: query
+          description: 视频ID (也支持 videoId)
+          required: true
+          schema:
+            type: integer
+            format: int64
+          example: 10001
+        - name: page
+          in: query
+          description: 页码，从1开始
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          example: 1
+        - name: pageSize
+          in: query
+          description: 每页大小 (也支持 size)
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+          example: 10
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetNotesResponse'
+              example:
+                code: 0
+                msg: "success"
+                data:
+                  notes:
+                    - id: 1001
+                      user_id: 100
+                      video_id: 10001
+                      title: "React Hooks 学习笔记"
+                      content: "useState是React中最常用的Hook..."
+                      seconds: 120
+                      created_at: 1701388800000
+                      updated_at: 1701388800000
+                      author:
+                        id: 100
+                        username: "tech_learner"
+                        avatar: "https://example.com/avatar/100.jpg"
+                        signature: "热爱学习的技术人"
+                      like_count: 25
+                      comment_count: 5
+                      favorite_count: 10
+                      is_liked: false
+                      is_favorited: true
+                    - id: 1002
+                      user_id: 101
+                      video_id: 10001
+                      title: "useEffect使用技巧"
+                      content: "useEffect的依赖数组很重要..."
+                      seconds: 300
+                      created_at: 1701302400000
+                      updated_at: 1701302400000
+                      author:
+                        id: 101
+                        username: "react_dev"
+                        avatar: "https://example.com/avatar/101.jpg"
+                      like_count: 42
+                      comment_count: 8
+                      favorite_count: 15
+                      is_liked: true
+                      is_favorited: false
+                  total: 28
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 10001
+                msg: "video_id参数不能为空"
+                data: null
+
+  /api/v1/note/user:
+    get:
+      tags:
+        - 笔记管理
+      summary: 获取用户笔记列表
+      description: |
+        获取指定用户创建的所有笔记，支持分页。
+
+        **必填参数**: user_id 或 userId
+
+        **分页参数**: page(页码，默认1), pageSize/size(每页大小，默认10)
+      operationId: getUserNotes
+      parameters:
+        - name: user_id
+          in: query
+          description: 用户ID (也支持 userId)
+          required: true
+          schema:
+            type: integer
+            format: int64
+          example: 100
+        - name: page
+          in: query
+          description: 页码，从1开始
+          required: false
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+          example: 1
+        - name: pageSize
+          in: query
+          description: 每页大小 (也支持 size)
+          required: false
+          schema:
+            type: integer
+            default: 10
+            minimum: 1
+            maximum: 100
+          example: 10
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetNotesResponse'
+              example:
+                code: 0
+                msg: "success"
+                data:
+                  notes:
+                    - id: 1001
+                      user_id: 100
+                      video_id: 10001
+                      title: "Vue3 组合式API"
+                      content: "setup函数是组合式API的入口..."
+                      seconds: 60
+                      created_at: 1701388800000
+                      author:
+                        id: 100
+                        username: "tech_learner"
+                        avatar: "https://example.com/avatar/100.jpg"
+                      like_count: 18
+                      comment_count: 3
+                      favorite_count: 7
+                      is_liked: false
+                      is_favorited: false
+                    - id: 1003
+                      user_id: 100
+                      video_id: 10005
+                      title: "TypeScript泛型入门"
+                      content: "泛型可以让我们编写更灵活的代码..."
+                      created_at: 1701216000000
+                      author:
+                        id: 100
+                        username: "tech_learner"
+                        avatar: "https://example.com/avatar/100.jpg"
+                      like_count: 56
+                      comment_count: 12
+                      favorite_count: 23
+                      is_liked: true
+                      is_favorited: true
+                  total: 15
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/note:
+    get:
+      tags:
+        - 笔记管理
+      summary: 通用笔记查询
+      description: |
+        根据type参数自动转发到对应的笔记查询接口。
+
+        - type="用户笔记": 转发到获取用户笔记接口，需要 user_id 参数
+        - 其他type或无type: 转发到获取视频笔记接口，需要 video_id 参数
+      operationId: getNotes
+      parameters:
+        - name: type
+          in: query
+          description: |
+            查询类型:
+            - "用户笔记": 查询用户的笔记
+            - 其他或空: 查询视频的笔记
+          required: false
+          schema:
+            type: string
+            enum:
+              - 用户笔记
+          example: ""
+        - name: video_id
+          in: query
+          description: 视频ID (type为空或非"用户笔记"时必填)
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: user_id
+          in: query
+          description: 用户ID (type为"用户笔记"时必填)
+          required: false
+          schema:
+            type: integer
+            format: int64
+        - name: page
+          in: query
+          description: 页码
+          required: false
+          schema:
+            type: integer
+            default: 1
+        - name: pageSize
+          in: query
+          description: 每页大小
+          required: false
+          schema:
+            type: integer
+            default: 10
+      responses:
+        '200':
+          description: 获取成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/GetNotesResponse'
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/note/like:
+    post:
+      tags:
+        - 笔记互动
+      summary: 点赞/取消点赞笔记
+      description: |
+        对笔记进行点赞或取消点赞操作（切换状态）。
+
+        - 如果未点赞，则点赞
+        - 如果已点赞，则取消点赞
+
+        **必填字段**: note_id
+      operationId: likeNote
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LikeNoteRequest'
+            examples:
+              点赞笔记:
+                value:
+                  note_id: 1001
+              驼峰命名:
+                value:
+                  noteId: 1001
+      responses:
+        '200':
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                code: 0
+                msg: "success"
+                data: null
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 10001
+                msg: "note_id is required"
+                data: null
+        '404':
+          description: 笔记不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                code: 10004
+                msg: "笔记不存在"
+                data: null
+
+  /api/v1/note/favorite:
+    post:
+      tags:
+        - 笔记互动
+      summary: 收藏/取消收藏笔记
+      description: |
+        对笔记进行收藏或取消收藏操作（切换状态）。
+
+        - 如果未收藏，则收藏
+        - 如果已收藏，则取消收藏
+
+        **必填字段**: note_id
+      operationId: favoriteNote
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FavoriteNoteRequest'
+            examples:
+              收藏笔记:
+                value:
+                  note_id: 1001
+              驼峰命名:
+                value:
+                  noteId: 1001
+      responses:
+        '200':
+          description: 操作成功
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                code: 0
+                msg: "success"
+                data: null
+        '400':
+          description: 参数错误
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: 笔记不存在
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT认证Token
+
+  schemas:
+    # ==================== 请求模型 ====================
+
+    CreateNoteRequest:
+      type: object
+      required:
+        - video_id
+        - title
+        - content
+      properties:
+        video_id:
+          type: integer
+          format: int64
+          description: 视频ID (也支持 videoId)
+          example: 10001
+        title:
+          type: string
+          maxLength: 255
+          description: 笔记标题
+          example: "React Hooks 学习笔记"
+        content:
+          type: string
+          description: 笔记内容
+          example: "useState是React中最常用的Hook，用于在函数组件中添加状态..."
+        seconds:
+          type: integer
+          format: int32
+          description: 视频时间戳（秒），标记笔记对应的视频位置
+          example: 180
+
+    DeleteNoteRequest:
+      type: object
+      required:
+        - note_id
+      properties:
+        note_id:
+          type: integer
+          format: int64
+          description: 笔记ID (也支持 noteId)
+          example: 1001
+
+    LikeNoteRequest:
+      type: object
+      required:
+        - note_id
+      properties:
+        note_id:
+          type: integer
+          format: int64
+          description: 笔记ID (也支持 noteId)
+          example: 1001
+
+    FavoriteNoteRequest:
+      type: object
+      required:
+        - note_id
+      properties:
+        note_id:
+          type: integer
+          format: int64
+          description: 笔记ID (也支持 noteId)
+          example: 1001
+
+    # ==================== 响应模型 ====================
+
+    BaseResponse:
+      type: object
+      properties:
+        code:
+          type: integer
+          description: |
+            响应码:
+            - 0: 成功
+            - 10001: 参数错误
+            - 10003: 无权限
+            - 10004: 资源不存在
+            - 50000: 服务器内部错误
+          example: 0
+        msg:
+          type: string
+          description: 响应消息
+          example: "success"
+
+    SuccessResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              nullable: true
+              description: 响应数据(成功时可能为null)
+
+    ErrorResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              nullable: true
+
+    CreateNoteResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                note_id:
+                  type: integer
+                  format: int64
+                  description: 新创建的笔记ID
+                  example: 1001
+
+    GetNotesResponse:
+      allOf:
+        - $ref: '#/components/schemas/BaseResponse'
+        - type: object
+          properties:
+            data:
+              type: object
+              properties:
+                notes:
+                  type: array
+                  items:
+                    $ref: '#/components/schemas/NoteInfo'
+                  description: 笔记列表
+                total:
+                  type: integer
+                  format: int64
+                  description: 总数量
+                  example: 28
+
+    # ==================== 数据模型 ====================
+
+    NoteInfo:
+      type: object
+      description: 笔记详情信息
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 笔记ID
+          example: 1001
+        user_id:
+          type: integer
+          format: int64
+          description: 创建者用户ID
+          example: 100
+        video_id:
+          type: integer
+          format: int64
+          description: 关联的视频ID
+          example: 10001
+        related_user_id:
+          type: integer
+          format: int64
+          description: 关联用户ID（可选）
+          example: null
+        title:
+          type: string
+          maxLength: 255
+          description: 笔记标题
+          example: "React Hooks 学习笔记"
+        content:
+          type: string
+          description: 笔记内容
+          example: "useState是React中最常用的Hook，用于在函数组件中添加状态..."
+        seconds:
+          type: integer
+          format: int32
+          description: 视频时间戳（秒）
+          example: 180
+        created_at:
+          type: integer
+          format: int64
+          description: 创建时间（Unix毫秒时间戳）
+          example: 1701388800000
+        updated_at:
+          type: integer
+          format: int64
+          description: 更新时间（Unix毫秒时间戳）
+          example: 1701388800000
+        author:
+          $ref: '#/components/schemas/Author'
+        like_count:
+          type: integer
+          format: int32
+          description: 点赞数
+          example: 25
+        comment_count:
+          type: integer
+          format: int32
+          description: 评论数
+          example: 5
+        favorite_count:
+          type: integer
+          format: int32
+          description: 收藏数
+          example: 10
+        is_liked:
+          type: boolean
+          description: 当前用户是否已点赞
+          example: false
+        is_favorited:
+          type: boolean
+          description: 当前用户是否已收藏
+          example: true
+
+    Author:
+      type: object
+      description: 笔记作者信息
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 用户ID
+          example: 100
+        username:
+          type: string
+          description: 用户名
+          example: "tech_learner"
+        avatar:
+          type: string
+          description: 头像URL
+          example: "https://example.com/avatar/100.jpg"
+        signature:
+          type: string
+          description: 个性签名
+          example: "热爱学习的技术人"
+        background_url:
+          type: string
+          description: 背景图片URL
+          example: "https://example.com/bg/100.jpg"
+        gender:
+          type: integer
+          description: |
+            性别:
+            - 0: 未知
+            - 1: 男
+            - 2: 女
+          example: 1
+        follow_count:
+          type: integer
+          format: int64
+          description: 关注数
+          example: 128
+        follower_count:
+          type: integer
+          format: int64
+          description: 粉丝数
+          example: 1024
+        is_follow:
+          type: boolean
+          description: 当前用户是否已关注
+          example: false
+
+    # ==================== 数据库模型（供参考）====================
+
+    Note:
+      type: object
+      description: 笔记数据库模型
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 主键ID
+        user_id:
+          type: integer
+          format: int64
+          description: 创建者用户ID
+        video_id:
+          type: integer
+          format: int64
+          description: 关联视频ID
+        related_user_id:
+          type: integer
+          format: int64
+          description: 关联用户ID
+        title:
+          type: string
+          maxLength: 255
+          description: 笔记标题
+        content:
+          type: string
+          description: 笔记内容(text类型)
+        seconds:
+          type: integer
+          format: int32
+          description: 视频时间戳
+        status:
+          type: integer
+          format: int8
+          description: |
+            状态:
+            - 0: 正常
+            - 1: 已删除
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间
+        updated_at:
+          type: string
+          format: date-time
+          description: 更新时间
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 删除时间（软删除）
+
+    NoteLike:
+      type: object
+      description: 笔记点赞数据库模型
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 主键ID
+        note_id:
+          type: integer
+          format: int64
+          description: 笔记ID
+        user_id:
+          type: integer
+          format: int64
+          description: 点赞用户ID
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 删除时间（软删除）
+
+    NoteComment:
+      type: object
+      description: 笔记评论数据库模型
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 主键ID
+        note_id:
+          type: integer
+          format: int64
+          description: 笔记ID
+        user_id:
+          type: integer
+          format: int64
+          description: 评论用户ID
+        content:
+          type: string
+          description: 评论内容(text类型)
+        parent_id:
+          type: integer
+          format: int64
+          nullable: true
+          description: 父评论ID（用于嵌套回复）
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间
+        updated_at:
+          type: string
+          format: date-time
+          description: 更新时间
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 删除时间（软删除）
+
+    NoteFavorite:
+      type: object
+      description: 笔记收藏数据库模型
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: 主键ID
+        note_id:
+          type: integer
+          format: int64
+          description: 笔记ID
+        user_id:
+          type: integer
+          format: int64
+          description: 收藏用户ID
+        created_at:
+          type: string
+          format: date-time
+          description: 创建时间
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: 删除时间（软删除）

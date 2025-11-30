@@ -96,66 +96,23 @@ class _AccountSwitcherPageState extends State<AccountSwitcherPage> {
   }
 
   Future<void> _addAccount() async {
-    final TextEditingController usernameController = TextEditingController();
-    final TextEditingController passwordController = TextEditingController();
-
-    final result = await showDialog<bool>(
+    final result = await showDialog<Map<String, String>?>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('添加账号'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: usernameController,
-              decoration: const InputDecoration(labelText: '用户名'),
-              autofocus: true,
-            ),
-            const SizedBox(height: Spacing.md),
-            TextField(
-              controller: passwordController,
-              decoration: const InputDecoration(labelText: '密码'),
-              obscureText: true,
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () {
-              if (usernameController.text.isNotEmpty &&
-                  passwordController.text.isNotEmpty) {
-                Navigator.pop(context, true);
-              } else {
-                ScaffoldMessenger.of(
-                  context,
-                ).showSnackBar(const SnackBar(content: Text('请输入用户名和密码')));
-              }
-            },
-            child: const Text('确定'),
-          ),
-        ],
-      ),
+      builder: (dialogContext) => const _AddAccountDialog(),
     );
 
-    if (result == true) {
+    if (result != null) {
       setState(() {
         _accounts.add(
           AccountEntry(
             id: DateTime.now().millisecondsSinceEpoch.toString(),
-            username: usernameController.text,
-            password: passwordController.text,
+            username: result['username']!,
+            password: result['password']!,
           ),
         );
       });
       await _saveAccounts();
     }
-
-    usernameController.dispose();
-    passwordController.dispose();
   }
 
   Future<void> _deleteAccount(String id) async {
@@ -256,21 +213,27 @@ class _AccountSwitcherPageState extends State<AccountSwitcherPage> {
     AccountEntry account,
   ) async {
     final authProvider = context.read<AuthProvider>();
+    final router = GoRouter.of(context);
 
     log('开始切换账号: ${account.username}');
     log('切换前登录状态: ${authProvider.isAuthenticated}');
 
-    // 显示加载对话框
+    // 显示加载对话框，保存 Navigator 用于后续关闭
+    final navigator = Navigator.of(context);
+
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: Spacing.md),
-            Text('正在切换账号...'),
-          ],
+      builder: (dialogContext) => const PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Row(
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(width: Spacing.md),
+              Text('正在切换账号...'),
+            ],
+          ),
         ),
       ),
     );
@@ -297,18 +260,90 @@ class _AccountSwitcherPageState extends State<AccountSwitcherPage> {
       log('登录后登录状态: ${authProvider.isAuthenticated}');
 
       // 登录成功后，关闭所有页面并导航到主页
-      if (context.mounted) {
-        Navigator.of(context).pop(); // 关闭加载对话框
+      if (mounted) {
+        navigator.pop(); // 关闭加载对话框
         // 使用go_router导航，替换Navigator.pushNamedAndRemoveUntil
-        context.go('/home');
+        router.go('/home');
         log('账号切换成功，导航到主页');
       }
     } catch (e) {
       log('账号切换失败: $e');
-      if (context.mounted) {
-        Navigator.of(context).pop(); // 关闭加载对话框
-        ErrorHandler.showError(context, e, prefix: '切换账号失败');
+      if (mounted) {
+        navigator.pop(); // 关闭加载对话框
+        if (context.mounted) {
+          ErrorHandler.showError(context, e, prefix: '切换账号失败');
+        }
       }
     }
+  }
+}
+
+/// 添加账号对话框 - 独立 StatefulWidget 管理控制器生命周期
+class _AddAccountDialog extends StatefulWidget {
+  const _AddAccountDialog();
+
+  @override
+  State<_AddAccountDialog> createState() => _AddAccountDialogState();
+}
+
+class _AddAccountDialogState extends State<_AddAccountDialog> {
+  final TextEditingController _usernameController = TextEditingController();
+  final TextEditingController _passwordController = TextEditingController();
+
+  @override
+  void dispose() {
+    _usernameController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    if (_usernameController.text.isNotEmpty &&
+        _passwordController.text.isNotEmpty) {
+      Navigator.pop(context, {
+        'username': _usernameController.text,
+        'password': _passwordController.text,
+      });
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请输入用户名和密码')),
+      );
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('添加账号'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: _usernameController,
+            decoration: const InputDecoration(labelText: '用户名'),
+            autofocus: true,
+            textInputAction: TextInputAction.next,
+          ),
+          const SizedBox(height: Spacing.md),
+          TextField(
+            controller: _passwordController,
+            decoration: const InputDecoration(labelText: '密码'),
+            obscureText: true,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _submit(),
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, null),
+          child: const Text('取消'),
+        ),
+        TextButton(
+          onPressed: _submit,
+          child: const Text('确定'),
+        ),
+      ],
+    );
   }
 }
