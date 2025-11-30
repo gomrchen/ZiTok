@@ -43,6 +43,10 @@ class _VideoDetailPageState extends State<VideoDetailPage> with WidgetsBindingOb
   double _videoHeightRatio = 0.40; // 视频区域占屏幕高度的比例 (0.0 ~ 1.0)
   bool _isDragging = false;
 
+  // 输入焦点状态
+  bool _isInputFocused = false;
+  double? _savedVideoHeightRatio; // 保存输入前的比例
+
   // 视频比例边界（使用自定义控制层后可以更灵活）
   static const double _minRatioPlaying = 0.25;  // 播放时最小比例
   static const double _maxRatioPlaying = 0.60;  // 播放时最大比例
@@ -225,6 +229,30 @@ class _VideoDetailPageState extends State<VideoDetailPage> with WidgetsBindingOb
     }
   }
 
+  /// 处理输入框获得焦点
+  void _onInputFocused() {
+    if (_isInputFocused) return;
+    setState(() {
+      _isInputFocused = true;
+      _savedVideoHeightRatio = _videoHeightRatio;
+      // 将视频区域缩小到最小，让互动区最大化
+      _videoHeightRatio = _minRatioPlaying;
+    });
+  }
+
+  /// 处理输入框失去焦点
+  void _onInputUnfocused() {
+    if (!_isInputFocused) return;
+    setState(() {
+      _isInputFocused = false;
+      // 恢复到之前的比例
+      if (_savedVideoHeightRatio != null) {
+        _videoHeightRatio = _savedVideoHeightRatio!;
+        _savedVideoHeightRatio = null;
+      }
+    });
+  }
+
   void _onBack() {
     if (_isFullscreen) {
       _exitFullscreen();
@@ -302,6 +330,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> with WidgetsBindingOb
       },
       child: Scaffold(
         backgroundColor: Colors.black,
+        resizeToAvoidBottomInset: false, // 手动处理键盘，避免视频区域被压缩
         body: _isFullscreen
             // 全屏模式：只显示视频播放器
             ? _buildVideoPlayer()
@@ -332,6 +361,8 @@ class _VideoDetailPageState extends State<VideoDetailPage> with WidgetsBindingOb
                                 video: _displayVideo,
                                 keyboardHeight: keyboardHeight,
                                 bottomPadding: bottomPadding,
+                                onInputFocused: _onInputFocused,
+                                onInputUnfocused: _onInputUnfocused,
                               )
                             : const Center(child: CircularProgressIndicator()),
                       ),
@@ -409,8 +440,8 @@ class _VideoDetailPageState extends State<VideoDetailPage> with WidgetsBindingOb
     final effectiveMinRatio = _currentMinRatio.clamp(minRatioByVideoHeight, 1.0);
     final effectiveMaxRatio = _currentMaxRatio.clamp(0.0, maxRatioByContentHeight);
 
-    // 检查是否可以拖拽（有拖拽空间）
-    final canDrag = _initialized && effectiveMaxRatio > effectiveMinRatio;
+    // 检查是否可以拖拽（有拖拽空间，且输入框未获得焦点）
+    final canDrag = _initialized && effectiveMaxRatio > effectiveMinRatio && !_isInputFocused;
 
     return GestureDetector(
       onVerticalDragStart: canDrag ? _onDragStart : null,
@@ -454,12 +485,18 @@ class VideoDetailContentWithKeyboard extends StatefulWidget {
   final Video video;
   final double keyboardHeight;
   final double bottomPadding;
+  /// 输入框获得焦点时的回调，用于通知父组件调整布局
+  final VoidCallback? onInputFocused;
+  /// 输入框失去焦点时的回调
+  final VoidCallback? onInputUnfocused;
 
   const VideoDetailContentWithKeyboard({
     super.key,
     required this.video,
     required this.keyboardHeight,
     required this.bottomPadding,
+    this.onInputFocused,
+    this.onInputUnfocused,
   });
 
   @override
@@ -483,15 +520,26 @@ class _VideoDetailContentWithKeyboardState extends State<VideoDetailContentWithK
     super.initState();
     _tab = TabController(length: 3, vsync: this);
     _tab.addListener(_onTabChanged);
+    // 监听输入框焦点变化
+    _commentFocusNode.addListener(_onFocusChanged);
   }
 
   @override
   void dispose() {
     _tab.removeListener(_onTabChanged);
+    _commentFocusNode.removeListener(_onFocusChanged);
     _tab.dispose();
     _commentController.dispose();
     _commentFocusNode.dispose();
     super.dispose();
+  }
+
+  void _onFocusChanged() {
+    if (_commentFocusNode.hasFocus) {
+      widget.onInputFocused?.call();
+    } else {
+      widget.onInputUnfocused?.call();
+    }
   }
 
   void _onTabChanged() {
@@ -580,88 +628,93 @@ class _VideoDetailContentWithKeyboardState extends State<VideoDetailContentWithK
 
         // 评论输入框（键盘弹起时显示在键盘上方）
         if (_tab.index == 1) // 仅在评论Tab显示
-          AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            padding: EdgeInsets.only(
-              left: Spacing.md,
-              right: Spacing.md,
-              top: Spacing.sm,
-              bottom: hasKeyboard ? Spacing.sm : widget.bottomPadding + Spacing.sm,
-            ),
+          Container(
             decoration: BoxDecoration(
               color: cs.surface,
               border: Border(
                 top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
               ),
             ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                // 回复提示条
-                if (_replyingTo != null)
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    margin: const EdgeInsets.only(bottom: Spacing.xs),
-                    decoration: BoxDecoration(
-                      color: cs.primaryContainer.withValues(alpha: 0.3),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.reply, size: 16, color: cs.primary),
-                        const SizedBox(width: 6),
-                        Expanded(
-                          child: Text(
-                            '回复 @${_replyingTo!.author}',
-                            style: theme.textTheme.bodySmall?.copyWith(color: cs.primary),
-                            overflow: TextOverflow.ellipsis,
+            child: SafeArea(
+              top: false,
+              bottom: !hasKeyboard, // 键盘弹出时不需要底部安全区
+              minimum: EdgeInsets.only(
+                left: Spacing.md,
+                right: Spacing.md,
+                top: Spacing.sm,
+                bottom: Spacing.sm,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 回复提示条
+                  if (_replyingTo != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      margin: const EdgeInsets.only(bottom: Spacing.xs),
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.reply, size: 16, color: cs.primary),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '回复 @${_replyingTo!.author}',
+                              style: theme.textTheme.bodySmall?.copyWith(color: cs.primary),
+                              overflow: TextOverflow.ellipsis,
+                            ),
                           ),
-                        ),
-                        GestureDetector(
-                          onTap: _cancelReply,
-                          child: Icon(Icons.close, size: 18, color: cs.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
-                // 输入框行
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _commentController,
-                        focusNode: _commentFocusNode,
-                        decoration: InputDecoration(
-                          hintText: _replyingTo == null ? '写下你的评论...' : '回复 @${_replyingTo!.author}',
-                          filled: true,
-                          fillColor: cs.surfaceContainerHighest,
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: BorderSide.none,
+                          GestureDetector(
+                            onTap: _cancelReply,
+                            child: Icon(Icons.close, size: 18, color: cs.onSurfaceVariant),
                           ),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 10,
-                          ),
-                          isDense: true,
-                        ),
-                        style: theme.textTheme.bodyMedium,
-                        maxLines: hasKeyboard ? 3 : 1,
-                        minLines: 1,
+                        ],
                       ),
                     ),
-                    const SizedBox(width: Spacing.sm),
-                    IconButton(
-                      onPressed: _sendComment,
-                      icon: Icon(Icons.send, color: cs.primary),
-                      tooltip: '发送',
-                    ),
-                  ],
-                ),
-              ],
+                  // 输入框行
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _commentController,
+                          focusNode: _commentFocusNode,
+                          decoration: InputDecoration(
+                            hintText: _replyingTo == null ? '写下你的评论...' : '回复 @${_replyingTo!.author}',
+                            filled: true,
+                            fillColor: cs.surfaceContainerHighest,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            isDense: true,
+                          ),
+                          style: theme.textTheme.bodyMedium,
+                          maxLines: hasKeyboard ? 3 : 1,
+                          minLines: 1,
+                        ),
+                      ),
+                      const SizedBox(width: Spacing.sm),
+                      IconButton(
+                        onPressed: _sendComment,
+                        icon: Icon(Icons.send, color: cs.primary),
+                        tooltip: '发送',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
+        // 键盘高度占位（手动处理键盘适配）
+        if (hasKeyboard) SizedBox(height: widget.keyboardHeight),
       ],
     );
   }

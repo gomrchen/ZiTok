@@ -45,11 +45,21 @@ class UserSession extends ChangeNotifier {
   bool get isLoggedIn =>
       _userId != null && _userId!.isNotEmpty && _accessToken != null && _accessToken!.isNotEmpty;
 
+  /// 是否可以尝试自动登录（有userId和refreshToken即可）
+  ///
+  /// 用于判断是否允许用户进入主界面，然后在后台尝试刷新token
+  bool get canAttemptAutoLogin =>
+      _userId != null && _userId!.isNotEmpty &&
+      _refreshToken != null && _refreshToken!.isNotEmpty;
+
   /// 是否有有效的访问令牌
   bool get hasValidToken => _accessToken != null && _accessToken!.isNotEmpty;
 
   /// 是否已初始化
   bool get isInitialized => _isInitialized;
+
+  /// 认证状态变化回调（用于全局监听认证失效）
+  VoidCallback? onAuthenticationFailed;
 
   /// 用户 ID（非空版本，仅在确定已登录时使用）
   ///
@@ -129,6 +139,14 @@ class UserSession extends ChangeNotifier {
     await prefs.remove('access_token');
     await prefs.remove('refresh_token');
     notifyListeners();
+  }
+
+  /// 触发认证失效（token刷新失败时调用）
+  ///
+  /// 会清除会话并触发 [onAuthenticationFailed] 回调
+  Future<void> triggerAuthenticationFailed(SharedPreferences prefs) async {
+    await clear(prefs);
+    onAuthenticationFailed?.call();
   }
 
   @override

@@ -873,9 +873,16 @@ class _FavoritesListState extends State<_FavoritesList> {
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
-            subtitle: Text(
-              '👍 ${video.likes ?? 0} · 👁️ ${video.views ?? 0}',
-              style: Theme.of(context).textTheme.bodySmall,
+            subtitle: Row(
+              children: [
+                Icon(Icons.favorite, size: 14, color: cs.onSurfaceVariant),
+                const SizedBox(width: 4),
+                Text('${video.likes ?? 0}', style: Theme.of(context).textTheme.bodySmall),
+                const SizedBox(width: 12),
+                Icon(Icons.chat_bubble_outline, size: 14, color: cs.onSurfaceVariant),
+                const SizedBox(width: 4),
+                Text('${video.commentCount ?? 0}', style: Theme.of(context).textTheme.bodySmall),
+              ],
             ),
             trailing: IconButton(
               icon: const Icon(Icons.star, color: Color(0xFFFFD700)),
@@ -1135,27 +1142,19 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
     );
   }
 
-  // 构建视频统计信息
+  // 构建视频统计信息 - 使用统一的icon样式
   Widget _buildVideoStats(Video video) {
-    final stats = <String>[];
-
-    if (video.views != null && video.views! > 0) {
-      stats.add('${video.views} 播放');
-    }
-
-    if (video.likes != null && video.likes! > 0) {
-      stats.add('${video.likes} 点赞');
-    }
-
-    if (stats.isEmpty) {
-      stats.add('暂无数据');
-    }
-
-    return Text(
-      stats.join(' · '),
-      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
+    final cs = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        Icon(Icons.favorite, size: 14, color: cs.onSurfaceVariant),
+        const SizedBox(width: 4),
+        Text('${video.likes ?? 0}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+        const SizedBox(width: 12),
+        Icon(Icons.chat_bubble_outline, size: 14, color: cs.onSurfaceVariant),
+        const SizedBox(width: 4),
+        Text('${video.commentCount ?? 0}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+      ],
     );
   }
 

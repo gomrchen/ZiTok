@@ -20,11 +20,16 @@ void showCommentsSheet(BuildContext context, {required String videoId}) {
     isScrollControlled: true,
     backgroundColor: Theme.of(context).colorScheme.surface,
     shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-    builder: (context) {
-      //【推荐修改】当Provider已在上层提供时，使用 .value 构造函数是最佳实践
-      return ChangeNotifierProvider.value(
-        value: context.read<CommentProvider>(),
-        child: _CommentSheetContent(videoId: videoId),
+    builder: (sheetContext) {
+      // 使用Padding包裹，确保键盘弹出时输入框在键盘上方
+      return Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(sheetContext).viewInsets.bottom,
+        ),
+        child: ChangeNotifierProvider.value(
+          value: context.read<CommentProvider>(),
+          child: _CommentSheetContent(videoId: videoId),
+        ),
       );
     },
   );
@@ -201,36 +206,43 @@ class _CommentsPaneState extends State<CommentsPane> with AutomaticKeepAliveClie
     super.build(context);
     final pad = widget.padding ?? const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm);
     final controller = widget.scrollController ?? ScrollController();
-    return Column(
-      children: [
-        ValueListenableBuilder<CommentSort>(
-          valueListenable: _sort,
-          builder: (context, sort, _) {
-            final list = _sorted(_comments, sort);
-            return Padding(
-              padding: pad,
-              child: Row(
-                children: [
-                  Text('评论（${list.length}）'),
-                  const Spacer(),
-                  PopupMenuButton<CommentSort>(
-                    tooltip: '排序',
-                    initialValue: sort,
-                    onSelected: (v) => _sort.value = v,
-                    itemBuilder: (_) => const [
-                      PopupMenuItem(value: CommentSort.timeDesc, child: Text('按时间（新→旧）')),
-                      PopupMenuItem(value: CommentSort.timeAsc, child: Text('按时间（旧→新）')),
-                      PopupMenuItem(value: CommentSort.hot, child: Text('按热度')),
-                    ],
-                    child: const Icon(Icons.sort),
-                  ),
-                ],
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 当可用高度太小时（键盘弹出），只显示评论列表
+        final showHeader = constraints.maxHeight > 100;
+
+        return Column(
+          children: [
+            if (showHeader) ...[
+              ValueListenableBuilder<CommentSort>(
+                valueListenable: _sort,
+                builder: (context, sort, _) {
+                  final list = _sorted(_comments, sort);
+                  return Padding(
+                    padding: pad,
+                    child: Row(
+                      children: [
+                        Text('评论（${list.length}）'),
+                        const Spacer(),
+                        PopupMenuButton<CommentSort>(
+                          tooltip: '排序',
+                          initialValue: sort,
+                          onSelected: (v) => _sort.value = v,
+                          itemBuilder: (_) => const [
+                            PopupMenuItem(value: CommentSort.timeDesc, child: Text('按时间（新→旧）')),
+                            PopupMenuItem(value: CommentSort.timeAsc, child: Text('按时间（旧→新）')),
+                            PopupMenuItem(value: CommentSort.hot, child: Text('按热度')),
+                          ],
+                          child: const Icon(Icons.sort),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
-            );
-          },
-        ),
-        const Divider(height: 1),
-        Expanded(
+              const Divider(height: 1),
+            ],
+            Expanded(
           child: ValueListenableBuilder<CommentSort>(
             valueListenable: _sort,
             builder: (context, sort, _) {
@@ -295,25 +307,14 @@ class _CommentsPaneState extends State<CommentsPane> with AutomaticKeepAliveClie
                     ),
                   ),
                   const SizedBox(width: Spacing.md),
-                  PopupMenuButton<String>(
-                    tooltip: 'Emoji',
-                    itemBuilder: (context) => const [
-                      PopupMenuItem(value: '😊', child: Text('😊')),
-                      PopupMenuItem(value: '👍', child: Text('👍')),
-                      PopupMenuItem(value: '🎯', child: Text('🎯')),
-                      PopupMenuItem(value: '❤️', child: Text('❤️')),
-                      PopupMenuItem(value: '🚀', child: Text('🚀')),
-                    ],
-                    onSelected: (e) => _text.text = (_text.text + e),
-                    child: const Icon(Icons.emoji_emotions_outlined),
-                  ),
-                  const SizedBox(width: Spacing.md),
                   ElevatedButton(onPressed: _send, child: const Text('发送')),
                 ],
               ),
             ),
           ),
-      ],
+        ],
+        );
+      },
     );
   }
 }
@@ -333,6 +334,11 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
   CommentItem? _replyingTo;
   final FocusNode _focusNode = FocusNode();
 
+  // DraggableScrollableSheet 控制器
+  final DraggableScrollableController _sheetController = DraggableScrollableController();
+  bool _isInputFocused = false;
+  double? _savedSheetSize;
+
   // 作者信息缓存
   String? _authorName;
   String? _authorAvatarUrl;
@@ -343,6 +349,9 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
   void initState() {
     super.initState();
     _tab = TabController(length: 2, vsync: this);
+
+    // 监听输入框焦点变化
+    _focusNode.addListener(_onFocusChanged);
 
     // 设置回复 hook：当子组件触发回复时，更新 _replyingTo 状态
     _paneController._startReplyHook = (commentToReply) {
@@ -363,6 +372,32 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
         );
       }
     };
+  }
+
+  void _onFocusChanged() {
+    if (_focusNode.hasFocus && !_isInputFocused) {
+      _isInputFocused = true;
+      // 保存当前尺寸并展开到最大
+      if (_sheetController.isAttached) {
+        _savedSheetSize = _sheetController.size;
+        _sheetController.animateTo(
+          0.95,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+      }
+    } else if (!_focusNode.hasFocus && _isInputFocused) {
+      _isInputFocused = false;
+      // 恢复到之前的尺寸
+      if (_sheetController.isAttached && _savedSheetSize != null) {
+        _sheetController.animateTo(
+          _savedSheetSize!,
+          duration: const Duration(milliseconds: 200),
+          curve: Curves.easeOut,
+        );
+        _savedSheetSize = null;
+      }
+    }
   }
 
   /// 获取视频作者信息
@@ -401,10 +436,12 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
 
   @override
   void dispose() {
+    _focusNode.removeListener(_onFocusChanged);
     _tab.dispose();
     _text.dispose();
     _focusNode.dispose();
-    // 清理所有 hooks，防止内存泄漏
+    _sheetController.dispose();
+    // 清理所有 hooks，防���内存泄漏
     _paneController._startReplyHook = null;
     _paneController._sendHook = null;
     super.dispose();
@@ -413,11 +450,19 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+    final keyboardHeight = MediaQuery.of(context).viewInsets.bottom;
+    final hasKeyboard = keyboardHeight > 0;
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
     return DraggableScrollableSheet(
       expand: false,
       initialChildSize: 0.7,
       minChildSize: 0.45,
       maxChildSize: 0.95,
+      controller: _sheetController,
+      snap: !_isInputFocused, // 输入时禁用吸附，防止干扰
+      snapSizes: const [0.45, 0.7, 0.95],
       builder: (context, controller) {
         return Column(
           children: [
@@ -465,54 +510,103 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
               ),
             ),
             const Divider(height: 1),
-            SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.all(Spacing.md),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: TextField(
-                        controller: _text,
-                        focusNode: _focusNode,
-                        decoration: InputDecoration(
-                          hintText: _replyingTo == null ? '写下你的评论...' : '回复 @${_replyingTo!.author}',
-                          border: const OutlineInputBorder(),
-                          isDense: true,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: Spacing.md),
-                    PopupMenuButton<String>(
-                      tooltip: 'Emoji',
-                      itemBuilder: (context) => const [
-                        PopupMenuItem(value: '😊', child: Text('😊')),
-                        PopupMenuItem(value: '👍', child: Text('👍')),
-                        PopupMenuItem(value: '🎯', child: Text('🎯')),
-                        PopupMenuItem(value: '❤️', child: Text('❤️')),
-                        PopupMenuItem(value: '🚀', child: Text('🚀')),
-                      ],
-                      onSelected: (e) => _text.text = (_text.text + e),
-                      child: const Icon(Icons.emoji_emotions_outlined),
-                    ),
-                    const SizedBox(width: Spacing.md),
-                    ElevatedButton(
-                      onPressed: () {
-                        final t = _text.text.trim();
-                        if (t.isEmpty) return;
-                        _paneController.send(t, parentId: _replyingTo?.id);
-                        _text.clear();
-                        _focusNode.unfocus();
-                        setState(() {
-                          _replyingTo = null;
-                        });
-                      },
-                      child: const Text('发送'),
-                    ),
-                  ],
+            // 输入区域 - 键盘适配
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: EdgeInsets.only(
+                left: Spacing.md,
+                right: Spacing.md,
+                top: Spacing.sm,
+                bottom: hasKeyboard ? Spacing.sm : bottomPadding + Spacing.sm,
+              ),
+              decoration: BoxDecoration(
+                color: cs.surface,
+                border: Border(
+                  top: BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5)),
                 ),
               ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  // 回复提示条
+                  if (_replyingTo != null)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      margin: const EdgeInsets.only(bottom: Spacing.xs),
+                      decoration: BoxDecoration(
+                        color: cs.primaryContainer.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Row(
+                        children: [
+                          Icon(Icons.reply, size: 16, color: cs.primary),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              '回复 @${_replyingTo!.author}',
+                              style: theme.textTheme.bodySmall?.copyWith(color: cs.primary),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                _replyingTo = null;
+                              });
+                            },
+                            child: Icon(Icons.close, size: 18, color: cs.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+                  // 输入框行
+                  Row(
+                    children: [
+                      Expanded(
+                        child: TextField(
+                          controller: _text,
+                          focusNode: _focusNode,
+                          decoration: InputDecoration(
+                            hintText: _replyingTo == null ? '写下你的评论...' : '回复 @${_replyingTo!.author}',
+                            filled: true,
+                            fillColor: cs.surfaceContainerHighest,
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(20),
+                              borderSide: BorderSide.none,
+                            ),
+                            contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 10,
+                            ),
+                            isDense: true,
+                          ),
+                          style: theme.textTheme.bodyMedium,
+                          maxLines: hasKeyboard ? 3 : 1,
+                          minLines: 1,
+                        ),
+                      ),
+                      const SizedBox(width: Spacing.sm),
+                      IconButton(
+                        onPressed: () {
+                          final t = _text.text.trim();
+                          if (t.isEmpty) return;
+                          _paneController.send(t, parentId: _replyingTo?.id);
+                          _text.clear();
+                          _focusNode.unfocus();
+                          setState(() {
+                            _replyingTo = null;
+                          });
+                        },
+                        icon: Icon(Icons.send, color: cs.primary),
+                        tooltip: '发送',
+                      ),
+                    ],
+                  ),
+                ],
+              ),
             ),
+            // ModalBottomSheet会自动处理键盘适配，不需要手动添加占位
           ],
         );
       },

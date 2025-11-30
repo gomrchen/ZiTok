@@ -142,7 +142,10 @@ class AppRouter {
         ),
       ],
       redirect: (context, state) {
-        final isLoggedIn = context.read<AuthProvider>().isAuthenticated;
+        final auth = context.read<AuthProvider>();
+        // 使用 canAttemptAutoLogin 判断是否允许进入受保护页面
+        // 这样即使token过期，只要有refreshToken就允许进入，然后在后台刷新
+        final canAccess = auth.isAuthenticated || auth.canAttemptAutoLogin;
         final loggingIn = state.matchedLocation.startsWith('/auth/');
         const protectedPrefixes = [
           '/home',
@@ -157,10 +160,10 @@ class AppRouter {
           (p) => state.matchedLocation.startsWith(p),
         );
 
-        if (!isLoggedIn && wantsProtected && !loggingIn) {
+        if (!canAccess && wantsProtected && !loggingIn) {
           return '/auth/login';
         }
-        if (isLoggedIn && loggingIn) {
+        if (canAccess && loggingIn) {
           return '/home';
         }
         return null;

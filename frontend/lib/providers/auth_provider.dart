@@ -18,6 +18,10 @@ class AuthProvider extends ChangeNotifier {
   });
 
   bool get isAuthenticated => userSession.isLoggedIn;
+  /// 是否可以尝试自动登录（有userId和refreshToken）
+  ///
+  /// 用于路由守卫判断是否允许进入主界面
+  bool get canAttemptAutoLogin => userSession.canAttemptAutoLogin;
   bool get isRegistered => _registeredUser != null;
   bool get loading => _loading;
   String? get error => _error;

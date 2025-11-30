@@ -74,6 +74,28 @@ class AuthService {
   /// 登出
   Future<Response<dynamic>> logout() {
     return client.dio.post('/user/logout');
-    
+  }
+
+  /// 刷新令牌
+  ///
+  /// 使用 refresh_token 换取新的 access_token
+  /// 注意：这里使用独立的 Dio 实例，避免被拦截器干扰
+  Future<Response<dynamic>> refreshToken({
+    required String userId,
+    required String refreshToken,
+  }) {
+    // 使用独立的 Dio 实例，避免触发拦截器的token刷新逻辑
+    final refreshDio = Dio(BaseOptions(
+      baseUrl: client.dio.options.baseUrl,
+      connectTimeout: const Duration(seconds: 10),
+      receiveTimeout: const Duration(seconds: 10),
+    ));
+    return refreshDio.post(
+      '/user/token/refresh',
+      queryParameters: {
+        'user_id': userId,
+        'refresh_token': refreshToken,
+      },
+    );
   }
 }

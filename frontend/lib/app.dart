@@ -69,58 +69,145 @@ class AppBootstrap {
 
   /// 验证本地缓存的会话是否仍然有效
   ///
-  /// 如果本地有token和userId，向服务端验证用户是否仍然存在。
-  /// 验证失败时清除本地缓存，确保用户需要重新登录。
+  /// 新逻辑：
+  /// 1. 如果有 userId 和 refreshToken，尝试刷新token
+  /// 2. 刷新成功：更新token，允许进入应用
+  /// 3. 刷新失败：清除会话，需要重新登录
+  /// 4. 网络错误：保留会话，允许查看缓存内容
   static Future<void> _validateSession() async {
-    // 如果没有登录信息或没有有效token，无需验证
-    if (!userSession.isLoggedIn || !userSession.hasValidToken) {
-      if (userSession.userId != null && !userSession.hasValidToken) {
-        // 有userId但没有token，清除会话
+    // 如果没有自动登录所需的凭据，无需验证
+    if (!userSession.canAttemptAutoLogin) {
+      // 清理可能存在的不完整会话数据
+      if (userSession.userId != null || userSession.refreshToken != null) {
         await _clearSession();
       }
       return;
     }
 
-    try {
-      // 调用 /user/info 验证token和用户状态
-      final response = await apiClient.dio.get('/user/info');
-      final body = response.data as Map<String, dynamic>? ?? {};
-      final code = body['code'];
+    // 如果已有有效token，先尝试验证
+    if (userSession.hasValidToken) {
+      try {
+        final response = await apiClient.dio.get('/user/info');
+        final body = response.data as Map<String, dynamic>? ?? {};
+        final code = body['code'];
 
-      // 检查业务码
-      if (code != 10000 && code != 200 && !(code == 0 && response.statusCode == 200)) {
-        // 业务码异常，可能用户被删除
-        await _clearSession();
-        return;
-      }
-
-      // 检查返回的用户数据
-      final data = body['data'] as Map<String, dynamic>?;
-      if (data == null) {
-        await _clearSession();
-        return;
-      }
-
-      // 检查用户是否被删除（如果后端返回deleted_at字段）
-      final deletedAt = data['deleted_at'];
-      if (deletedAt != null && deletedAt.toString().isNotEmpty) {
-        await _clearSession();
-        return;
-      }
-
-      // 验证通过，可以选择更新本地用户信息
-    } catch (e) {
-      // 网络错误或服务端错误
-      // 对于 401/403 错误，清除会话
-      if (e is DioException) {
-        final statusCode = e.response?.statusCode;
-        if (statusCode == 401 || statusCode == 403) {
-          await _clearSession();
+        // 验证成功
+        if (code == 10000 || code == 200 || (code == '10000')) {
           return;
         }
-        // 其他网络错误（如无网络），保留本地会话，让用户可以查看缓存内容
+      } catch (e) {
+        if (e is DioException) {
+          final statusCode = e.response?.statusCode;
+          // 401/403 表示token无效，继续尝试刷新
+          if (statusCode != 401 && statusCode != 403) {
+            // 其他网络错误，保留会话
+            return;
+          }
+        }
       }
     }
+
+    // 尝试刷新token
+    await _tryRefreshToken();
+  }
+
+  /// 尝试刷新token
+  ///
+  /// 返回 true 表示刷新成功，false 表示失败
+  static Future<bool> _tryRefreshToken() async {
+    final userId = userSession.userId;
+    final refreshToken = userSession.refreshToken;
+
+    if (userId == null || refreshToken == null) {
+      return false;
+    }
+
+    try {
+      final authService = AuthService(apiClient, prefs: prefs);
+      final response = await authService.refreshToken(
+        userId: userId,
+        refreshToken: refreshToken,
+      );
+
+      final body = response.data as Map<String, dynamic>? ?? {};
+      final code = body['code']?.toString();
+
+      // 检查响应码
+      if (code != '10000' && code != '200') {
+        await _clearSession();
+        return false;
+      }
+
+      // 解析token
+      final data = body['data'] as Map<String, dynamic>? ?? body;
+      final newToken = (data['token'] ?? data['access_token'])?.toString();
+      final newRefreshToken = (data['refresh_token'] ?? data['refreshToken'])?.toString();
+
+      if (newToken == null || newToken.isEmpty) {
+        await _clearSession();
+        return false;
+      }
+
+      // 更新token
+      await userSession.setTokens(
+        prefs,
+        accessToken: newToken,
+        refreshToken: newRefreshToken,
+      );
+
+      return true;
+    } catch (e) {
+      // 网络错误：保留会话（允许查看缓存内容）
+      // 认证错误：清除会话
+      if (e is DioException) {
+        final statusCode = e.response?.statusCode;
+        if (statusCode == 401 || statusCode == 403 || statusCode == 400) {
+          await _clearSession();
+          return false;
+        }
+        // 网络不可用等错误，保留会话
+        return false;
+      }
+      await _clearSession();
+      return false;
+    }
+  }
+
+  /// 公开方法：在应用运行时刷新token
+  ///
+  /// 用于主界面进入后在后台刷新token
+  /// 返回 true 表示刷新成功或无需刷新，false 表示认证失效
+  static Future<bool> refreshTokenIfNeeded() async {
+    if (!userSession.canAttemptAutoLogin) {
+      return false;
+    }
+
+    // 如果已有有效token，先验证是否仍然有效
+    if (userSession.hasValidToken) {
+      try {
+        final response = await apiClient.dio.get('/user/info');
+        final body = response.data as Map<String, dynamic>? ?? {};
+        final code = body['code']?.toString();
+        if (code == '10000' || code == '200') {
+          return true; // token仍然有效
+        }
+      } catch (e) {
+        if (e is DioException) {
+          final statusCode = e.response?.statusCode;
+          if (statusCode != 401 && statusCode != 403) {
+            return true; // 网络错误，假设token有效
+          }
+        }
+      }
+    }
+
+    // 尝试刷新token
+    final success = await _tryRefreshToken();
+    if (!success && userSession.onAuthenticationFailed != null) {
+      // 触发认证失效回调
+      userSession.onAuthenticationFailed!();
+    }
+    return success;
   }
 
   /// 清除本地会话信息
