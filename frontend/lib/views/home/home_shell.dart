@@ -60,7 +60,7 @@ class _HomeShellState extends State<HomeShell> {
                 label: '消息',
                 selected: _index == 2,
                 onTap: () => setState(() => _index = 2),
-                unread: 2,
+                unread: 0, // 不显示未读提示
               ),
               NavItem(
                 label: '我',

@@ -1,6 +1,8 @@
 class Video {
   final String id;
   final String? uid;
+  final String? authorName;     // 作者名称
+  final String? authorAvatarUrl; // 作者头像URL
   final String? title;
   final String? intro;
   final String? coverUrl;
@@ -16,6 +18,8 @@ class Video {
   const Video({
     required this.id,
     this.uid,
+    this.authorName,
+    this.authorAvatarUrl,
     this.title,
     this.intro,
     this.coverUrl,
@@ -32,6 +36,8 @@ class Video {
   factory Video.fromJson(Map<String, dynamic> j) => Video(
         id: (j['id'] ?? j['video_id'] ?? '').toString(),
         uid: (j['uid'] ?? j['user_id'] ?? j['authorId'])?.toString(),
+        authorName: (j['author_name'] ?? j['authorName'] ?? j['username'])?.toString(),
+        authorAvatarUrl: (j['author_avatar'] ?? j['authorAvatar'] ?? j['avatar'] ?? j['avatar_url'])?.toString(),
         videoUrl: (j['video_url'] as String?) ?? (j['playUrl'] as String?),
         coverUrl: (j['cover_url'] as String?) ?? (j['coverUrl'] as String?),
         intro: (j['intro'] ?? j['description']) as String?,
@@ -64,6 +70,8 @@ class Video {
   Video copyWith({
     String? id,
     String? uid,
+    String? authorName,
+    String? authorAvatarUrl,
     String? title,
     String? intro,
     String? coverUrl,
@@ -78,6 +86,8 @@ class Video {
     return Video(
       id: id ?? this.id,
       uid: uid ?? this.uid,
+      authorName: authorName ?? this.authorName,
+      authorAvatarUrl: authorAvatarUrl ?? this.authorAvatarUrl,
       title: title ?? this.title,
       intro: intro ?? this.intro,
       coverUrl: coverUrl ?? this.coverUrl,

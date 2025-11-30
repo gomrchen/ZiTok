@@ -2,9 +2,11 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
 import '../../app.dart';
 import '../../models/user_models.dart';
 import '../../models/video.dart';
+import '../../providers/messaging_provider.dart';
 import '../../services/user_service.dart';
 import '../../theme/theme_tokens.dart';
 import '../../utils/url_utils.dart';
@@ -25,7 +27,6 @@ class _VisitorProfilePageState extends State<VisitorProfilePage> {
   bool _loading = true;
   bool _loadingVideos = false;
   String? _error;
-  bool _isFollowing = false;
   bool _followLoading = false;
 
   @override
@@ -93,22 +94,26 @@ class _VisitorProfilePageState extends State<VisitorProfilePage> {
 
     setState(() => _followLoading = true);
 
-    // TODO: 调用关注/取消关注 API
-    await Future.delayed(const Duration(milliseconds: 500));
+    try {
+      final mp = context.read<MessagingProvider>();
+      final success = await mp.toggleFollow(widget.userId);
 
-    setState(() {
-      _isFollowing = !_isFollowing;
-      _followLoading = false;
-    });
-
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(_isFollowing ? '已关注' : '已取消关注'),
-          duration: const Duration(milliseconds: 1500),
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
+      if (mounted) {
+        final isNowFollowing = mp.isFollowing(widget.userId);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success
+                ? (isNowFollowing ? '已关注' : '已取消关注')
+                : '操作失败'),
+            duration: const Duration(milliseconds: 1500),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _followLoading = false);
+      }
     }
   }
 
@@ -274,6 +279,9 @@ class _VisitorProfilePageState extends State<VisitorProfilePage> {
   }
 
   Widget _buildUserInfoCard(User user, ThemeData theme, ColorScheme cs) {
+    final mp = context.watch<MessagingProvider>();
+    final isFollowing = mp.isFollowing(widget.userId);
+
     return Padding(
       padding: const EdgeInsets.all(Spacing.md),
       child: Column(
@@ -312,8 +320,8 @@ class _VisitorProfilePageState extends State<VisitorProfilePage> {
             child: ElevatedButton.icon(
               onPressed: _followLoading ? null : _toggleFollow,
               style: ElevatedButton.styleFrom(
-                backgroundColor: _isFollowing ? cs.surfaceContainerHighest : cs.primary,
-                foregroundColor: _isFollowing ? cs.onSurface : cs.onPrimary,
+                backgroundColor: isFollowing ? cs.surfaceContainerHighest : cs.primary,
+                foregroundColor: isFollowing ? cs.onSurface : cs.onPrimary,
                 padding: const EdgeInsets.symmetric(vertical: 12),
               ),
               icon: _followLoading
@@ -322,11 +330,11 @@ class _VisitorProfilePageState extends State<VisitorProfilePage> {
                       height: 16,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: _isFollowing ? cs.onSurface : cs.onPrimary,
+                        color: isFollowing ? cs.onSurface : cs.onPrimary,
                       ),
                     )
-                  : Icon(_isFollowing ? Icons.check : Icons.add),
-              label: Text(_isFollowing ? '已关注' : '关注'),
+                  : Icon(isFollowing ? Icons.check : Icons.add),
+              label: Text(isFollowing ? '已关注' : '关注'),
             ),
           ),
         ],

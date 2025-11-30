@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/video_provider.dart';
+import '../../providers/messaging_provider.dart';
 import '../../models/video.dart';
 import '../../theme/theme_tokens.dart';
 import '../../widgets/comment_sheet.dart';
@@ -18,6 +19,8 @@ class FollowPage extends StatefulWidget {
 
 class _FollowPageState extends State<FollowPage> with AutomaticKeepAliveClientMixin {
   final ScrollController _scroll = ScrollController();
+  bool _usingFallback = false; // 是否使用备用方案
+  List<Video> _fallbackVideos = []; // 备用方案获取的视频
 
   @override
   void initState() {
@@ -25,7 +28,7 @@ class _FollowPageState extends State<FollowPage> with AutomaticKeepAliveClientMi
     final vp = context.read<VideoProvider>();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (vp.follow.isEmpty) {
-        vp.refreshFollow();
+        _loadFollowVideos();
       }
     });
     // 恢复滚动位置
@@ -38,9 +41,62 @@ class _FollowPageState extends State<FollowPage> with AutomaticKeepAliveClientMi
       final vp2 = context.read<VideoProvider>();
       vp2.setFollowScrollOffset(_scroll.offset);
       if (_scroll.position.pixels > _scroll.position.maxScrollExtent - 300) {
-        vp2.loadMoreFollow();
+        if (!_usingFallback) {
+          vp2.loadMoreFollow();
+        }
       }
     });
+  }
+
+  /// 加载关注用户的视频
+  Future<void> _loadFollowVideos() async {
+    final vp = context.read<VideoProvider>();
+
+    // 首先尝试使用原有的 /feed/follow 接口
+    await vp.refreshFollow();
+
+    // 如果返回空，尝试使用备用方案
+    if (vp.follow.isEmpty && mounted) {
+      debugPrint('FollowPage: /feed/follow returned empty, trying fallback');
+      await _loadFallbackVideos();
+    }
+  }
+
+  /// 备用方案：从关注列表获取每个用户的视频
+  Future<void> _loadFallbackVideos() async {
+    final mp = context.read<MessagingProvider>();
+    final vp = context.read<VideoProvider>();
+
+    // 获取关注列表
+    final following = mp.following;
+    if (following.isEmpty) {
+      debugPrint('FollowPage: no following users');
+      return;
+    }
+
+    debugPrint('FollowPage: fallback - fetching videos from ${following.length} users');
+
+    // 获取关注用户的ID列表
+    final userIds = following.map((f) => f.id).toList();
+
+    // 使用备用方法获取视频
+    final videos = await vp.repo.fetchVideosFromUsers(userIds, limit: 5);
+
+    if (mounted && videos.isNotEmpty) {
+      setState(() {
+        _usingFallback = true;
+        _fallbackVideos = videos;
+      });
+      debugPrint('FollowPage: fallback got ${videos.length} videos');
+    }
+  }
+
+  Future<void> _onRefresh() async {
+    setState(() {
+      _usingFallback = false;
+      _fallbackVideos = [];
+    });
+    await _loadFollowVideos();
   }
 
   @override
@@ -56,27 +112,34 @@ class _FollowPageState extends State<FollowPage> with AutomaticKeepAliveClientMi
   Widget build(BuildContext context) {
     super.build(context);
     final vp = context.watch<VideoProvider>();
+
+    // 确定显示的视频列表
+    final videos = _usingFallback ? _fallbackVideos : vp.follow;
+    final isLoading = vp.loadingFollow;
+
     return RefreshIndicator(
-      onRefresh: () => vp.refreshFollow(),
+      onRefresh: _onRefresh,
       child: ListView.builder(
         controller: _scroll,
         padding: const EdgeInsets.only(bottom: Spacing.xl),
-        itemCount: vp.follow.length + 1,
+        itemCount: videos.length + 1,
         itemBuilder: (context, index) {
-          if (index == vp.follow.length) {
-            if (vp.loadingFollow) {
+          if (index == videos.length) {
+            if (isLoading) {
               return const Padding(
                 padding: EdgeInsets.all(Spacing.md),
                 child: Center(child: CircularProgressIndicator()),
               );
             }
-            if (!vp.followHasMore && vp.follow.isEmpty) {
+            if (videos.isEmpty) {
               return const _EmptyState();
             }
             return const SizedBox(height: Spacing.lg);
           }
-          final video = vp.follow[index];
-          final isRecommended = vp.recommendStartIndexInFollow != null && index >= vp.recommendStartIndexInFollow!;
+          final video = videos[index];
+          final isRecommended = !_usingFallback &&
+              vp.recommendStartIndexInFollow != null &&
+              index >= vp.recommendStartIndexInFollow!;
           return _FollowListItem(
             video: video,
             isRecommended: isRecommended,

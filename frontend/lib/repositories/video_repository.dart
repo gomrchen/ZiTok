@@ -27,6 +27,7 @@ class VideoRepository {
         .map((v) => v.copyWith(
               videoUrl: UrlUtils.resolveStorageUrl(v.videoUrl, defaultDir: 'videos'),
               coverUrl: UrlUtils.resolveStorageUrl(v.coverUrl, defaultDir: 'covers'),
+              authorAvatarUrl: UrlUtils.resolveStorageUrl(v.authorAvatarUrl, defaultDir: 'avatars'),
             ))
         .toList();
     final hasMore = items.length == query.pageSize;
@@ -61,6 +62,7 @@ class VideoRepository {
         .map((v) => v.copyWith(
               videoUrl: UrlUtils.resolveStorageUrl(v.videoUrl, defaultDir: 'videos'),
               coverUrl: UrlUtils.resolveStorageUrl(v.coverUrl, defaultDir: 'covers'),
+              authorAvatarUrl: UrlUtils.resolveStorageUrl(v.authorAvatarUrl, defaultDir: 'avatars'),
             ))
         .toList();
     final start = (query.page - 1) * query.pageSize;
@@ -82,30 +84,96 @@ class VideoRepository {
       return PagedResult(items: [], page: query.page, pageSize: query.pageSize, hasMore: false);
     }
 
-    final resp = await api.followFeed(userId: userId, page: query.page, size: query.pageSize);
-    final root = resp.data as Map<String, dynamic>? ?? {};
-    List<dynamic> raw = [];
-    if (root['data'] is List) {
-      raw = root['data'] as List;
-    } else if (root['data'] is Map && (root['data'] as Map)['items'] is List) {
-      raw = (root['data'] as Map)['items'] as List;
-    } else if (root['items'] is List) {
-      raw = root['items'] as List;
+    try {
+      final resp = await api.followFeed(userId: userId, page: query.page, size: query.pageSize);
+      final root = resp.data as Map<String, dynamic>? ?? {};
+
+      // 打印完整响应以便调试
+      debugPrint('VideoRepository.fetchFollow: API response code=${root['code']}, message=${root['message']}');
+      debugPrint('VideoRepository.fetchFollow: data type=${root['data']?.runtimeType}, data=${ root['data']?.toString().substring(0, (root['data']?.toString().length ?? 0) > 200 ? 200 : (root['data']?.toString().length ?? 0))}');
+
+      List<dynamic> raw = [];
+      if (root['data'] is List) {
+        raw = root['data'] as List;
+      } else if (root['data'] is Map && (root['data'] as Map)['items'] is List) {
+        raw = (root['data'] as Map)['items'] as List;
+      } else if (root['data'] is Map && (root['data'] as Map)['VideoList'] is List) {
+        raw = (root['data'] as Map)['VideoList'] as List;
+      } else if (root['items'] is List) {
+        raw = root['items'] as List;
+      } else if (root['VideoList'] is List) {
+        raw = root['VideoList'] as List;
+      }
+
+      var items = raw.map((e) => Video.fromJson(e as Map<String, dynamic>)).toList();
+      items = items
+          .map((v) => v.copyWith(
+                videoUrl: UrlUtils.resolveStorageUrl(v.videoUrl, defaultDir: 'videos'),
+                coverUrl: UrlUtils.resolveStorageUrl(v.coverUrl, defaultDir: 'covers'),
+                authorAvatarUrl: UrlUtils.resolveStorageUrl(v.authorAvatarUrl, defaultDir: 'avatars'),
+              ))
+          .toList();
+      final hasMore = items.length == query.pageSize;
+      debugPrint('VideoRepository.fetchFollow: page=${query.page} size=${query.pageSize} items=${items.length} hasMore=$hasMore');
+      if (items.isNotEmpty) {
+        final sample = items.take(3).map((e) => '${e.title}(${e.uid})').toList();
+        debugPrint('VideoRepository.fetchFollow: sample=$sample');
+      }
+      return PagedResult(items: items, page: query.page, pageSize: query.pageSize, hasMore: hasMore);
+    } catch (e) {
+      debugPrint('VideoRepository.fetchFollow: API error=$e');
+      return PagedResult(items: [], page: query.page, pageSize: query.pageSize, hasMore: false);
     }
-    var items = raw.map((e) => Video.fromJson(e as Map<String, dynamic>)).toList();
-    items = items
+  }
+
+  /// 从指定用户列表获取视频（备用方案，当 /feed/follow 不可用时使用）
+  /// [userIds] 用户ID列表
+  /// [limit] 每个用户最多获取的视频数量
+  Future<List<Video>> fetchVideosFromUsers(List<String> userIds, {int limit = 5}) async {
+    if (userIds.isEmpty) return [];
+
+    debugPrint('VideoRepository.fetchVideosFromUsers: fetching videos for ${userIds.length} users');
+
+    final List<Video> allVideos = [];
+
+    // 并行获取每个用户的视频
+    final futures = userIds.map((uid) async {
+      try {
+        final resp = await api.list(userId: uid, page: 1, size: limit);
+        final root = resp.data as Map<String, dynamic>? ?? {};
+        List<dynamic> raw = [];
+        if (root['data'] is List) {
+          raw = root['data'] as List;
+        } else if (root['data'] is Map && (root['data'] as Map)['items'] is List) {
+          raw = (root['data'] as Map)['items'] as List;
+        }
+        return raw.map((e) => Video.fromJson(e as Map<String, dynamic>)).toList();
+      } catch (e) {
+        debugPrint('VideoRepository.fetchVideosFromUsers: error fetching for user $uid: $e');
+        return <Video>[];
+      }
+    });
+
+    final results = await Future.wait(futures);
+    for (final videos in results) {
+      allVideos.addAll(videos);
+    }
+
+    // 处理URL并去重
+    var items = allVideos
         .map((v) => v.copyWith(
               videoUrl: UrlUtils.resolveStorageUrl(v.videoUrl, defaultDir: 'videos'),
               coverUrl: UrlUtils.resolveStorageUrl(v.coverUrl, defaultDir: 'covers'),
+              authorAvatarUrl: UrlUtils.resolveStorageUrl(v.authorAvatarUrl, defaultDir: 'avatars'),
             ))
         .toList();
-    final hasMore = items.length == query.pageSize;
-    debugPrint('VideoRepository.fetchFollow: page=${query.page} size=${query.pageSize} items=${items.length} hasMore=$hasMore');
-    if (items.isNotEmpty) {
-      final sample = items.take(3).map((e) => '${e.title}(${e.uid})').toList();
-      debugPrint('VideoRepository.fetchFollow: sample=$sample');
-    }
-    return PagedResult(items: items, page: query.page, pageSize: query.pageSize, hasMore: hasMore);
+
+    // 按ID去重
+    final seen = <String>{};
+    items = items.where((v) => seen.add(v.id)).toList();
+
+    debugPrint('VideoRepository.fetchVideosFromUsers: got ${items.length} total videos');
+    return items;
   }
 
   Future<void> like(String videoId) async {
@@ -132,6 +200,7 @@ class VideoRepository {
         .map((v) => v.copyWith(
               videoUrl: UrlUtils.resolveStorageUrl(v.videoUrl, defaultDir: 'videos'),
               coverUrl: UrlUtils.resolveStorageUrl(v.coverUrl, defaultDir: 'covers'),
+              authorAvatarUrl: UrlUtils.resolveStorageUrl(v.authorAvatarUrl, defaultDir: 'avatars'),
             ))
         .toList();
     final hasMore = items.length == pageSize;
@@ -369,6 +438,7 @@ class VideoRepository {
           .map((v) => v.copyWith(
                 videoUrl: UrlUtils.resolveStorageUrl(v.videoUrl, defaultDir: 'videos'),
                 coverUrl: UrlUtils.resolveStorageUrl(v.coverUrl, defaultDir: 'covers'),
+                authorAvatarUrl: UrlUtils.resolveStorageUrl(v.authorAvatarUrl, defaultDir: 'avatars'),
               ))
           .toList();
 

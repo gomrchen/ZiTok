@@ -3,8 +3,12 @@ import 'package:provider/provider.dart';
 import 'package:video_player/video_player.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/video_provider.dart';
+import '../../providers/messaging_provider.dart';
 import '../../theme/theme_tokens.dart';
 import '../../services/video/video_preload_manager.dart';
+import '../../services/user_service.dart';
+import '../../app.dart';
+import '../../utils/url_utils.dart';
 import '../../widgets/video_stats.dart';
 import 'featured_page.dart';
 import 'widgets/md_notes_sheet.dart';
@@ -436,243 +440,242 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        // 视频播放器
-        _error != null
-            ? Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    const Icon(Icons.error_outline, size: 64, color: Colors.white54),
-                    const SizedBox(height: 16),
-                    Text(_error!, style: const TextStyle(color: Colors.white70)),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: _initController,
-                      child: const Text('重试'),
-                    ),
-                  ],
-                ),
-              )
-            : _initialized && _controller != null
-                ? FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: GestureDetector(
-                      onTap: _onVideoTap,
-                      child: Container(
-                        color: Colors.black,
-                        child: FittedBox(
-                          fit: BoxFit.cover,
-                          child: SizedBox(
-                            width: _controller!.value.size.width,
-                            height: _controller!.value.size.height,
-                            child: VideoPlayer(_controller!),
-                          ),
-                        ),
-                      ),
-                    ),
-                  )
-                : Container(
-                    color: Colors.black,
-                    child: const Center(child: CircularProgressIndicator(color: Colors.white)),
-                  ),
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
 
-        // 缓冲指示器
-        if (_initialized && _isBuffering)
-          Container(
-            color: Colors.black26,
-            child: const Center(
+    return Container(
+      color: Colors.black,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          // 视频播放器 - 全屏铺满
+          if (_error != null)
+            Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.error_outline, size: 64, color: Colors.white54),
+                  const SizedBox(height: 16),
+                  Text(_error!, style: const TextStyle(color: Colors.white70)),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: _initController,
+                    child: const Text('重试'),
+                  ),
+                ],
+              ),
+            )
+          else if (_initialized && _controller != null)
+            GestureDetector(
+              onTap: _onVideoTap,
+              child: FadeTransition(
+                opacity: _fadeAnimation,
+                child: Center(
+                  child: AspectRatio(
+                    aspectRatio: _controller!.value.aspectRatio,
+                    child: VideoPlayer(_controller!),
+                  ),
+                ),
+              ),
+            )
+          else
+            const Center(child: CircularProgressIndicator(color: Colors.white)),
+
+          // 缓冲指示器
+          if (_initialized && _isBuffering)
+            const Center(
               child: CircularProgressIndicator(
                 color: Colors.white,
                 strokeWidth: 3,
               ),
             ),
-          ),
 
-        // 播放/暂停按钮overlay
-        if (_initialized && _showControls && !_isBuffering && _controller != null)
-          Center(
-            child: GestureDetector(
-              onTap: _togglePlayPause,
-              child: Container(
-                width: 80,
-                height: 80,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.black.withValues(alpha: 0.5),
-                ),
-                child: Icon(
-                  _controller!.value.isPlaying ? Icons.pause : Icons.play_arrow,
-                  size: 50,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ),
-        // 顶部功能栏（仅保留附件icon）
-        Positioned(
-          left: Spacing.md,
-          right: Spacing.md,
-          top: MediaQuery.of(context).padding.top + Spacing.xs,
-          child: Row(
-            children: [
-              // 附件标志 icon（圆形半透明背景）
-              Container(
-                width: 40,
-                height: 40,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0x33000000),
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.attach_file, color: Colors.white),
-                  tooltip: '查看笔记',
-                  onPressed: _openNotesSheet,
-                ),
-              ),
-            ],
-          ),
-        ),
-        // 右侧操作栏
-        Positioned(
-          right: 12,
-          bottom: MediaQuery.of(context).size.height * 0.15,
-          child: Column(
-            children: [
-              // 创作者头像（带+关注）
-              _PublisherAvatar(
-                uid: widget.video.uid,
-                avatarUrl: null, // TODO: 添加头像URL字段到Video模型
-              ),
-              const SizedBox(height: 24),
-              // 点赞
-              _LikeActionIcon(
-                initialCount: widget.video.likes ?? 0,
-                onTap: () =>
-                    context.read<VideoProvider>().like(widget.video.id),
-              ),
-              const SizedBox(height: 16),
-              // 评论
-              _ActionIcon(
-                icon: Icons.chat_bubble_outline,
-                label: formatCountCompact(widget.video.commentCount),
-                onTap: () {
-                  showCommentsSheet(context, videoId: widget.video.id);
-                },
-              ),
-              const SizedBox(height: 16),
-              // 收藏
-              _CollectActionIcon(videoId: widget.video.id),
-              // 注：转发按钮按需求不予实现，但保留注释说明
-              // const SizedBox(height: 16),
-              // _ActionIcon(
-              //   icon: Icons.share_outlined,
-              //   label: '',
-              //   onTap: _onShare,
-              // ),
-            ],
-          ),
-        ),
-        // 底部文案（添加渐变背景确保始终可见）
-        Positioned(
-          left: 0,
-          right: 80,
-          bottom: 50,
-          child: Container(
-            padding: EdgeInsets.only(
-              left: Spacing.md,
-              right: Spacing.md,
-              top: 40,
-              bottom: 16,
-            ),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.transparent,
-                  Colors.black.withValues(alpha: 0.7),
-                ],
-              ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '@${widget.video.uid ?? '未知作者'}',
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _isDescriptionExpanded = !_isDescriptionExpanded;
-                    });
-                  },
-                  child: Text(
-                    '${widget.video.intro ?? ''}',
-                    maxLines: _isDescriptionExpanded ? null : 2,
-                    overflow: _isDescriptionExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
-                    style: theme.textTheme.bodySmall?.copyWith(color: Colors.white70),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                VideoStatsText(
-                  commentCount: widget.video.commentCount,
-                  likeCount: widget.video.likes,
-                  isDark: true,
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // 查看详情按钮（底部中央）
-        if (_initialized)
-          Positioned(
-            bottom: 60,
-            left: 0,
-            right: 0,
-            child: Center(
+          // 播放/暂停按钮overlay
+          if (_initialized && _showControls && !_isBuffering && _controller != null)
+            Center(
               child: GestureDetector(
-                onTap: _openVideoDetail,
+                onTap: _togglePlayPause,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  width: 72,
+                  height: 72,
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.6),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
+                    shape: BoxShape.circle,
+                    color: Colors.black.withValues(alpha: 0.4),
                   ),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.info_outline, color: Colors.white, size: 20),
-                      SizedBox(width: 6),
-                      Text(
-                        '查看详情',
-                        style: TextStyle(color: Colors.white, fontSize: 14),
-                      ),
-                    ],
+                  child: Icon(
+                    _controller!.value.isPlaying ? Icons.pause : Icons.play_arrow,
+                    size: 44,
+                    color: Colors.white,
                   ),
                 ),
               ),
             ),
-          ),
 
-        // 底部进度条
-        if (_initialized && _controller != null)
+          // 底部渐变遮罩 - 从下往上渐变，覆盖底部区域
           Positioned(
             left: 0,
             right: 0,
             bottom: 0,
-            child: _VideoProgressBar(controller: _controller!),
+            child: IgnorePointer(
+              child: Container(
+                height: 280,
+                decoration: const BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Color(0x40000000),
+                      Color(0x99000000),
+                    ],
+                    stops: [0.0, 0.4, 1.0],
+                  ),
+                ),
+              ),
+            ),
           ),
-      ],
+
+          // 顶部功能栏
+          Positioned(
+            left: Spacing.md,
+            right: Spacing.md,
+            top: MediaQuery.of(context).padding.top + Spacing.xs,
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black.withValues(alpha: 0.3),
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.attach_file, color: Colors.white),
+                    tooltip: '查看笔记',
+                    onPressed: _openNotesSheet,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // 右侧操作栏 - 调整位置确保在渐变区域内
+          Positioned(
+            right: 8,
+            bottom: bottomPadding + 100,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                _PublisherAvatar(
+                  uid: widget.video.uid,
+                  avatarUrl: widget.video.authorAvatarUrl,
+                ),
+                const SizedBox(height: 20),
+                _LikeActionIcon(
+                  initialCount: widget.video.likes ?? 0,
+                  onTap: () => context.read<VideoProvider>().like(widget.video.id),
+                ),
+                const SizedBox(height: 16),
+                _ActionIcon(
+                  icon: Icons.chat_bubble_outline,
+                  label: formatCountCompact(widget.video.commentCount),
+                  onTap: () => showCommentsSheet(context, videoId: widget.video.id),
+                ),
+                const SizedBox(height: 16),
+                _CollectActionIcon(videoId: widget.video.id),
+              ],
+            ),
+          ),
+
+          // 底部信息区域
+          Positioned(
+            left: Spacing.md,
+            right: 70,
+            bottom: bottomPadding + 50,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 作者名
+                GestureDetector(
+                  onTap: () {
+                    if (widget.video.uid != null) {
+                      context.push('/user/${widget.video.uid}');
+                    }
+                  },
+                  child: Text(
+                    '@${widget.video.uid ?? '未知作者'}',
+                    style: theme.textTheme.bodyMedium?.copyWith(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      shadows: [
+                        Shadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 4),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                // 视频简介
+                if (widget.video.intro != null && widget.video.intro!.isNotEmpty)
+                  GestureDetector(
+                    onTap: () {
+                      setState(() {
+                        _isDescriptionExpanded = !_isDescriptionExpanded;
+                      });
+                    },
+                    child: Text(
+                      widget.video.intro!,
+                      maxLines: _isDescriptionExpanded ? null : 2,
+                      overflow: _isDescriptionExpanded ? TextOverflow.visible : TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        shadows: [
+                          Shadow(color: Colors.black.withValues(alpha: 0.5), blurRadius: 4),
+                        ],
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 12),
+                // 查看详情按钮
+                if (_initialized)
+                  GestureDetector(
+                    onTap: _openVideoDetail,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 0.5),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.info_outline, color: Colors.white.withValues(alpha: 0.9), size: 16),
+                          const SizedBox(width: 4),
+                          Text(
+                            '查看详情',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.9),
+                              fontSize: 12,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // 底部进度条
+          if (_initialized && _controller != null)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: bottomPadding,
+              child: _VideoProgressBar(controller: _controller!),
+            ),
+        ],
+      ),
     );
   }
 }
@@ -724,7 +727,63 @@ class _PublisherAvatar extends StatefulWidget {
 
 class _PublisherAvatarState extends State<_PublisherAvatar> {
   DateTime? _lastClickTime;
-  bool _isFollowed = false;
+  bool _isLoading = false;
+  String? _fetchedAvatarUrl; // 从API获取的头像URL
+  bool _fetchingAvatar = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 如果传入的avatarUrl为空，则尝试获取用户头像
+    if ((widget.avatarUrl == null || widget.avatarUrl!.isEmpty) && widget.uid != null) {
+      _fetchUserAvatar();
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _PublisherAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // 如果uid变化了，重新获取头像
+    if (oldWidget.uid != widget.uid) {
+      _fetchedAvatarUrl = null;
+      if ((widget.avatarUrl == null || widget.avatarUrl!.isEmpty) && widget.uid != null) {
+        _fetchUserAvatar();
+      }
+    }
+  }
+
+  Future<void> _fetchUserAvatar() async {
+    if (_fetchingAvatar || widget.uid == null) return;
+    _fetchingAvatar = true;
+
+    try {
+      final userService = UserService(AppBootstrap.apiClient.dio);
+      final resp = await userService.info(userId: widget.uid);
+      final data = resp.data as Map<String, dynamic>? ?? {};
+
+      if (data['code']?.toString() == '10000' && data['data'] != null) {
+        final userData = data['data'] as Map<String, dynamic>;
+        final avatarUrl = (userData['avatar'] ?? userData['avatar_url'])?.toString();
+        if (avatarUrl != null && avatarUrl.isNotEmpty && mounted) {
+          setState(() {
+            _fetchedAvatarUrl = UrlUtils.resolveStorageUrl(avatarUrl, defaultDir: 'avatars');
+          });
+        }
+      }
+    } catch (e) {
+      debugPrint('_PublisherAvatar: fetch avatar error: $e');
+    } finally {
+      _fetchingAvatar = false;
+    }
+  }
+
+  /// 获取有效的头像URL（优先使用传入的，其次使用获取的）
+  String? get _effectiveAvatarUrl {
+    if (widget.avatarUrl != null && widget.avatarUrl!.isNotEmpty) {
+      return widget.avatarUrl;
+    }
+    return _fetchedAvatarUrl;
+  }
 
   void _handleTap() {
     // 防抖处理：300ms内只响应一次点击
@@ -740,7 +799,9 @@ class _PublisherAvatarState extends State<_PublisherAvatar> {
     }
   }
 
-  void _handleFollow() {
+  Future<void> _handleFollow() async {
+    if (_isLoading || widget.uid == null) return;
+
     // 防抖处理
     final now = DateTime.now();
     if (_lastClickTime != null && now.difference(_lastClickTime!).inMilliseconds < 300) {
@@ -748,21 +809,37 @@ class _PublisherAvatarState extends State<_PublisherAvatar> {
     }
     _lastClickTime = now;
 
-    setState(() {
-      _isFollowed = !_isFollowed;
-    });
+    setState(() => _isLoading = true);
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(_isFollowed ? '已关注' : '已取消关注'),
-        duration: const Duration(milliseconds: 1200),
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    try {
+      final mp = context.read<MessagingProvider>();
+      final success = await mp.toggleFollow(widget.uid!);
+
+      if (mounted) {
+        final isNowFollowing = mp.isFollowing(widget.uid!);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(success
+                ? (isNowFollowing ? '已关注' : '已取消关注')
+                : '操作失败'),
+            duration: const Duration(milliseconds: 1200),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final mp = context.watch<MessagingProvider>();
+    final isFollowed = widget.uid != null && mp.isFollowing(widget.uid!);
+    final avatarUrl = _effectiveAvatarUrl;
+
     return GestureDetector(
       onTap: _handleTap,
       child: SizedBox(
@@ -780,43 +857,67 @@ class _PublisherAvatarState extends State<_PublisherAvatar> {
                 color: Colors.grey.shade300,
               ),
               child: ClipOval(
-                child: widget.avatarUrl != null && widget.avatarUrl!.isNotEmpty
+                child: avatarUrl != null && avatarUrl.isNotEmpty
                     ? Image.network(
-                        widget.avatarUrl!,
+                        avatarUrl,
                         fit: BoxFit.cover,
                         errorBuilder: (context, error, stackTrace) {
-                          return Icon(Icons.person, size: 30, color: Colors.grey.shade600);
+                          return _buildPlaceholder();
                         },
                       )
-                    : Icon(Icons.person, size: 30, color: Colors.grey.shade600),
+                    : _buildPlaceholder(),
               ),
             ),
-            // 右上角+号关注按钮
-            if (!_isFollowed)
-              Positioned(
-                right: 0,
-                bottom: 0,
-                child: GestureDetector(
-                  onTap: _handleFollow,
-                  child: Container(
-                    width: 20,
-                    height: 20,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFFFF2D55), // 抖音红色
-                    ),
-                    child: const Icon(
-                      Icons.add,
-                      color: Colors.white,
-                      size: 16,
-                    ),
+            // 右下角关注按钮
+            Positioned(
+              right: 0,
+              bottom: 0,
+              child: GestureDetector(
+                onTap: _isLoading ? null : _handleFollow,
+                child: Container(
+                  width: 20,
+                  height: 20,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: isFollowed ? Colors.grey : const Color(0xFFFF2D55),
                   ),
+                  child: _isLoading
+                      ? const Padding(
+                          padding: EdgeInsets.all(3),
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Icon(
+                          isFollowed ? Icons.check : Icons.add,
+                          color: Colors.white,
+                          size: 14,
+                        ),
                 ),
               ),
+            ),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildPlaceholder() {
+    // 如果有uid，显示首字母
+    if (widget.uid != null && widget.uid!.isNotEmpty) {
+      return Center(
+        child: Text(
+          widget.uid!.substring(0, 1).toUpperCase(),
+          style: TextStyle(
+            color: Colors.grey.shade600,
+            fontWeight: FontWeight.bold,
+            fontSize: 24,
+          ),
+        ),
+      );
+    }
+    return Icon(Icons.person, size: 30, color: Colors.grey.shade600);
   }
 }
 

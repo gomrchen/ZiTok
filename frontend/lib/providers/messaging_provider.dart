@@ -113,6 +113,50 @@ class MessagingProvider extends ChangeNotifier {
   List<Friend> get following => List.unmodifiable(_following);
   List<Friend> get followers => List.unmodifiable(_followers);
 
+  /// 检查是否关注了指定用户
+  bool isFollowing(String uid) {
+    return _following.any((f) => f.id == uid);
+  }
+
+  /// 关注或取消关注用户
+  Future<bool> toggleFollow(String targetUid) async {
+    final uid = currentUid;
+    if (uid == null || relationRepository == null) return false;
+
+    final targetId = int.tryParse(targetUid);
+    if (targetId == null) return false;
+
+    final wasFollowing = isFollowing(targetUid);
+
+    try {
+      if (wasFollowing) {
+        // 目前API可能没有取消关注接口，暂时只从本地移除
+        _following.removeWhere((f) => f.id == targetUid);
+      } else {
+        // 调用关注API（使用sendFriendRequest）
+        final result = await relationRepository!.sendFriendRequest(uid, targetId, '');
+        if (result['success'] != true) {
+          debugPrint('toggleFollow: ${result['message']}');
+          // 如果是"已经关注对方"的错误，仍然添加到本地列表
+          if (result['message']?.toString().contains('已经关注') != true) {
+            return false;
+          }
+        }
+        // 添加到本地列表
+        _following.add(Friend(
+          id: targetUid,
+          name: '用户$targetUid',
+          avatarUrl: '',
+        ));
+      }
+      notifyListeners();
+      return true;
+    } catch (e) {
+      debugPrint('toggleFollow error: $e');
+      return false;
+    }
+  }
+
   List<Friend> get mutualFriends {
     final followerIds = _followers.map((e) => e.id).toSet();
     return _following.where((f) => followerIds.contains(f.id)).toList();
