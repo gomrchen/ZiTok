@@ -6,6 +6,7 @@ import '../../providers/video_provider.dart';
 import '../../providers/messaging_provider.dart';
 import '../../theme/theme_tokens.dart';
 import '../../services/video/video_preload_manager.dart';
+import '../../services/video_playback_manager.dart';
 import '../../services/user_service.dart';
 import '../../app.dart';
 import '../../utils/url_utils.dart';
@@ -65,15 +66,14 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
   }
 
   void _onTabChanged() {
-    // Tab切换时暂停非当前页的视频
-    if (_tab.index != 1) {
-      _pauseAllVideos();
-    }
+    // Tab切换时暂停所有视频（无论切换到哪个Tab）
+    _pauseAllVideos();
   }
 
   void _pauseAllVideos() {
-    // 通过PreloadManager暂停所有视频
+    // 通过PreloadManager和PlaybackManager暂停所有视频
     _preloadManager.pauseAll();
+    VideoPlaybackManager.instance.pauseAll();
   }
 
   void _onIndexChanged(int index) {
@@ -82,6 +82,8 @@ class _DiscoverPageState extends State<DiscoverPage> with TickerProviderStateMix
   }
 
   void _onSearchTap() {
+    // 进入搜索页前暂停视频
+    VideoPlaybackManager.instance.pauseAll();
     context.push('/search');
   }
 
@@ -181,14 +183,23 @@ class _RecommendFullScreen extends StatefulWidget {
 class _RecommendFullScreenState extends State<_RecommendFullScreen> {
   late final PageController _pageController;
 
+  /// 是否正在加载中
+  bool _isFetching = false;
+
   Future<void> _fetch({bool refresh = false}) async {
+    if (_isFetching) return;
+    _isFetching = true;
+
     final vp = context.read<VideoProvider>();
     if (refresh) {
       await vp.refreshRecommend();
     } else {
       await vp.loadMoreRecommend();
     }
+
+    _isFetching = false;
   }
+
   @override
   void initState() {
     super.initState();
@@ -207,12 +218,17 @@ class _RecommendFullScreenState extends State<_RecommendFullScreen> {
     super.dispose();
   }
 
+  /// 将虚拟索引转换为实际列表索引（循环）
+  int _toRealIndex(int virtualIndex, int listLength) {
+    if (listLength == 0) return 0;
+    return virtualIndex % listLength;
+  }
+
   @override
   Widget build(BuildContext context) {
     final vp = context.watch<VideoProvider>();
     final items = vp.recommend;
     final loading = vp.loadingRecommend;
-    final hasMore = vp.recommendHasMore;
 
     if (loading && items.isEmpty) {
       return const Center(child: CircularProgressIndicator());
@@ -222,16 +238,26 @@ class _RecommendFullScreenState extends State<_RecommendFullScreen> {
         child: Column(mainAxisSize: MainAxisSize.min, children: [const Text('暂无推荐内容'), const SizedBox(height: 8), ElevatedButton(onPressed: () => _fetch(refresh: true), child: const Text('重新加载'))]),
       );
     }
+
+    // 使用无限滚动模式：itemCount 为 null 表示无限
     return PageView.builder(
       scrollDirection: Axis.vertical,
       controller: _pageController,
-      itemCount: items.length,
-      onPageChanged: (i) {
-        widget.onIndexChanged(i);
-        if (hasMore && i >= items.length - 2) _fetch();
+      // 不设置 itemCount，允许无限滚动
+      onPageChanged: (virtualIdx) {
+        final realIndex = _toRealIndex(virtualIdx, items.length);
+        widget.onIndexChanged(realIndex);
+
+        // 当虚拟索引接近当前已加载数据的边界时，尝试加载更多
+        // 这里用虚拟索引来判断，确保每次接近"边界"都会触发
+        final distanceToEnd = items.length - (virtualIdx % items.length) - 1;
+        if (distanceToEnd <= 3 && !loading) {
+          _fetch();
+        }
       },
-      itemBuilder: (context, i) {
-        final v = items[i];
+      itemBuilder: (context, virtualIdx) {
+        final realIndex = _toRealIndex(virtualIdx, items.length);
+        final v = items[realIndex];
         return _FullScreenVideoItem(video: v);
       },
     );
@@ -358,6 +384,9 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
         setState(() => _initialized = true);
         _controller!.setLooping(true);
         _controller!.addListener(_onControllerUpdate);
+        // 注册到全局播放管理器
+        VideoPlaybackManager.instance.register(_controller!);
+        VideoPlaybackManager.instance.markAsPlaying(_controller!);
         _controller!.play();
         // 启动淡入动画
         _fadeController.forward();
@@ -379,6 +408,9 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
       if (mounted && !_isDisposed && _controller == newController) {
         setState(() => _initialized = true);
         _controller!.setLooping(true);
+        // 注册到全局播放管理器
+        VideoPlaybackManager.instance.register(_controller!);
+        VideoPlaybackManager.instance.markAsPlaying(_controller!);
         _controller!.play();
         // 启动淡入动画
         _fadeController.forward();
@@ -427,6 +459,8 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
 
     if (_controller != null) {
       _controller!.removeListener(_onControllerUpdate);
+      // 从全局播放管理器注销
+      VideoPlaybackManager.instance.unregister(_controller!);
       // 只有非预加载的controller才需要dispose
       // 预加载的controller由PreloadManager管理
       if (!_isPreloadedController) {
@@ -469,8 +503,8 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
   }
 
   void _openVideoDetail() {
-    // 暂停当前视频
-    _controller?.pause();
+    // 通过全局管理器暂停当前视频
+    VideoPlaybackManager.instance.pauseCurrent();
 
     // 导航到视频详情页
     Navigator.push(
@@ -479,8 +513,9 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
         builder: (context) => VideoDetailPage(video: widget.video),
       ),
     ).then((_) {
-      // 返回时恢复播放
+      // 返回时恢复播放（如果页面仍然活跃）
       if (mounted && !_isDisposed && _controller != null) {
+        VideoPlaybackManager.instance.markAsPlaying(_controller!);
         _controller!.play();
       }
     });

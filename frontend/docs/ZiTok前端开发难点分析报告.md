@@ -1,9 +1,9 @@
 # ZiTok 知识短视频社交平台前端开发报告
 
 > 项目名称：ZiTok（知音App）
-> 技术栈：Flutter + Provider + GoRouter + Dio
+> 技术栈：Flutter + Provider + GoRouter + Dio + connectivity_plus
 > 报告日期：2025年12月
-> 代码规模：约10,000+ 行 Dart 代码
+> 代码规模：约12,000+ 行 Dart 代码
 
 ---
 
@@ -83,6 +83,83 @@ VideoVisibilityWrapper(
 void didChangeAppLifecycleState(AppLifecycleState state) {
   if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
     _pauseIfPlaying();
+  }
+}
+```
+
+**5. 网络感知加载** (`lib/services/video/network_aware_loader.dart`)
+
+针对低带宽环境（如3M服务器带宽）的智能加载策略：
+
+```dart
+/// 网络质量等级
+enum NetworkQuality {
+  veryPoor,   // <200KB/s - 不预加载，专注当前视频
+  poor,       // 200-500KB/s - 预加载1个
+  moderate,   // 500-1500KB/s - 预加载2个
+  good,       // >1500KB/s - 预加载3个
+  unknown,    // 保守策略，预加载1个
+}
+
+class NetworkAwareLoader {
+  // 网络速度采样历史（滑动平均）
+  final List<double> _speedHistory = [];
+
+  /// 记录下载速度样本
+  void recordSpeedSample(int bytesDownloaded, Duration duration) {
+    final speedKBps = bytesDownloaded / duration.inMilliseconds * 1000 / 1024;
+    _speedHistory.add(speedKBps);
+    // 保持最近5个样本，计算平均速度
+  }
+
+  /// 根据网络质量动态调整预加载数量
+  int getRecommendedPreloadCount() {
+    switch (currentStatus.quality) {
+      case NetworkQuality.veryPoor: return 0;
+      case NetworkQuality.poor: return 1;
+      case NetworkQuality.moderate: return 2;
+      case NetworkQuality.good: return 3;
+      case NetworkQuality.unknown: return 1;
+    }
+  }
+}
+```
+
+**6. 快速滑动检测与预加载暂停**
+
+```dart
+// 检测快速滑动（1秒内切换3次视为快速滑动）
+static const int _fastScrollThreshold = 3;
+static const Duration _fastScrollWindow = Duration(seconds: 1);
+
+void updateCurrentIndex(int index) {
+  final now = DateTime.now();
+  if (_lastIndexChangeTime != null &&
+      now.difference(_lastIndexChangeTime!) < _fastScrollWindow) {
+    _fastScrollCount++;
+  } else {
+    _fastScrollCount = 1;
+  }
+
+  // 快速滑动时延长防抖时间，避免频繁加载
+  if (_fastScrollCount >= _fastScrollThreshold) {
+    _preloadDebouncer = Timer(Duration(milliseconds: 500), _executePreload);
+  }
+}
+```
+
+**7. 串行 vs 并行加载策略**
+
+```dart
+Future<void> _executePreload() async {
+  // 网络差时串行加载（避免带宽竞争），网络好时并行加载
+  if (_networkLoader?.currentStatus.quality == NetworkQuality.veryPoor ||
+      _networkLoader?.currentStatus.quality == NetworkQuality.poor) {
+    for (final item in toPreload) {
+      await _preloadVideo(item);  // 串行
+    }
+  } else {
+    await Future.wait(toPreload.map((item) => _preloadVideo(item)));  // 并行
   }
 }
 ```
@@ -497,7 +574,82 @@ return PopScope(
 
 ---
 
-### 2.6 状态管理与用户切换
+### 2.6 无限滚动与虚拟索引
+
+#### 难点描述
+
+短视频应用需要给用户"永远有新内容"的体验：
+
+1. **数据循环**：当服务端数据耗尽时，需要无缝循环已有内容
+2. **滚动边界**：PageView 默认有 itemCount 限制，无法真正无限滚动
+3. **加载触发**：需要在合适时机触发新数据加载
+
+#### 为什么困难
+
+- Flutter PageView 的 itemCount 限制了滚动范围
+- 简单的循环会导致索引混乱
+- 需要平衡数据去重和用户体验
+
+#### 技术方案
+
+**1. 虚拟索引模式** (`lib/views/video/discover_page.dart`)
+
+```dart
+/// 将虚拟索引转换为实际列表索引（循环）
+int _toRealIndex(int virtualIndex, int listLength) {
+  if (listLength == 0) return 0;
+  return virtualIndex % listLength;
+}
+
+// 不设置 itemCount，允许无限滚动
+return PageView.builder(
+  scrollDirection: Axis.vertical,
+  controller: _pageController,
+  // itemCount: null - 允许无限滚动
+  onPageChanged: (virtualIdx) {
+    final realIndex = _toRealIndex(virtualIdx, items.length);
+    widget.onIndexChanged(realIndex);
+
+    // 当接近已加载数据边界时，触发加载更多
+    final distanceToEnd = items.length - (virtualIdx % items.length) - 1;
+    if (distanceToEnd <= 3 && !loading) {
+      _fetch();
+    }
+  },
+  itemBuilder: (context, virtualIdx) {
+    final realIndex = _toRealIndex(virtualIdx, items.length);
+    return _FullScreenVideoItem(video: items[realIndex]);
+  },
+);
+```
+
+**2. 游标重置策略** (`lib/providers/video_provider.dart`)
+
+```dart
+Future<void> loadMoreRecommend({String? category}) async {
+  final res = await repo.fetchRecommend(limit: 10, lastVisit: _lastVisit);
+
+  // 过滤重复视频
+  final existingIds = _recommend.map((v) => v.id).toSet();
+  final newItems = res.items.where((v) => !existingIds.contains(v.id)).toList();
+
+  if (newItems.isNotEmpty) {
+    _recommend.addAll(newItems);
+  }
+
+  // 后端无更多数据时，重置游标从头获取
+  if (!res.hasMore) {
+    _lastVisit = 0;  // 重置，下次从头获取
+  }
+
+  // 始终保持 hasMore 为 true，让 UI 可以继续请求
+  _recommendHasMore = true;
+}
+```
+
+---
+
+### 2.7 状态管理与用户切换
 
 #### 难点描述
 
@@ -565,7 +717,52 @@ void clearUserData() {
 
 ---
 
-### 2.7 URL 处理与 CDN 映射
+### 2.8 视频性能配置优化
+
+#### 难点描述
+
+生产环境需要在播放流畅度和资源占用间取得平衡。
+
+#### 技术方案
+
+**集中化性能配置** (`lib/utils/app_config.dart`)
+
+```dart
+class VideoPerformanceConfig {
+  // 预加载策略（优先保证播放流畅）
+  static int get preloadCount => 4;           // 预加载视频数量
+  static int get preloadWindow => 2;          // 预加载窗口（前后各2个）
+  static int get preloadDelayMs => 100;       // 预加载防抖延迟
+
+  // 缓冲策略（减少首帧等待时间）
+  static Duration get minBufferDuration => const Duration(seconds: 8);
+  static Duration get maxBufferDuration => const Duration(seconds: 60);
+  static Duration get bufferForPlayback => const Duration(milliseconds: 500);
+
+  // 缓存策略（充足的缓存空间）
+  static int get memoryCacheSizeMB => 200;    // 内存缓存
+  static int get diskCacheSizeMB => 800;      // 磁盘缓存
+  static int get coverCacheCount => 100;      // 封面缓存数量
+  static int get controllerPoolSize => 5;     // 控制器池大小
+
+  // 智能加载开关
+  static bool get enableSmartPreload => true;
+  static bool get enableBackgroundPreload => true;
+  static int get backgroundPreloadCount => 6;
+  static bool get enableAdaptiveQuality => true;
+  static bool get pausePreloadOnFastScroll => true;
+}
+
+class MemoryConfig {
+  static bool get aggressiveGC => false;      // 关闭激进GC，优先流畅度
+  static double get cacheExtent => 1000.0;    // 列表缓存范围
+  static bool get releaseResourcesOnPageLeave => false;  // 保持资源
+}
+```
+
+---
+
+### 2.9 URL 处理与 CDN 映射
 
 #### 难点描述
 
@@ -648,6 +845,7 @@ class UrlUtils {
 | 状态管理 | Provider | ChangeNotifier 模式 |
 | 路由 | GoRouter | 声明式路由，深链接支持 |
 | 网络 | Dio | HTTP 客户端，拦截器 |
+| 网络检测 | connectivity_plus | 网络类型检测（WiFi/移动网络） |
 | 实时通信 | web_socket_channel | WebSocket |
 | 本地存储 | Hive + SharedPreferences | KV 数据库 + 轻量存储 |
 | 视频播放 | video_player + chewie | 原生视频播放器 |
@@ -684,11 +882,20 @@ class UrlUtils {
 
 ## 六、待优化方向
 
-1. **视频缓存**：实现更完善的视频文件本地缓存
+### 已实现 ✅
+1. ~~**网络感知加载**~~：根据网络质量动态调整预加载策略 ✅
+2. ~~**无限滚动体验**~~：虚拟索引 + 游标重置实现永续滚动 ✅
+3. ~~**快速滑动优化**~~：检测快速滑动并暂停预加载 ✅
+4. ~~**性能配置优化**~~：生产环境参数调优 ✅
+
+### 待实现
+1. **视频缓存**：实现更完善的视频文件本地缓存（当前已有基础框架）
 2. **消息已读同步**：跨设备的已读状态同步
 3. **推送通知**：集成 FCM/APNs 推送
 4. **性能监控**：集成 APM 工具监控真实用户体验
 5. **测试覆盖**：增加单元测试和集成测试覆盖率
+6. **自适应码率**：根据网络状况自动切换视频清晰度
+7. **边下边播**：实现视频分片下载，提升弱网体验
 
 ---
 
@@ -702,6 +909,9 @@ ZiTok 前端项目在开发过程中面临了多个技术难点，包括视频�
 - **消息去重机制**：基于内容签名的可靠去重
 - **动态布局系统**：类 B 站的可拖拽视频详情页
 - **Provider 响应式架构**：清晰的状态管理和数据流
+- **网络感知加载**：根据带宽动态调整预加载策略（veryPoor/poor/moderate/good）
+- **虚拟索引无限滚动**：PageView 无限滚动 + 游标重置，实现"永远有新内容"体验
+- **智能预加载管理**：快速滑动检测、优先级队列、串行/并行加载策略
 
 ---
 

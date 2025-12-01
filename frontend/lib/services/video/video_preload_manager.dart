@@ -3,6 +3,7 @@ import 'dart:collection';
 import 'package:video_player/video_player.dart';
 import 'video_cache_service.dart';
 import 'video_performance_monitor.dart';
+import 'network_aware_loader.dart';
 import '../../utils/app_config.dart';
 
 /// 视频预加载配置（从 AppConfig 读取生产/开发模式配置）
@@ -47,6 +48,7 @@ class ControllerWrapper {
   final VideoPlayerController controller;
   final String videoId;
   final DateTime createdAt;
+  DateTime lastAccessedAt;  // 最后访问时间（用于 LRU）
   bool isPreloaded;
   bool isPlaying;
 
@@ -56,9 +58,14 @@ class ControllerWrapper {
     required this.createdAt,
     this.isPreloaded = false,
     this.isPlaying = false,
-  });
+  }) : lastAccessedAt = createdAt;
 
   Duration get age => DateTime.now().difference(createdAt);
+
+  /// 标记为已访问（更新 LRU 时间戳）
+  void markAccessed() {
+    lastAccessedAt = DateTime.now();
+  }
 }
 
 /// 视频预加载管理器
@@ -84,15 +91,39 @@ class VideoPreloadManager {
 
   VideoCacheService? _cacheService;
   VideoPerformanceMonitor? _monitor;
+  NetworkAwareLoader? _networkLoader;
+
+  /// 快速滑动检测
+  DateTime? _lastIndexChangeTime;
+  int _fastScrollCount = 0;
+  static const int _fastScrollThreshold = 3; // 1秒内切换3次视为快速滑动
+  static const Duration _fastScrollWindow = Duration(seconds: 1);
 
   /// 初始化管理器
-  void init({
+  Future<void> init({
     VideoCacheService? cacheService,
     VideoPerformanceMonitor? monitor,
-  }) {
+  }) async {
     _cacheService = cacheService;
     _monitor = monitor;
-    AppConfig.videoLog('VideoPreloadManager: initialized');
+
+    // 初始化网络感知加载器
+    _networkLoader = NetworkAwareLoader.instance;
+    await _networkLoader!.init();
+
+    // 监听网络状态变化
+    _networkLoader!.addListener(_onNetworkStatusChanged);
+
+    AppConfig.videoLog('VideoPreloadManager: initialized with network-aware loading');
+  }
+
+  /// 网络状态变化处理
+  void _onNetworkStatusChanged(NetworkStatus status) {
+    AppConfig.videoLog('VideoPreloadManager: network status changed to ${status.quality}');
+    // 网络变好时，触发预加载
+    if (status.quality != NetworkQuality.veryPoor) {
+      _schedulePreload();
+    }
   }
 
   /// 设置视频列表
@@ -104,8 +135,48 @@ class VideoPreloadManager {
   /// 更新当前播放索引，触发预加载
   void updateCurrentIndex(int index) {
     if (index == _currentIndex && _controllers.isNotEmpty) return;
+
+    // 检测快速滑动
+    final now = DateTime.now();
+    if (_lastIndexChangeTime != null &&
+        now.difference(_lastIndexChangeTime!) < _fastScrollWindow) {
+      _fastScrollCount++;
+    } else {
+      _fastScrollCount = 1;
+    }
+    _lastIndexChangeTime = now;
+
+    final isFastScrolling = _fastScrollCount >= _fastScrollThreshold;
+
     _currentIndex = index;
-    _schedulePreload();
+
+    // 更新优先级：当前视频最高优先级
+    if (index >= 0 && index < _videoList.length) {
+      final currentVideo = _videoList[index];
+      _networkLoader?.setPriority(currentVideo.videoId, 0);
+
+      // 设置相邻视频优先级
+      for (int i = 1; i <= _config.preloadWindow; i++) {
+        if (index + i < _videoList.length) {
+          _networkLoader?.setPriority(_videoList[index + i].videoId, i);
+        }
+        if (index - i >= 0) {
+          _networkLoader?.setPriority(_videoList[index - i].videoId, i);
+        }
+      }
+    }
+
+    // 快速滑动时延长防抖时间，避免频繁加载
+    if (isFastScrolling) {
+      AppConfig.videoLog('VideoPreloadManager: fast scrolling detected, pausing preload');
+      _preloadDebouncer?.cancel();
+      _preloadDebouncer = Timer(
+        const Duration(milliseconds: 500), // 快速滑动时等待更久
+        _executePreload,
+      );
+    } else {
+      _schedulePreload();
+    }
   }
 
   /// 获取或创建视频控制器
@@ -113,7 +184,9 @@ class VideoPreloadManager {
     // 检查是否已存在
     final existing = _controllers[videoId];
     if (existing != null) {
-      // 移到末尾（LRU）
+      // 更新访问时间（LRU）
+      existing.markAccessed();
+      // 移到末尾（LinkedHashMap 顺序）
       _controllers.remove(videoId);
       _controllers[videoId] = existing;
       AppConfig.videoLog('VideoPreloadManager: reuse controller for $videoId');
@@ -129,7 +202,9 @@ class VideoPreloadManager {
   VideoPlayerController? getPreloadedController(String videoId) {
     final wrapper = _controllers[videoId];
     if (wrapper != null && wrapper.isPreloaded) {
-      // 移到末尾（LRU）
+      // 更新访问时间（LRU）
+      wrapper.markAccessed();
+      // 移到末尾（LinkedHashMap 顺序）
       _controllers.remove(videoId);
       _controllers[videoId] = wrapper;
       return wrapper.controller;
@@ -205,16 +280,29 @@ class VideoPreloadManager {
   Future<void> _executePreload() async {
     if (_videoList.isEmpty) return;
 
-    // 计算需要预加载的索引范围
-    final start = (_currentIndex - _config.preloadWindow).clamp(0, _videoList.length - 1);
-    final end = (_currentIndex + _config.preloadWindow).clamp(0, _videoList.length - 1);
+    // 获取网络感知的预加载数量
+    final smartPreloadCount = _getSmartPreloadCount();
+
+    // 网络极差时，不预加载，只确保当前视频能播放
+    if (smartPreloadCount == 0) {
+      AppConfig.videoLog('VideoPreloadManager: network too slow, skip preloading');
+      return;
+    }
+
+    // 计算需要预加载的索引范围（根据网络状况动态调整）
+    final windowSize = smartPreloadCount.clamp(1, _config.preloadWindow);
+    final start = (_currentIndex - windowSize).clamp(0, _videoList.length - 1);
+    final end = (_currentIndex + windowSize).clamp(0, _videoList.length - 1);
 
     // 收集需要预加载的视频
     final toPreload = <PreloadItem>[];
     for (int i = start; i <= end; i++) {
       final item = _videoList[i];
       if (!_controllers.containsKey(item.videoId) && !_preloading.contains(item.videoId)) {
-        toPreload.add(item);
+        // 检查网络感知加载器是否允许加载
+        if (_networkLoader?.shouldLoad(item.videoId) ?? true) {
+          toPreload.add(item);
+        }
       }
     }
 
@@ -225,24 +313,35 @@ class VideoPreloadManager {
       return distA.compareTo(distB);
     });
 
-    // 智能预加载：根据网络状况限制预加载数量
-    final preloadCount = _config.smartPreload ? _getSmartPreloadCount() : toPreload.length;
-    final limited = toPreload.take(preloadCount);
+    // 限制预加载数量
+    final limited = toPreload.take(smartPreloadCount + 1); // +1 包含当前视频
 
-    AppConfig.videoLog('VideoPreloadManager: preloading ${limited.length} videos around index $_currentIndex');
+    AppConfig.videoLog('VideoPreloadManager: preloading ${limited.length} videos (network: ${_networkLoader?.currentStatus.quality})');
 
-    // 并行预加载
-    await Future.wait(limited.map((item) => _preloadVideo(item)));
+    // 串行预加载（低带宽时避免竞争）
+    // 网络差时串行，网络好时并行
+    if (_networkLoader?.currentStatus.quality == NetworkQuality.veryPoor ||
+        _networkLoader?.currentStatus.quality == NetworkQuality.poor) {
+      // 串行加载，优先级高的先加载
+      for (final item in limited) {
+        await _preloadVideo(item);
+      }
+    } else {
+      // 并行预加载
+      await Future.wait(limited.map((item) => _preloadVideo(item)));
+    }
 
-    // 清理超出范围的控制器
-    _cleanupOldControllers(start, end);
+    // 不再主动清理控制器，让 LRU 策略在容量不足时自动清理
+    // 这样用户滑回之前的视频时可以复用已缓存的控制器
   }
 
   /// 根据网络状况获取预加载数量
   int _getSmartPreloadCount() {
-    // TODO: 接入网络状态检测
+    if (_networkLoader != null) {
+      return _networkLoader!.getRecommendedPreloadCount();
+    }
     // 默认返回配置的窗口大小
-    return _config.preloadWindow * 2 + 1;
+    return _config.preloadWindow;
   }
 
   /// 预加载单个视频
@@ -277,19 +376,40 @@ class VideoPreloadManager {
     try {
       // 尝试从缓存获取
       String actualUrl = videoUrl;
+      bool fromCache = false;
       if (_cacheService != null) {
         final cachedPath = await _cacheService!.getCachedVideoPath(videoUrl);
         if (cachedPath != null) {
           actualUrl = cachedPath;
+          fromCache = true;
           AppConfig.videoLog('VideoPreloadManager: using cached video for $videoId');
         }
       }
 
-      final controller = VideoPlayerController.networkUrl(Uri.parse(actualUrl));
+      final controller = VideoPlayerController.networkUrl(
+        Uri.parse(actualUrl),
+        videoPlayerOptions: VideoPlayerOptions(
+          mixWithOthers: true,
+          allowBackgroundPlayback: false,
+        ),
+      );
+
       await controller.initialize();
 
       final loadTime = DateTime.now().difference(startTime);
       _monitor?.recordLoadComplete(videoId, loadTime);
+
+      // 记录网络速度样本（仅非缓存加载）
+      if (!fromCache && controller.value.isInitialized) {
+        // 估算下载的数据量（使用视频时长和码率估算）
+        final duration = controller.value.duration;
+        if (duration.inSeconds > 0) {
+          // 假设初始化加载了约3秒的数据，按平均码率1Mbps估算
+          // 实际情况会有差异，但可以作为参考
+          final estimatedBytes = (duration.inSeconds.clamp(1, 5) * 125 * 1024); // ~1Mbps
+          _networkLoader?.recordSpeedSample(estimatedBytes, loadTime);
+        }
+      }
 
       final wrapper = ControllerWrapper(
         controller: controller,
@@ -300,7 +420,7 @@ class VideoPreloadManager {
 
       _controllers[videoId] = wrapper;
 
-      AppConfig.videoLog('VideoPreloadManager: created controller for $videoId in ${loadTime.inMilliseconds}ms');
+      AppConfig.videoLog('VideoPreloadManager: created controller for $videoId in ${loadTime.inMilliseconds}ms (cache: $fromCache)');
       return controller;
     } catch (e) {
       _monitor?.recordLoadError(videoId, e.toString());
@@ -309,52 +429,44 @@ class VideoPreloadManager {
     }
   }
 
-  /// 确保控制器数量不超过限制
+  /// 确保控制器数量不超过限制（使用 LRU 策略）
   void _ensureCapacity() {
     while (_controllers.length >= _config.maxControllers) {
-      // 找到最早且非播放中的控制器
+      // 找到最久未访问且非播放中的控制器（真正的 LRU）
       String? toRemove;
+      DateTime? oldestAccessTime;
+
       for (final entry in _controllers.entries) {
         if (!entry.value.isPlaying) {
-          toRemove = entry.key;
-          break;
+          if (oldestAccessTime == null ||
+              entry.value.lastAccessedAt.isBefore(oldestAccessTime)) {
+            oldestAccessTime = entry.value.lastAccessedAt;
+            toRemove = entry.key;
+          }
         }
       }
 
       if (toRemove != null) {
         final wrapper = _controllers.remove(toRemove);
         wrapper?.controller.dispose();
-        AppConfig.videoLog('VideoPreloadManager: evicted controller for $toRemove (capacity)');
+        AppConfig.videoLog('VideoPreloadManager: evicted LRU controller for $toRemove (capacity)');
       } else {
-        // 所有控制器都在播放，强制移除最老的
-        final oldest = _controllers.entries.first;
-        _controllers.remove(oldest.key);
-        oldest.value.controller.dispose();
-        AppConfig.videoLog('VideoPreloadManager: force evicted controller for ${oldest.key}');
+        // 所有控制器都在播放，强制移除最久未访问的
+        String? forceRemove;
+        DateTime? forceOldest;
+        for (final entry in _controllers.entries) {
+          if (forceOldest == null ||
+              entry.value.lastAccessedAt.isBefore(forceOldest)) {
+            forceOldest = entry.value.lastAccessedAt;
+            forceRemove = entry.key;
+          }
+        }
+        if (forceRemove != null) {
+          final wrapper = _controllers.remove(forceRemove);
+          wrapper?.controller.dispose();
+          AppConfig.videoLog('VideoPreloadManager: force evicted controller for $forceRemove');
+        }
       }
-    }
-  }
-
-  /// 清理超出预加载范围的控制器
-  void _cleanupOldControllers(int start, int end) {
-    final validIds = <String>{};
-    for (int i = start; i <= end; i++) {
-      if (i >= 0 && i < _videoList.length) {
-        validIds.add(_videoList[i].videoId);
-      }
-    }
-
-    final toRemove = <String>[];
-    for (final entry in _controllers.entries) {
-      if (!validIds.contains(entry.key) && !entry.value.isPlaying) {
-        toRemove.add(entry.key);
-      }
-    }
-
-    for (final id in toRemove) {
-      final wrapper = _controllers.remove(id);
-      wrapper?.controller.dispose();
-      AppConfig.videoLog('VideoPreloadManager: cleaned up controller for $id (out of range)');
     }
   }
 

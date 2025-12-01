@@ -9,6 +9,7 @@ import '../../providers/profile_provider.dart';
 import '../../utils/url_utils.dart';
 import '../../utils/app_config.dart';
 import 'friend_search_page.dart';
+import 'group_members_page.dart';
 
 class ChatPage extends StatefulWidget {
   final String conversationId;
@@ -155,7 +156,25 @@ class _ChatPageState extends State<ChatPage> {
                 onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FriendSearchPage())),
                 icon: const Icon(Icons.search)
             ),
-            IconButton(onPressed: () {}, icon: const Icon(Icons.more_horiz)),
+            IconButton(
+              onPressed: () {
+                if (widget.isGroup) {
+                  // 群聊：打开群成员页面
+                  Navigator.of(context).push(MaterialPageRoute(
+                    builder: (_) => GroupMembersPage(
+                      roomId: widget.conversationId,
+                      groupName: conversation?.name ?? '群聊',
+                    ),
+                  ));
+                } else {
+                  // 私聊：可以添加其他功能，如查看对方主页
+                  if (widget.conversationId.isNotEmpty) {
+                    context.push('/user/${widget.conversationId}');
+                  }
+                }
+              },
+              icon: const Icon(Icons.more_horiz),
+            ),
           ],
         ),
         body: Column(

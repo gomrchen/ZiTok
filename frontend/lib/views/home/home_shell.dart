@@ -7,6 +7,7 @@ import '../messages/messages_page.dart';
 import '../../widgets/nav_items.dart';
 import '../profile/profile_page.dart';
 import '../../services/video/video_preload_manager.dart';
+import '../../services/video_playback_manager.dart';
 import '../../app.dart';
 
 /// 统一主界面：以组件方式管理四个模块，避免重复底部导航
@@ -82,6 +83,7 @@ class _HomeShellState extends State<HomeShell> {
     // 从首页Tab切走时暂停所有视频
     if (oldIndex == 0 && newIndex != 0) {
       _preloadManager.pauseAll();
+      VideoPlaybackManager.instance.pauseAll();
     }
   }
 

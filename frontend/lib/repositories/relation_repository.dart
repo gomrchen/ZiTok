@@ -102,6 +102,44 @@ class RelationRepository {
     }
   }
 
+  /// 获取群聊成员列表
+  /// 返回成员ID列表和创建者ID
+  Future<Map<String, dynamic>> getChatRoomMembers(int roomId) async {
+    try {
+      final response = await api.getChatRoomMembers(roomId: roomId);
+      final data = response.data;
+      if (data['code'] == '10000' || data['code'] == 10000) {
+        final roomData = data['data'];
+        final List memberIds = roomData?['member_ids'] ?? roomData?['members'] ?? [];
+        final int creatorId = roomData?['creator_id'] ?? 0;
+        return {
+          'success': true,
+          'member_ids': memberIds.map((e) => int.tryParse(e.toString()) ?? 0).toList(),
+          'creator_id': creatorId,
+        };
+      }
+      return {'success': false, 'member_ids': <int>[], 'creator_id': 0};
+    } catch (e) {
+      return {'success': false, 'member_ids': <int>[], 'creator_id': 0};
+    }
+  }
+
+  /// 批量获取用户信息
+  Future<List<Friend>> getUsersByIds(List<int> userIds) async {
+    final futures = userIds.map((id) async {
+      try {
+        final resp = await api.getUserInfo(userId: id);
+        final data = resp.data;
+        if (data['code'] == '10000' || data['code'] == 10000) {
+          return Friend.fromMergedData(data['data'], 0);
+        }
+      } catch (_) {}
+      return null;
+    });
+    final results = await Future.wait(futures);
+    return results.whereType<Friend>().toList();
+  }
+
   // 【新增】创建群聊逻辑
   Future<Map<String, dynamic>> createGroup(String name, int creatorId, List<int> memberIds) async {
     try {

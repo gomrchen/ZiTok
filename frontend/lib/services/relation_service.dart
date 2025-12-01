@@ -64,6 +64,13 @@ class RelationService {
     });
   }
 
+  /// 获取群聊成员列表
+  Future<Response> getChatRoomMembers({required int roomId}) {
+    return dio.get('/social/chatroom/members', queryParameters: {
+      'room_id': roomId,
+    });
+  }
+
   String chatUrl() {
     final base = dio.options.baseUrl.replaceFirst('http', 'ws');
     return '$base/api/relation/auth/chat';

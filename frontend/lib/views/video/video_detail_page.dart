@@ -17,6 +17,7 @@ import '../../repositories/notes_repository.dart';
 import '../../utils/url_utils.dart';
 import '../../utils/app_config.dart';
 import '../../app.dart';
+import '../../services/video_playback_manager.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:io';
 import '../profile/note_manage_page.dart';
@@ -78,7 +79,11 @@ class _VideoDetailPageState extends State<VideoDetailPage> with WidgetsBindingOb
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _videoController?.dispose();
+    // 从全局播放管理器注销
+    if (_videoController != null) {
+      VideoPlaybackManager.instance.unregister(_videoController!);
+      _videoController!.dispose();
+    }
     // 退出时恢复屏幕方向
     if (_isFullscreen) {
       _exitFullscreen();
@@ -141,7 +146,11 @@ class _VideoDetailPageState extends State<VideoDetailPage> with WidgetsBindingOb
       // 监听播放状态变化
       _videoController!.addListener(_onVideoStateChanged);
 
+      // 注册到全局播放管理器
+      VideoPlaybackManager.instance.register(_videoController!);
+
       // 自动播放
+      VideoPlaybackManager.instance.markAsPlaying(_videoController!);
       _videoController!.play();
 
       setState(() => _initialized = true);

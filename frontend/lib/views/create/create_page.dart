@@ -20,6 +20,7 @@ import 'widgets/upload_box.dart';
 import 'video_controller.dart';
 import 'markdown_preview_page.dart';
 import 'markdown_editor_page.dart';
+import '../video/video_detail_page.dart';
 
 enum CreateStep { modeSelect, prepare, edit, publish }
 
@@ -66,6 +67,9 @@ class _CreatePageState extends State<CreatePage> {
   late final PageController _pageController;
   double _dragDx = 0;
   bool _boundarySnackShown = false;
+
+  // 发布完成状态：发布成功后设为true，退出时不弹确认框
+  bool _isPublished = false;
 
   @override
   void initState() {
@@ -119,7 +123,9 @@ class _CreatePageState extends State<CreatePage> {
   }
 
   /// 检查是否有已填写的数据
+  /// 如果已经发布成功，返回false，这样退出时不会弹出确认框
   bool _hasFilledData() {
+    if (_isPublished) return false;
     return videoSource != null ||
         mdContent.isNotEmpty ||
         _titleCtl.text.isNotEmpty ||
@@ -509,11 +515,24 @@ class _CreatePageState extends State<CreatePage> {
         );
 
         if (noteId != null && mounted) {
+          // 标记为已发布，退出时不弹确认框
+          setState(() => _isPublished = true);
+
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('笔记发布成功！')),
           );
-          _resetForm();
-          _animateToStep(CreateStep.modeSelect);
+
+          // 跳转到关联视频的详情页
+          if (_linkedVideo != null) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => VideoDetailPage(video: _linkedVideo),
+              ),
+            );
+          } else {
+            // 如果没有关联视频（理论上不应该发生），返回首页
+            Navigator.of(context).pop();
+          }
         } else {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -1089,9 +1108,17 @@ class _CreatePageState extends State<CreatePage> {
         _resetForm();
         _animateToStep(CreateStep.modeSelect);
       },
-      onPop: () => Navigator.of(context).maybePop(),
+      onPop: () {
+        // 标记为已发布，退出时不弹确认框
+        setState(() => _isPublished = true);
+        Navigator.of(context).maybePop();
+      },
       onGoToEdit: () => _animateToStep(CreateStep.edit),
       onPublish: _publish,
+      onPublishSuccess: () {
+        // 发布成功时标记状态，允许直接退出
+        setState(() => _isPublished = true);
+      },
       onRetry: () {
         context.read<VideoProvider>().resetPublishProgress();
         _publish();
@@ -1573,7 +1600,7 @@ class _ModeCard extends StatelessWidget {
 }
 
 /// 发布页面内容组件（独立监听状态，避免与 PageView 布局冲突）
-class _PublishPageContent extends StatelessWidget {
+class _PublishPageContent extends StatefulWidget {
   final bool isNoteOnly;
   final String titleText;
   final String descText;
@@ -1588,6 +1615,7 @@ class _PublishPageContent extends StatelessWidget {
   final VoidCallback onRetry;
   final VoidCallback onShowVideoPreview;
   final VoidCallback onShowMarkdownPreview;
+  final VoidCallback? onPublishSuccess;
 
   const _PublishPageContent({
     required this.isNoteOnly,
@@ -1604,7 +1632,15 @@ class _PublishPageContent extends StatelessWidget {
     required this.onRetry,
     required this.onShowVideoPreview,
     required this.onShowMarkdownPreview,
+    this.onPublishSuccess,
   });
+
+  @override
+  State<_PublishPageContent> createState() => _PublishPageContentState();
+}
+
+class _PublishPageContentState extends State<_PublishPageContent> {
+  bool _successNotified = false;
 
   @override
   Widget build(BuildContext context) {
@@ -1617,6 +1653,13 @@ class _PublishPageContent extends StatelessWidget {
         final isUploading = progress.isInProgress;
 
         if (progress.isSuccess) {
+          // 发布成功时通知父组件（只通知一次）
+          if (!_successNotified && widget.onPublishSuccess != null) {
+            _successNotified = true;
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              widget.onPublishSuccess?.call();
+            });
+          }
           return _buildSuccessView(context, cs);
         }
 
@@ -1645,12 +1688,12 @@ class _PublishPageContent extends StatelessWidget {
                 ),
                 const SizedBox(height: Spacing.md),
                 Text(
-                  isNoteOnly ? '笔记发布成功！' : '视频发布成功！',
+                  widget.isNoteOnly ? '笔记发布成功！' : '视频发布成功！',
                   style: Theme.of(context).textTheme.headlineSmall,
                 ),
                 const SizedBox(height: Spacing.sm),
                 Text(
-                  isNoteOnly ? '您的笔记已发布' : '您的视频已提交，后台正在处理中',
+                  widget.isNoteOnly ? '您的笔记已发布' : '您的视频已提交，后台正在处理中',
                   style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: cs.onSurfaceVariant,
                       ),
@@ -1667,11 +1710,11 @@ class _PublishPageContent extends StatelessWidget {
           alignment: WrapAlignment.end,
           children: [
             OutlinedButton(
-              onPressed: onResetAndGoBack,
-              child: Text(isNoteOnly ? '发布新笔记' : '发布新视频'),
+              onPressed: widget.onResetAndGoBack,
+              child: Text(widget.isNoteOnly ? '发布新笔记' : '发布新视频'),
             ),
             FilledButton(
-              onPressed: onPop,
+              onPressed: widget.onPop,
               child: const Text('返回首页'),
             ),
           ],
@@ -1694,11 +1737,11 @@ class _PublishPageContent extends StatelessWidget {
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _InfoRow(icon: Icons.title, label: '标题', value: titleText.isEmpty ? '（未填写）' : titleText),
+                _InfoRow(icon: Icons.title, label: '标题', value: widget.titleText.isEmpty ? '（未填写）' : widget.titleText),
                 const SizedBox(height: Spacing.sm),
-                _InfoRow(icon: Icons.description, label: '简介', value: descText.isEmpty ? '（未填写）' : descText),
+                _InfoRow(icon: Icons.description, label: '简介', value: widget.descText.isEmpty ? '（未填写）' : widget.descText),
                 const SizedBox(height: Spacing.sm),
-                _InfoRow(icon: Icons.tag, label: '标签', value: tags.isEmpty ? '（无）' : tags.join(', ')),
+                _InfoRow(icon: Icons.tag, label: '标签', value: widget.tags.isEmpty ? '（无）' : widget.tags.join(', ')),
               ],
             ),
           ),
@@ -1716,12 +1759,12 @@ class _PublishPageContent extends StatelessWidget {
   }
 
   Widget _buildPreviewSection(BuildContext context) {
-    if (isNoteOnly) {
+    if (widget.isNoteOnly) {
       return _PreviewCard(
         icon: Icons.article_outlined,
         title: 'Markdown 预览',
-        subtitle: mdContent.isNotEmpty ? '${mdContent.length} 字符' : '未添加',
-        onTap: mdContent.isNotEmpty ? onShowMarkdownPreview : null,
+        subtitle: widget.mdContent.isNotEmpty ? '${widget.mdContent.length} 字符' : '未添加',
+        onTap: widget.mdContent.isNotEmpty ? widget.onShowMarkdownPreview : null,
       );
     }
     // 使用 Column 垂直排列预览卡片，避免 Row + Expanded 的布局问题
@@ -1732,15 +1775,15 @@ class _PublishPageContent extends StatelessWidget {
         _PreviewCard(
           icon: Icons.play_circle_outline,
           title: '视频预览',
-          subtitle: videoName ?? '未选择',
-          onTap: videoSource != null ? onShowVideoPreview : null,
+          subtitle: widget.videoName ?? '未选择',
+          onTap: widget.videoSource != null ? widget.onShowVideoPreview : null,
         ),
         const SizedBox(height: Spacing.md),
         _PreviewCard(
           icon: Icons.article_outlined,
           title: 'Markdown 预览',
-          subtitle: mdContent.isNotEmpty ? '${mdContent.length} 字符' : '未添加',
-          onTap: mdContent.isNotEmpty ? onShowMarkdownPreview : null,
+          subtitle: widget.mdContent.isNotEmpty ? '${widget.mdContent.length} 字符' : '未添加',
+          onTap: widget.mdContent.isNotEmpty ? widget.onShowMarkdownPreview : null,
         ),
       ],
     );
@@ -1763,7 +1806,7 @@ class _PublishPageContent extends StatelessWidget {
             ),
             const SizedBox(height: Spacing.md),
             FilledButton(
-              onPressed: onRetry,
+              onPressed: widget.onRetry,
               child: const Text('重试'),
             ),
           ],
@@ -1777,12 +1820,12 @@ class _PublishPageContent extends StatelessWidget {
       alignment: WrapAlignment.spaceBetween,
       children: [
         OutlinedButton.icon(
-          onPressed: onGoToEdit,
+          onPressed: widget.onGoToEdit,
           icon: const Icon(Icons.arrow_back),
           label: const Text('返回编辑'),
         ),
         FilledButton.icon(
-          onPressed: onPublish,
+          onPressed: widget.onPublish,
           icon: const Icon(Icons.publish),
           label: const Text('确认发布'),
         ),

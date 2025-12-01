@@ -95,7 +95,7 @@ class VideoProvider extends ChangeNotifier {
 
     // 清理推荐（用户相关的推荐）
     _recommend = [];
-    _lastVisit = null;
+    _lastVisit = 0;
     _recommendHasMore = true;
     _loadingRecommend = false;
     _recommendStartIndexInFollow = null;
@@ -484,14 +484,16 @@ class VideoProvider extends ChangeNotifier {
   /// 刷新推荐视频（使用新推荐接口）
   Future<void> refreshRecommend({String? category}) async {
     _recommend = [];
-    _lastVisit = null;
+    _lastVisit = 0;
     _recommendHasMore = true;
     await loadMoreRecommend(category: category);
   }
 
   /// 加载更多推荐视频
+  /// 实现无限滚动：UI层使用虚拟索引循环显示，Provider持续尝试获取新内容
   Future<void> loadMoreRecommend({String? category}) async {
-    if (_loadingRecommend || !_recommendHasMore) return;
+    if (_loadingRecommend) return;
+
     _loadingRecommend = true;
     notifyListeners();
 
@@ -502,23 +504,45 @@ class VideoProvider extends ChangeNotifier {
         lastVisit: _lastVisit,
       );
 
-      // 标记已收藏的视频
+      // 标记已收藏和已点赞的视频
       final items = res.items.map((v) {
+        Video updated = v;
         if (_favoritedIds.contains(v.id)) {
-          return v.copyWith(isFavorited: true);
+          updated = updated.copyWith(isFavorited: true);
         }
-        return v;
+        if (_likedIds.contains(v.id)) {
+          updated = updated.copyWith(isLiked: true);
+        }
+        return updated;
       }).toList();
 
-      _recommend.addAll(items);
-      _recommendHasMore = res.hasMore;
+      // 过滤掉已存在的视频ID，避免列表中出现重复
+      final existingIds = _recommend.map((v) => v.id).toSet();
+      final newItems = items.where((v) => !existingIds.contains(v.id)).toList();
 
-      // 更新游标（如果最后一个视频有views，用作下次请求的last_visit）
+      if (newItems.isNotEmpty) {
+        // 有新视频，添加到列表
+        _recommend.addAll(newItems);
+        AppConfig.log('VideoProvider.loadMoreRecommend: 添加 ${newItems.length} 个新视频，总数 ${_recommend.length}');
+      }
+
+      // 更新游标
       if (items.isNotEmpty) {
         _lastVisit = items.last.views ?? DateTime.now().millisecondsSinceEpoch;
       }
 
-      AppConfig.log('VideoProvider.loadMoreRecommend: items=${items.length} total=${_recommend.length} hasMore=$_recommendHasMore');
+      // 如果后端没有更多数据，重置游标从头开始获取
+      // 这样下次调用时会从头开始，可能获取到之前没看过的视频
+      if (!res.hasMore) {
+        AppConfig.log('VideoProvider.loadMoreRecommend: 后端无更多数据，重置游标准备下一轮');
+        _lastVisit = 0;
+      }
+
+      // 始终保持 hasMore 为 true，让 UI 可以继续请求
+      // UI 层会通过虚拟索引循环显示已有视频
+      _recommendHasMore = true;
+
+      AppConfig.log('VideoProvider.loadMoreRecommend: fetched=${items.length} new=${newItems.length} total=${_recommend.length}');
     } catch (e) {
       AppConfig.log('VideoProvider.loadMoreRecommend: error=$e');
     } finally {

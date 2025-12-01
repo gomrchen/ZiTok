@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../providers/auth_provider.dart';
+import '../services/video_playback_manager.dart';
 import '../views/welcome/welcome_page.dart';
 import '../views/auth/login_page.dart';
 import '../views/auth/register_page.dart';
@@ -29,6 +30,7 @@ class AppRouter {
     return GoRouter(
       initialLocation: '/welcome',
       refreshListenable: null,
+      observers: [VideoRouteObserver.instance],
       routes: [
         GoRoute(
           path: '/welcome',
