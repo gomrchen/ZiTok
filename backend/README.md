@@ -1,4 +1,6 @@
-# VideoHub
+# ZiTok Backend
+
+ZiTok 后端微服务系统
 
 API文档: https://2pr5l6um26.apifox.cn
 
@@ -45,15 +47,14 @@ API文档: https://2pr5l6um26.apifox.cn
 - **监控**: OpenTelemetry
 - **部署**: Docker, Docker Compose
 
-### 前端
-- **框架**: Vue 3
-- **构建工具**: Vite
-- **UI组件库**: Element Plus
-- **状态管理**: Pinia
-- **路由**: Vue Router
-- **HTTP客户端**: Axios
-- **样式**: SCSS
-- **包管理器**: npm
+### 前端 (Flutter)
+- **框架**: Flutter 3.x (Dart)
+- **状态管理**: Provider
+- **路由**: GoRouter
+- **HTTP客户端**: Dio
+- **本地存储**: Hive + SharedPreferences
+- **视频播放**: video_player + chewie
+- **实时通信**: web_socket_channel
 
 ## 系统架构
 
@@ -140,7 +141,9 @@ make gateway     # 启动网关服务
 
 make frontend-build #docker构建前端
 make frontend #启动前端服务
-（或直接在web目录下运行npm run dev，访问http://localhost:3000）
+
+# Flutter 客户端开发（参见 frontend/README.md）
+cd ../frontend && flutter run
 ```
 
 5. 访问前端页面
