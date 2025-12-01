@@ -113,7 +113,7 @@ class _VideoSheetState extends State<VideoSheet> {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
-                        _metric(cs, Icons.thumb_up, widget.likes),
+                        _metric(cs, Icons.thumb_up_outlined, widget.likes),
                         _metric(cs, Icons.bookmark, widget.favorites),
                         _metric(cs, Icons.visibility, widget.views),
                       ],

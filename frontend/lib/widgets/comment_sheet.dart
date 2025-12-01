@@ -714,7 +714,7 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
                         const SizedBox(height: 4),
                         Row(
                           children: [
-                            Icon(Icons.favorite_border, size: 14, color: cs.onSurfaceVariant),
+                            Icon(Icons.thumb_up_outlined, size: 14, color: cs.onSurfaceVariant),
                             const SizedBox(width: 4),
                             Text(
                               formatCount(video.likes),

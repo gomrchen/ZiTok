@@ -78,7 +78,7 @@ class VideoStats extends StatelessWidget {
         Text(formatCount(commentCount), style: style),
         const SizedBox(width: 16), // 两数据项间距 16px
         // 点赞数
-        Icon(Icons.favorite_border, size: iconSize, color: iconColor),
+        Icon(Icons.thumb_up_outlined, size: iconSize, color: iconColor),
         const SizedBox(width: 4),
         Text(formatCount(likeCount), style: style),
       ],

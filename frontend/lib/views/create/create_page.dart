@@ -8,11 +8,17 @@ import '../../theme/theme_tokens.dart';
 import '../../utils/content_validator.dart';
 import '../../providers/video_provider.dart';
 import '../../services/user_session.dart';
+import '../../services/user_service.dart';
+import '../../services/notes_service.dart';
+import '../../repositories/notes_repository.dart';
 import '../../models/video_publish.dart';
+import '../../models/video.dart';
+import '../../app.dart';
 import 'widgets/step_indicator.dart';
 import 'widgets/upload_box.dart';
 import 'video_controller.dart';
 import 'markdown_preview_page.dart';
+import 'markdown_editor_page.dart';
 
 enum CreateStep { modeSelect, prepare, edit, publish }
 
@@ -35,6 +41,9 @@ class _CreatePageState extends State<CreatePage> {
   String? mdFileName;
   String mdContent = '';
   bool markdownEditMode = true; // 上传/编辑切换
+
+  // 笔记单独发布模式 - 关联视频
+  Video? _linkedVideo;
 
   // 内容编辑
   final TextEditingController _titleCtl = TextEditingController();
@@ -70,6 +79,10 @@ class _CreatePageState extends State<CreatePage> {
     if (isNoteOnly && mdContent.isEmpty) {
       return '请先添加 Markdown 笔记内容';
     }
+    // 笔记模式：必须关联视频
+    if (isNoteOnly && _linkedVideo == null) {
+      return '请先选择要关联的视频';
+    }
     // 必须有标题
     if (_titleCtl.text.trim().isEmpty) {
       return isNoteOnly ? '请输入笔记标题' : '请输入视频标题';
@@ -83,7 +96,8 @@ class _CreatePageState extends State<CreatePage> {
         mdContent.isNotEmpty ||
         _titleCtl.text.isNotEmpty ||
         _descCtl.text.isNotEmpty ||
-        _tags.isNotEmpty;
+        _tags.isNotEmpty ||
+        _linkedVideo != null;
   }
 
   /// 显示重新选择模式的确认弹窗
@@ -392,6 +406,28 @@ class _CreatePageState extends State<CreatePage> {
     setState(() {});
   }
 
+  /// 打开专业 Markdown 编辑器
+  Future<void> _openMarkdownEditor() async {
+    final result = await openMarkdownEditor(
+      context,
+      initialContent: mdContent,
+      title: 'Markdown 笔记编辑',
+    );
+    if (result != null) {
+      setState(() {
+        mdContent = result;
+        if (mdFileName == null && result.isNotEmpty) {
+          mdFileName = 'note_${DateTime.now().millisecondsSinceEpoch}.md';
+        }
+      });
+      // 从编辑后的内容中提取标签
+      final tags = ContentValidator.extractTags(result);
+      for (final t in tags) {
+        if (!_tags.contains(t)) _tags.add(t);
+      }
+    }
+  }
+
   String? _validateBeforePublish() {
     final isNoteOnly = publishMode == PublishMode.noteOnly;
 
@@ -441,11 +477,43 @@ class _CreatePageState extends State<CreatePage> {
 
     // 笔记单独发布
     if (isNoteOnly) {
-      // TODO: 实现笔记单独发布的 API 调用
-      // 目前模拟成功
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('笔记发布功能开发中...')),
-      );
+      if (_linkedVideo == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请先选择要关联的视频')),
+        );
+        return;
+      }
+
+      try {
+        final notesService = NotesService(AppBootstrap.apiClient.dio);
+        final notesRepo = NotesRepository(api: notesService);
+        final noteId = await notesRepo.create(
+          videoId: int.tryParse(_linkedVideo!.id) ?? 0,
+          title: _titleCtl.text.trim(),
+          content: mdContent,
+          seconds: 0,
+        );
+
+        if (noteId != null && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('笔记发布成功！')),
+          );
+          _resetForm();
+          _animateToStep(CreateStep.modeSelect);
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('笔记发布失败，请重试')),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('笔记发布失败: $e')),
+          );
+        }
+      }
       return;
     }
 
@@ -666,6 +734,8 @@ class _CreatePageState extends State<CreatePage> {
 
   Widget _buildPrepare(double width) {
     final isNoteOnly = publishMode == PublishMode.noteOnly;
+    final cs = Theme.of(context).colorScheme;
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -679,42 +749,156 @@ class _CreatePageState extends State<CreatePage> {
           ),
           const SizedBox(height: Spacing.lg),
         ],
-        // Markdown 上传/编辑切换
-        Align(
-          alignment: Alignment.centerLeft,
-          child: ToggleButtons(
-            isSelected: [!markdownEditMode, markdownEditMode],
-            onPressed: (i) => setState(() => markdownEditMode = i == 1),
-            borderRadius: Radii.md,
-            children: const [
-              Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('上传')),
-              Padding(padding: EdgeInsets.symmetric(horizontal: 16), child: Text('编辑')),
+        // 笔记单独发布模式 - 关联视频选择（必需）
+        if (isNoteOnly) ...[
+          _CardContainer(
+            label: '关联视频（必需）',
+            child: InkWell(
+              onTap: _showVideoSearchDialog,
+              borderRadius: Radii.md,
+              child: Container(
+                padding: const EdgeInsets.all(Spacing.md),
+                decoration: BoxDecoration(
+                  border: Border.all(color: cs.outlineVariant),
+                  borderRadius: Radii.md,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      _linkedVideo != null ? Icons.check_circle : Icons.video_library,
+                      color: _linkedVideo != null ? cs.primary : cs.onSurfaceVariant,
+                    ),
+                    const SizedBox(width: Spacing.md),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            _linkedVideo != null
+                                ? (_linkedVideo!.title ?? '无标题视频')
+                                : '点击搜索并选择要关联的视频',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  color: _linkedVideo != null ? cs.onSurface : cs.onSurfaceVariant,
+                                ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          if (_linkedVideo != null) ...[
+                            const SizedBox(height: 4),
+                            Text(
+                              '视频ID: ${_linkedVideo!.id}',
+                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: cs.onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                    if (_linkedVideo != null)
+                      IconButton(
+                        icon: const Icon(Icons.close),
+                        onPressed: () => setState(() => _linkedVideo = null),
+                        tooltip: '清除选择',
+                      )
+                    else
+                      Icon(Icons.search, color: cs.onSurfaceVariant),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: Spacing.lg),
+        ],
+        // Markdown 笔记区域
+        _CardContainer(
+          label: isNoteOnly ? 'Markdown 笔记（必需）' : 'Markdown 笔记（可选）',
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // 内容预览/状态
+              Container(
+                padding: const EdgeInsets.all(Spacing.md),
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: Radii.sm,
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      mdContent.isNotEmpty ? Icons.check_circle : Icons.article_outlined,
+                      color: mdContent.isNotEmpty ? cs.primary : cs.onSurfaceVariant,
+                      size: 20,
+                    ),
+                    const SizedBox(width: Spacing.sm),
+                    Expanded(
+                      child: Text(
+                        mdContent.isNotEmpty
+                            ? '${mdContent.length} 字符${mdFileName != null ? ' · $mdFileName' : ''}'
+                            : '暂无内容',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: mdContent.isNotEmpty ? cs.onSurface : cs.onSurfaceVariant,
+                            ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: Spacing.md),
+              // 操作按钮
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: _pickMarkdown,
+                      icon: const Icon(Icons.upload_file, size: 18),
+                      label: const Text('导入文件'),
+                    ),
+                  ),
+                  const SizedBox(width: Spacing.sm),
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _openMarkdownEditor(),
+                      icon: const Icon(Icons.edit, size: 18),
+                      label: const Text('编辑内容'),
+                    ),
+                  ),
+                ],
+              ),
             ],
           ),
         ),
-        const SizedBox(height: Spacing.md),
-        if (!markdownEditMode)
-          UploadBox(
-            title: isNoteOnly ? '导入 Markdown 笔记（必需）' : '导入 Markdown 笔记',
-            hint: mdFileName == null ? '粘贴文本或选择文件（简化）' : mdFileName!,
-            icon: Icons.note_add,
-            onTap: _pickMarkdown,
-          )
-        else
-          _MarkdownEditor(
-            content: mdContent,
-            onChanged: (t) => setState(() => mdContent = t),
-          ),
         const SizedBox(height: Spacing.lg),
         Align(
           alignment: Alignment.centerRight,
           child: FilledButton(
-            onPressed: () => _animateToStep(CreateStep.edit),
+            onPressed: () {
+              // 笔记模式下验证关联视频
+              if (isNoteOnly && _linkedVideo == null) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('请先选择要关联的视频')),
+                );
+                return;
+              }
+              _animateToStep(CreateStep.edit);
+            },
             child: const Text('下一步 · 内容编辑'),
           ),
         ),
       ],
     );
+  }
+
+  /// 显示视频搜索选择弹窗
+  Future<void> _showVideoSearchDialog() async {
+    final result = await showDialog<Video>(
+      context: context,
+      builder: (dialogContext) => _VideoSearchDialog(),
+    );
+    if (result != null) {
+      setState(() => _linkedVideo = result);
+    }
   }
 
   Widget _buildEdit(double width, double minPreviewHeight, bool isWide) {
@@ -997,6 +1181,7 @@ class _CreatePageState extends State<CreatePage> {
       videoSource = null;
       mdFileName = null;
       mdContent = '';
+      _linkedVideo = null;
       _titleCtl.clear();
       _descCtl.clear();
       _tagCtl.clear();
@@ -1588,6 +1773,253 @@ class _PublishPageContent extends StatelessWidget {
           label: const Text('确认发布'),
         ),
       ],
+    );
+  }
+}
+
+/// 视频搜索选择弹窗
+class _VideoSearchDialog extends StatefulWidget {
+  @override
+  State<_VideoSearchDialog> createState() => _VideoSearchDialogState();
+}
+
+class _VideoSearchDialogState extends State<_VideoSearchDialog> {
+  final TextEditingController _searchController = TextEditingController();
+  List<Video> _videos = [];
+  bool _loading = false;
+  String? _error;
+  String? _userId;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadUserVideos();
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadUserVideos() async {
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
+
+    try {
+      final userSession = UserSession.instance;
+      _userId = userSession.userId;
+
+      if (_userId == null) {
+        setState(() {
+          _error = '请先登录';
+          _loading = false;
+        });
+        return;
+      }
+
+      final userService = UserService(AppBootstrap.apiClient.dio);
+      final videos = await userService.getVideos(
+        userId: _userId!,
+        page: 1,
+        size: 50,
+      );
+
+      setState(() {
+        _videos = videos;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = '加载失败: $e';
+        _loading = false;
+      });
+    }
+  }
+
+  List<Video> get _filteredVideos {
+    final query = _searchController.text.trim().toLowerCase();
+    if (query.isEmpty) return _videos;
+    return _videos.where((v) {
+      final title = (v.title ?? '').toLowerCase();
+      final intro = (v.intro ?? '').toLowerCase();
+      return title.contains(query) || intro.contains(query);
+    }).toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+
+    return Dialog(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 500, maxHeight: 600),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            // 标题栏
+            Padding(
+              padding: const EdgeInsets.all(Spacing.md),
+              child: Row(
+                children: [
+                  const Icon(Icons.video_library),
+                  const SizedBox(width: Spacing.sm),
+                  Expanded(
+                    child: Text('选择关联视频', style: theme.textTheme.titleMedium),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.close),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            // 搜索框
+            Padding(
+              padding: const EdgeInsets.all(Spacing.md),
+              child: TextField(
+                controller: _searchController,
+                decoration: InputDecoration(
+                  hintText: '搜索我的视频...',
+                  prefixIcon: const Icon(Icons.search),
+                  border: OutlineInputBorder(borderRadius: Radii.md),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                ),
+                onChanged: (_) => setState(() {}),
+              ),
+            ),
+            // 视频列表
+            Expanded(
+              child: _buildVideoList(cs, theme),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildVideoList(ColorScheme cs, ThemeData theme) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, color: cs.error, size: 48),
+            const SizedBox(height: Spacing.md),
+            Text(_error!, style: TextStyle(color: cs.error)),
+            const SizedBox(height: Spacing.md),
+            ElevatedButton(onPressed: _loadUserVideos, child: const Text('重试')),
+          ],
+        ),
+      );
+    }
+
+    final videos = _filteredVideos;
+
+    if (videos.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.video_library_outlined, size: 48, color: cs.onSurfaceVariant),
+            const SizedBox(height: Spacing.md),
+            Text(
+              _searchController.text.isNotEmpty ? '未找到匹配的视频' : '您还没有发布任何视频',
+              style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+      itemCount: videos.length,
+      itemBuilder: (context, index) {
+        final video = videos[index];
+        return _VideoSelectItem(
+          video: video,
+          onTap: () => Navigator.pop(context, video),
+        );
+      },
+    );
+  }
+}
+
+class _VideoSelectItem extends StatelessWidget {
+  final Video video;
+  final VoidCallback onTap;
+
+  const _VideoSelectItem({required this.video, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: Spacing.sm),
+      color: cs.surfaceContainerLow,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: Radii.md,
+        child: Padding(
+          padding: const EdgeInsets.all(Spacing.md),
+          child: Row(
+            children: [
+              // 封面
+              Container(
+                width: 80,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: cs.surfaceContainerHighest,
+                  borderRadius: BorderRadius.circular(8),
+                  image: video.coverUrl != null && video.coverUrl!.isNotEmpty
+                      ? DecorationImage(
+                          image: NetworkImage(video.coverUrl!),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+                child: video.coverUrl == null || video.coverUrl!.isEmpty
+                    ? Icon(Icons.video_library, color: cs.onSurfaceVariant)
+                    : null,
+              ),
+              const SizedBox(width: Spacing.md),
+              // 信息
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      video.title ?? '无标题',
+                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'ID: ${video.id}',
+                      style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

@@ -45,7 +45,7 @@ class VideoCard extends StatelessWidget {
                     children: [
                       Text('👍 ${video.likes ?? 0} · 👁️ ${video.views ?? 0}', style: Theme.of(context).textTheme.bodySmall),
                       const Spacer(),
-                      const Icon(Icons.favorite, size: 16),
+                      const Icon(Icons.thumb_up_outlined, size: 16),
                       const SizedBox(width: 4),
                       Text('${video.likes ?? 0}', style: Theme.of(context).textTheme.bodySmall),
                     ],

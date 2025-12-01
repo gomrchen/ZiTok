@@ -49,8 +49,8 @@ func main() {
 
 	router.RegisterWebSocket(h)
 
-	router.RegisterStaticRoutes(h)
-	router.GeneratedRegister(h)
+	router.GeneratedRegister(h)      // 先注册 API 路由
+  	router.RegisterStaticRoutes(h)
 
 	h.Spin()
 }

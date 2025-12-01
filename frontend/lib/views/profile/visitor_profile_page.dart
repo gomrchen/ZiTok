@@ -454,7 +454,7 @@ class _VideoThumbnail extends StatelessWidget {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Icon(Icons.favorite, size: 12, color: Colors.white),
+                    const Icon(Icons.thumb_up_outlined, size: 12, color: Colors.white),
                     const SizedBox(width: 2),
                     Text(
                       _formatCount(video.likes ?? 0),

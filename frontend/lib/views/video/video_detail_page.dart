@@ -6,15 +6,19 @@ import '../../providers/video_provider.dart';
 import '../../providers/comment_provider.dart';
 import '../../models/video.dart';
 import '../../models/comment.dart';
+import '../../models/notes_models.dart';
 import '../../theme/theme_tokens.dart';
 import '../../widgets/video_controls_overlay.dart';
 import '../../widgets/comment_sheet.dart';
 import '../../widgets/animated_like_button.dart';
 import '../../services/user_service.dart';
+import '../../services/notes_service.dart';
+import '../../repositories/notes_repository.dart';
 import '../../utils/url_utils.dart';
 import '../../app.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:io';
+import '../profile/note_manage_page.dart';
 
 /// 视频详情页 - 支持可拖拽互动区域（类似B站移动端）
 ///
@@ -745,7 +749,7 @@ class _IntroTab extends StatelessWidget {
           // 统计数据
           Row(
             children: [
-              Icon(Icons.favorite_border, size: 16, color: cs.onSurfaceVariant),
+              Icon(Icons.thumb_up_outlined, size: 16, color: cs.onSurfaceVariant),
               const SizedBox(width: 4),
               Text('${video.likes ?? 0}', style: theme.textTheme.bodySmall),
               const SizedBox(width: Spacing.md),
@@ -897,25 +901,283 @@ class _CommentsTabState extends State<_CommentsTab> {
   }
 }
 
-/// 笔记Tab
-class _NotesTab extends StatelessWidget {
+/// 笔记Tab - 展示视频关联的笔记列表
+class _NotesTab extends StatefulWidget {
   final Video video;
   const _NotesTab({required this.video});
 
   @override
+  State<_NotesTab> createState() => _NotesTabState();
+}
+
+enum NoteSortType { latest, likes, favorites }
+
+class _NotesTabState extends State<_NotesTab> {
+  List<NoteItem> _notes = [];
+  bool _loading = false;
+  String? _error;
+  NoteSortType _sortType = NoteSortType.latest;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotes();
+  }
+
+  Future<void> _loadNotes() async {
+    if (mounted) {
+      setState(() {
+        _loading = true;
+        _error = null;
+      });
+    }
+
+    try {
+      final notesService = NotesService(AppBootstrap.apiClient.dio);
+      final notesRepo = NotesRepository(api: notesService);
+      final result = await notesRepo.getVideoNotes(
+        videoId: int.tryParse(widget.video.id) ?? 0,
+        page: 1,
+        pageSize: 50,
+      );
+
+      if (mounted) {
+        setState(() {
+          _notes = result.notes;
+          _sortNotes();
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _error = e.toString());
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _loading = false);
+      }
+    }
+  }
+
+  void _sortNotes() {
+    switch (_sortType) {
+      case NoteSortType.latest:
+        _notes.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+        break;
+      case NoteSortType.likes:
+        _notes.sort((a, b) => b.likeCount.compareTo(a.likeCount));
+        break;
+      case NoteSortType.favorites:
+        _notes.sort((a, b) => b.favoriteCount.compareTo(a.favoriteCount));
+        break;
+    }
+  }
+
+  void _onSortChanged(NoteSortType type) {
+    if (_sortType != type) {
+      setState(() {
+        _sortType = type;
+        _sortNotes();
+      });
+    }
+  }
+
+  void _openNoteReader(NoteItem note) {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (context) => NoteReaderPage(note: note),
+      ),
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final cs = theme.colorScheme;
 
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.note_outlined, size: 48, color: theme.colorScheme.onSurfaceVariant),
-          const SizedBox(height: Spacing.md),
-          Text('暂无笔记', style: theme.textTheme.bodyMedium?.copyWith(
-            color: theme.colorScheme.onSurfaceVariant,
-          )),
-        ],
+    if (_loading) {
+      return const Center(
+        child: Padding(
+          padding: EdgeInsets.all(Spacing.lg),
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+
+    if (_error != null) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(Spacing.lg),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(Icons.error_outline, color: cs.error, size: 48),
+              const SizedBox(height: Spacing.md),
+              Text('加载失败', style: theme.textTheme.bodyMedium?.copyWith(color: cs.error)),
+              const SizedBox(height: Spacing.sm),
+              TextButton(onPressed: _loadNotes, child: const Text('重试')),
+            ],
+          ),
+        ),
+      );
+    }
+
+    if (_notes.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.note_outlined, size: 48, color: cs.onSurfaceVariant),
+            const SizedBox(height: Spacing.md),
+            Text('暂无笔记', style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+            const SizedBox(height: Spacing.sm),
+            Text('还没有人为这个视频写笔记', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+          ],
+        ),
+      );
+    }
+
+    return Column(
+      children: [
+        // 排序栏
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.xs),
+          child: Row(
+            children: [
+              Text('${_notes.length}条笔记', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+              const Spacer(),
+              _SortChip(
+                label: '最新',
+                selected: _sortType == NoteSortType.latest,
+                onTap: () => _onSortChanged(NoteSortType.latest),
+              ),
+              const SizedBox(width: 8),
+              _SortChip(
+                label: '点赞',
+                selected: _sortType == NoteSortType.likes,
+                onTap: () => _onSortChanged(NoteSortType.likes),
+              ),
+              const SizedBox(width: 8),
+              _SortChip(
+                label: '收藏',
+                selected: _sortType == NoteSortType.favorites,
+                onTap: () => _onSortChanged(NoteSortType.favorites),
+              ),
+            ],
+          ),
+        ),
+        // 笔记列表
+        Expanded(
+          child: RefreshIndicator(
+            onRefresh: _loadNotes,
+            child: ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+              itemCount: _notes.length,
+              itemBuilder: (context, index) {
+                final note = _notes[index];
+                return _VideoNoteItem(
+                  note: note,
+                  onTap: () => _openNoteReader(note),
+                );
+              },
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _SortChip extends StatelessWidget {
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _SortChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+        decoration: BoxDecoration(
+          color: selected ? cs.primaryContainer : cs.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+            color: selected ? cs.onPrimaryContainer : cs.onSurfaceVariant,
+            fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _VideoNoteItem extends StatelessWidget {
+  final NoteItem note;
+  final VoidCallback onTap;
+
+  const _VideoNoteItem({required this.note, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final cs = theme.colorScheme;
+
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: Spacing.sm),
+      color: cs.surfaceContainerLow,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(Spacing.md),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 标题
+              Text(
+                note.title.isNotEmpty ? note.title : '无标题笔记',
+                style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 4),
+              // 内容预览
+              if (note.content.isNotEmpty)
+                Text(
+                  note.content,
+                  style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              const SizedBox(height: 8),
+              // 统计数据
+              Row(
+                children: [
+                  Icon(Icons.thumb_up_outlined, size: 14, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 4),
+                  Text('${note.likeCount}', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                  const SizedBox(width: 16),
+                  Icon(Icons.star_outline, size: 14, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 4),
+                  Text('${note.favoriteCount}', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                  const Spacer(),
+                  Icon(Icons.chevron_right, size: 18, color: cs.onSurfaceVariant),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

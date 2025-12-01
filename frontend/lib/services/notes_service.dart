@@ -1,25 +1,72 @@
 import 'package:dio/dio.dart';
 
-/// 笔记服务（前端新增模块），用于视频关联的时间戳笔记
-/// 后端暂未提供正式实现，本模块在开发环境进行本地短路，在非开发环境按 REST 约定调用 /api/notes/* 路由
+/// 笔记服务 - 对接后端笔记模块API
+/// API基础路径: /api/v1/note/
 class NotesService {
   final Dio dio;
   NotesService(this.dio);
 
-  Future<Response> list({required String videoId}) {
-    return dio.get('/api/notes/list', queryParameters: {'video_id': videoId});
+  /// 获取视频关联的笔记列表
+  Future<Response> getVideoNotes({
+    required int videoId,
+    int page = 1,
+    int pageSize = 10,
+  }) {
+    return dio.get('/note/video', queryParameters: {
+      'video_id': videoId,
+      'page': page,
+      'page_size': pageSize,
+    });
   }
 
-  Future<Response> create({required String videoId, required String title, required String content, required int seconds}) {
-    return dio.post('/api/notes/create', data: {
+  /// 获取用户的笔记列表
+  Future<Response> getUserNotes({
+    required int userId,
+    int page = 1,
+    int pageSize = 10,
+  }) {
+    return dio.get('/note/user', queryParameters: {
+      'user_id': userId,
+      'page': page,
+      'page_size': pageSize,
+    });
+  }
+
+  /// 创建笔记
+  Future<Response> create({
+    required int videoId,
+    required String title,
+    required String content,
+    List<String> imageUrls = const [],
+    int seconds = 0,
+  }) {
+    return dio.post('/note/create', data: {
       'video_id': videoId,
       'title': title,
       'content': content,
+      'imageUrls': imageUrls,
       'seconds': seconds,
     });
   }
 
-  Future<Response> delete({required String noteId}) {
-    return dio.post('/api/notes/delete', data: {'note_id': noteId});
+  /// 删除笔记
+  Future<Response> delete({required int noteId}) {
+    return dio.post('/note/delete', data: {
+      'noteId': noteId,
+    });
+  }
+
+  /// 点赞/取消点赞笔记（后端自动判断操作类型）
+  Future<Response> like({required int noteId}) {
+    return dio.post('/note/like', data: { 
+      'noteId': noteId,
+    });
+  }
+
+  /// 收藏/取消收藏笔记（后端自动判断操作类型）
+  Future<Response> favorite({required int noteId}) {
+    return dio.post('/note/favorite', data: {
+      'noteId': noteId,
+    });
   }
 }

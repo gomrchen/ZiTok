@@ -82,7 +82,7 @@ class _NoteSheetState extends State<NoteSheet> {
                     ]),
                     const SizedBox(height: Spacing.sm),
                     Row(mainAxisAlignment: MainAxisAlignment.spaceAround, children: [
-                      _metric(cs, Icons.thumb_up, widget.likes),
+                      _metric(cs, Icons.thumb_up_outlined, widget.likes),
                       _metric(cs, Icons.bookmark, widget.favorites),
                       _metric(cs, Icons.article, widget.reads),
                     ]),
@@ -118,7 +118,7 @@ class _NoteSheetState extends State<NoteSheet> {
       builder: (dctx) => AlertDialog(title: const Text('确认删除'), content: const Text('删除后不可恢复'), actions: [TextButton(onPressed: () => Navigator.pop(dctx, false), child: const Text('取消')), FilledButton(onPressed: () => Navigator.pop(dctx, true), child: const Text('删除'))]),
     );
     if (ok == true) {
-      await NotesService(AppBootstrap.apiClient.dio).delete(noteId: widget.id);
+      await NotesService(AppBootstrap.apiClient.dio).delete(noteId: int.tryParse(widget.id) ?? 0);
       if (widget.onDeleted != null) widget.onDeleted!();
       if (mounted) Navigator.pop(context);
     }

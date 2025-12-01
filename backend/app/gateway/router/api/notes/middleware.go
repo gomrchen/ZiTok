@@ -8,58 +8,45 @@ import (
 )
 
 func rootMw() []app.HandlerFunc {
-	// your code...
-	return []app.HandlerFunc{}
+	return nil
 }
 
 func _apiMw() []app.HandlerFunc {
-	// your code...
-	return []app.HandlerFunc{}
+	return nil
 }
 
 func _v1Mw() []app.HandlerFunc {
-	// your code...
-	return []app.HandlerFunc{}
+	return nil
 }
 
-func authMw() []app.HandlerFunc {
-	// 添加鉴权中间件
-	return []app.HandlerFunc{
-		mw.Auth(),
-	}
-}
-
-func publicMw() []app.HandlerFunc {
-	// your code...
-	return []app.HandlerFunc{}
+func _noteMw() []app.HandlerFunc {
+	return nil
 }
 
 func _createNoteMw() []app.HandlerFunc {
-	// your code...
-	return []app.HandlerFunc{}
+	return []app.HandlerFunc{mw.Auth()}
 }
 
 func _deleteNoteMw() []app.HandlerFunc {
-	// your code...
-	return []app.HandlerFunc{}
+	return []app.HandlerFunc{mw.Auth()}
 }
 
 func _getVideoNotesMw() []app.HandlerFunc {
-	// your code...
-	return []app.HandlerFunc{}
+	return nil
 }
 
 func _getUserNotesMw() []app.HandlerFunc {
-	// your code...
-	return []app.HandlerFunc{}
+	return nil
 }
 
 func _likeNoteMw() []app.HandlerFunc {
-	// your code...
-	return []app.HandlerFunc{}
+	return []app.HandlerFunc{mw.Auth()}
 }
 
 func _favoriteNoteMw() []app.HandlerFunc {
-	// your code...
-	return []app.HandlerFunc{}
+	return []app.HandlerFunc{mw.Auth()}
+}
+
+func _getNotesMw() []app.HandlerFunc {
+	return nil
 }

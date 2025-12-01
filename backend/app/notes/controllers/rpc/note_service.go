@@ -1,14 +1,13 @@
 package rpc
 
 import (
-    "context"
-    "fmt"
+	"context"
 
-    "github.com/yxrxy/videoHub/app/notes/domain/service"
-    "github.com/yxrxy/videoHub/app/notes/usecase"
-    "github.com/yxrxy/videoHub/kitex_gen/model"
-    "github.com/yxrxy/videoHub/kitex_gen/notes"
-    "github.com/yxrxy/videoHub/pkg/errno"
+	"github.com/yxrxy/videoHub/app/notes/domain/service"
+	"github.com/yxrxy/videoHub/app/notes/usecase"
+	"github.com/yxrxy/videoHub/kitex_gen/model"
+	"github.com/yxrxy/videoHub/kitex_gen/notes"
+	"github.com/yxrxy/videoHub/pkg/errno"
 )
 
 // NoteServiceHandler 笔记服务处理器
@@ -46,11 +45,12 @@ func (h *NoteServiceHandler) CreateNote(ctx context.Context, req *notes.CreateNo
 	// 调用用例创建笔记
 	noteModel, err := h.noteUsecase.CreateNote(ctx, createReq)
 	if err != nil {
-		return nil, fmt.Errorf("create note failed: %w", err)
+		return &notes.CreateNoteResponse{Base: &model.BaseResp{Code: errno.InternalServiceErrorCode, Msg: err.Error()}}, nil
 	}
 
 	// 转换响应
 	resp := &notes.CreateNoteResponse{
+		Base:   &model.BaseResp{Code: errno.SuccessCode, Msg: "ok"},
 		NoteId: &noteModel.ID,
 	}
 
@@ -77,6 +77,7 @@ func (h *NoteServiceHandler) GetNotes(ctx context.Context, req *notes.GetNotesRe
 
 	// 转换响应
 	resp := &notes.GetNotesResponse{
+		Base:  &model.BaseResp{Code: errno.SuccessCode, Msg: "ok"},
 		Total: int64(total),
 		Notes: make([]*notes.NoteInfo, 0, len(notesList)),
 	}
@@ -132,32 +133,32 @@ func (h *NoteServiceHandler) DeleteNote(ctx context.Context, req *notes.DeleteNo
 	// 调用用例删除笔记
 	err := h.noteUsecase.DeleteNote(ctx, req.NoteId, req.UserId)
 	if err != nil {
-		return nil, fmt.Errorf("delete note failed: %w", err)
+		return &notes.DeleteNoteResponse{Base: &model.BaseResp{Code: errno.InternalServiceErrorCode, Msg: err.Error()}}, nil
 	}
 
-	return &notes.DeleteNoteResponse{}, nil
+	return &notes.DeleteNoteResponse{Base: &model.BaseResp{Code: errno.SuccessCode, Msg: "ok"}}, nil
 }
 
 // LikeNote 点赞笔记
 func (h *NoteServiceHandler) LikeNote(ctx context.Context, req *notes.LikeNoteRequest) (*notes.LikeNoteResponse, error) {
 	// 调用用例点赞笔记
-    err := h.noteUsecase.LikeNote(ctx, req.NoteId, req.UserId)
-    if err != nil {
-        return &notes.LikeNoteResponse{Base: &model.BaseResp{Code: errno.InternalServiceErrorCode, Msg: err.Error()}}, nil
-    }
+	err := h.noteUsecase.LikeNote(ctx, req.NoteId, req.UserId)
+	if err != nil {
+		return &notes.LikeNoteResponse{Base: &model.BaseResp{Code: errno.InternalServiceErrorCode, Msg: err.Error()}}, nil
+	}
 
-	return &notes.LikeNoteResponse{}, nil
+	return &notes.LikeNoteResponse{Base: &model.BaseResp{Code: errno.SuccessCode, Msg: "ok"}}, nil
 }
 
 // FavoriteNote 收藏笔记
 func (h *NoteServiceHandler) FavoriteNote(ctx context.Context, req *notes.FavoriteNoteRequest) (*notes.FavoriteNoteResponse, error) {
 	// 调用用例收藏笔记
-    err := h.noteUsecase.FavoriteNote(ctx, req.NoteId, req.UserId)
-    if err != nil {
-        return &notes.FavoriteNoteResponse{Base: &model.BaseResp{Code: errno.InternalServiceErrorCode, Msg: err.Error()}}, nil
-    }
+	err := h.noteUsecase.FavoriteNote(ctx, req.NoteId, req.UserId)
+	if err != nil {
+		return &notes.FavoriteNoteResponse{Base: &model.BaseResp{Code: errno.InternalServiceErrorCode, Msg: err.Error()}}, nil
+	}
 
-	return &notes.FavoriteNoteResponse{}, nil
+	return &notes.FavoriteNoteResponse{Base: &model.BaseResp{Code: errno.SuccessCode, Msg: "ok"}}, nil
 }
 
 // GetUserNotes 获取用户的笔记列表
@@ -180,6 +181,7 @@ func (h *NoteServiceHandler) GetUserNotes(ctx context.Context, req *notes.GetUse
 
 	// 转换响应
 	resp := &notes.GetUserNotesResponse{
+		Base:  &model.BaseResp{Code: errno.SuccessCode, Msg: "ok"},
 		Total: int64(total),
 		Notes: make([]*notes.NoteInfo, 0, len(notesList)),
 	}
@@ -195,7 +197,7 @@ func (h *NoteServiceHandler) GetUserNotes(ctx context.Context, req *notes.GetUse
 			updatedAtVal := int64(n.UpdatedAt.Unix())
 			updatedAt = &updatedAtVal
 		}
-		
+
 		// 转换可选字段
 		var videoId *int64
 		if n.VideoID != 0 {

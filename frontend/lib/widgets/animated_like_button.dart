@@ -133,7 +133,7 @@ class _AnimatedLikeButtonState extends State<AnimatedLikeButton>
             ScaleTransition(
               scale: _scaleAnimation,
               child: Icon(
-                isLiked ? Icons.favorite : Icons.favorite_border,
+                isLiked ? Icons.thumb_up : Icons.thumb_up_outlined,
                 size: widget.size,
                 color: isLiked ? activeColor : inactiveColor,
               ),
@@ -168,7 +168,7 @@ class _AnimatedLikeButtonState extends State<AnimatedLikeButton>
   Widget _buildParticle(Offset offset, Color color) {
     return Transform.translate(
       offset: offset,
-      child: Icon(Icons.favorite, color: color, size: 8),
+      child: Icon(Icons.thumb_up, color: color, size: 8),
     );
   }
 
@@ -284,7 +284,7 @@ class _FullScreenLikeButtonState extends State<FullScreenLikeButton>
                     CurvedAnimation(parent: _scaleController, curve: Curves.easeOut),
                   ),
                   child: Icon(
-                    isLiked ? Icons.favorite : Icons.favorite_border,
+                    isLiked ? Icons.thumb_up : Icons.thumb_up_outlined,
                     color: isLiked ? Colors.red : Colors.white,
                   ),
                 ),
@@ -304,7 +304,7 @@ class _FullScreenLikeButtonState extends State<FullScreenLikeButton>
   Widget _particle(Offset offset, Color color) {
     return Transform.translate(
       offset: offset,
-      child: Icon(Icons.favorite, color: color, size: 10),
+      child: Icon(Icons.thumb_up, color: color, size: 10),
     );
   }
 

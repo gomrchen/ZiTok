@@ -5,22 +5,29 @@ info:
     笔记模块提供视频笔记的创建、查询、删除、点赞和收藏功能。
 
     ## 认证说明
-    - 所有接口需要携带 Authorization 请求头进行身份验证
-    - 格式: `Authorization: Bearer <token>`
-    - 如果未提供有效token，系统将使用默认用户ID(1)
+    - 需要认证的接口必须携带 Authorization 请求头
+    - 格式: `Authorization: Bearer <token>` 或 `Authorization: <token>`
+    - 需要认证: POST /create, POST /delete, POST /like, POST /favorite
+    - 无需认证: GET /video, GET /user, GET /
 
     ## 参数兼容性
     - 所有接口同时支持驼峰命名(camelCase)和下划线命名(snake_case)
     - 例如: `video_id` 和 `videoId` 均可使用
+
+    ## 响应码说明
+    - code: "0" 或 0 表示成功
+    - code: "10001" 参数错误
+    - code: "40100" 未授权/Token无效
+    - code: "50000" 服务器内部错误
   version: 1.0.0
   contact:
     name: ZiTok Team
 
 servers:
+  - url: http://106.53.190.84:8080
+    description: 测试服务器
   - url: http://localhost:8080
     description: 本地开发服务器
-  - url: https://api.zitok.com
-    description: 生产服务器
 
 tags:
   - name: 笔记管理

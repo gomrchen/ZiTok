@@ -72,7 +72,7 @@ class WorkManageSheet extends StatelessWidget {
                               if (type == WorkType.video) {
                                 await VideoService(AppBootstrap.apiClient.dio).delete(videoId: '$i');
                               } else {
-                                await NotesService(AppBootstrap.apiClient.dio).delete(noteId: '$i');
+                                await NotesService(AppBootstrap.apiClient.dio).delete(noteId: i);
                               }
                               if (ctx.mounted) {
                                 Navigator.pop(ctx);

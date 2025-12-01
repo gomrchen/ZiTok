@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../../models/video.dart';
 import '../../../providers/video_provider.dart';
 import 'package:provider/provider.dart';
@@ -8,6 +9,7 @@ import '../../../repositories/notes_repository.dart';
 import '../../../services/notes_service.dart';
 import '../../../app.dart';
 import '../../../models/notes_models.dart';
+import 'md_notes_sheet.dart' show NoteReaderPage;
 
 /// 下半部分内容容器：评论 / 简介 / 笔记
 class VideoDetailContent extends StatefulWidget {
@@ -40,9 +42,9 @@ class _VideoDetailContentState extends State<VideoDetailContent> with TickerProv
   Future<NoteListResp> _fetchNotes(String vid) async {
     try {
       final repo = NotesRepository(api: NotesService(AppBootstrap.apiClient.dio));
-      return await repo.list(vid);
+      return await repo.getVideoNotes(videoId: int.tryParse(vid) ?? 0);
     } catch (_) {
-      return const NoteListResp(count: 0, items: []);
+      return const NoteListResp(total: 0, notes: []);
     }
   }
 
@@ -92,29 +94,7 @@ class _VideoDetailContentState extends State<VideoDetailContent> with TickerProv
                     )
                   : const _CommentsSkeleton(),
               // 笔记
-              SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
-                child: FutureBuilder<NoteListResp>(
-                  future: _notesFuture,
-                  builder: (context, snap) {
-                    final loaded = snap.connectionState == ConnectionState.done && snap.hasData;
-                    final items = loaded ? snap.data!.items : const <NoteItem>[];
-                    final attach = items.where((e) => e.seconds > 0).toList();
-                    final user = items.where((e) => e.seconds <= 0).toList();
-                    if (!loaded) return const _NotesSkeleton();
-                    return Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text('关联笔记', style: theme.textTheme.titleSmall),
-                        const SizedBox(height: Spacing.sm),
-                        _NotesBlock(title: '视频附件笔记', items: attach, accent: Colors.blueAccent),
-                        const SizedBox(height: Spacing.md),
-                        _UserNotesBlock(videoId: widget.video.id, items: user),
-                      ],
-                    );
-                  },
-                ),
-              ),
+              _NotesTabContent(video: widget.video, notesFuture: _notesFuture),
             ],
           ),
         ),
@@ -137,7 +117,7 @@ class _IntroSection extends StatelessWidget {
         const SizedBox(height: 6),
         Row(children: [
           // 点赞数和评论数
-          Icon(Icons.favorite_border, size: 14, color: Colors.grey.shade600),
+          Icon(Icons.thumb_up_outlined, size: 14, color: Colors.grey.shade600),
           const SizedBox(width: 4),
           Text('${video.likes ?? 0}', style: theme.textTheme.bodySmall),
           const SizedBox(width: 12),
@@ -148,7 +128,7 @@ class _IntroSection extends StatelessWidget {
           // 点赞按钮
           IconButton(
             onPressed: () => context.read<VideoProvider>().like(video.id),
-            icon: const Icon(Icons.favorite_border),
+            icon: const Icon(Icons.thumb_up_outlined),
             tooltip: '点赞',
           ),
           // 收藏按钮
@@ -273,161 +253,245 @@ class _SkeletonLine extends StatelessWidget {
 
 // 已移除预览数据结构，改为复用 CommentsPane 内部逻辑
 
-class _NotesBlock extends StatelessWidget {
-  final String title;
-  final List<NoteItem> items;
-  final Color accent;
-  const _NotesBlock({required this.title, required this.items, required this.accent});
+/// 笔记Tab内容（统一样式+快速发布按钮）
+class _NotesTabContent extends StatefulWidget {
+  final Video video;
+  final Future<NoteListResp>? notesFuture;
+
+  const _NotesTabContent({required this.video, required this.notesFuture});
+
+  @override
+  State<_NotesTabContent> createState() => _NotesTabContentState();
+}
+
+class _NotesTabContentState extends State<_NotesTabContent> {
+  List<NoteItem> _notes = [];
+  bool _loaded = false;
+  String _sortBy = 'like'; // 'like' or 'favorite'
+
+  @override
+  void initState() {
+    super.initState();
+    _loadNotes();
+  }
+
+  Future<void> _loadNotes() async {
+    if (widget.notesFuture == null) return;
+    try {
+      final result = await widget.notesFuture!;
+      if (mounted) {
+        setState(() {
+          _notes = result.notes;
+          _loaded = true;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _loaded = true);
+      }
+    }
+  }
+
+  List<NoteItem> get _sortedNotes {
+    final sorted = List<NoteItem>.from(_notes);
+    if (_sortBy == 'like') {
+      sorted.sort((a, b) => b.likeCount.compareTo(a.likeCount));
+    } else {
+      sorted.sort((a, b) => b.favoriteCount.compareTo(a.favoriteCount));
+    }
+    return sorted;
+  }
+
+  void _navigateToQuickPublish() {
+    // 跳转到笔记发布页面，并预设关联视频
+    context.push('/create', extra: {
+      'mode': 'note_only',
+      'linkedVideo': widget.video,
+    });
+  }
+
+  void _openNoteReader(NoteItem note) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => NoteReaderPage(note: note),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
+
+    if (!_loaded) {
+      return const _NotesSkeleton();
+    }
+
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(children: [
-          Container(width: 4, height: 18, decoration: BoxDecoration(color: accent, borderRadius: Radii.sm)),
-          const SizedBox(width: 8),
-          Text(title, style: theme.textTheme.titleSmall),
-        ]),
-        const SizedBox(height: Spacing.sm),
-        if (items.isEmpty)
-          Text('暂无内容', style: theme.textTheme.bodySmall)
-        else
-          Column(
+        // 排序栏
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.xs),
+          color: cs.surfaceContainerLow,
+          child: Row(
             children: [
-              for (final n in items)
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: accent.withValues(alpha: 0.08),
-                    borderRadius: Radii.md,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(n.title, style: theme.textTheme.titleSmall),
-                      const SizedBox(height: 6),
-                      Text(n.content, style: theme.textTheme.bodySmall),
-                      if (n.seconds > 0) ...[
-                        const SizedBox(height: 6),
-                        Row(children: [const Icon(Icons.schedule, size: 16), const SizedBox(width: 4), Text('${n.seconds}s')]),
-                      ],
-                    ],
-                  ),
+              Icon(Icons.article_outlined, size: 18, color: cs.primary),
+              const SizedBox(width: Spacing.xs),
+              Text('关联笔记 (${_notes.length})', style: theme.textTheme.labelLarge),
+              const Spacer(),
+              // 排序选择
+              PopupMenuButton<String>(
+                initialValue: _sortBy,
+                onSelected: (value) => setState(() => _sortBy = value),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.sort, size: 16, color: cs.onSurfaceVariant),
+                    const SizedBox(width: 4),
+                    Text(
+                      _sortBy == 'like' ? '按点赞数' : '按收藏数',
+                      style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                    ),
+                    Icon(Icons.arrow_drop_down, size: 16, color: cs.onSurfaceVariant),
+                  ],
                 ),
+                itemBuilder: (context) => [
+                  const PopupMenuItem(value: 'like', child: Text('按点赞数排序')),
+                  const PopupMenuItem(value: 'favorite', child: Text('按收藏数排序')),
+                ],
+              ),
             ],
           ),
+        ),
+        // 笔记列表
+        Expanded(
+          child: _notes.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.article_outlined, size: 48, color: cs.onSurfaceVariant.withValues(alpha: 0.5)),
+                      const SizedBox(height: Spacing.md),
+                      Text('暂无关联笔记', style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+                      const SizedBox(height: Spacing.xs),
+                      Text('成为第一个发布笔记的人吧！', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.all(Spacing.md),
+                  itemCount: _sortedNotes.length,
+                  itemBuilder: (context, index) {
+                    final note = _sortedNotes[index];
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: Spacing.sm),
+                      child: _UnifiedNoteListItem(
+                        note: note,
+                        onTap: () => _openNoteReader(note),
+                      ),
+                    );
+                  },
+                ),
+        ),
+        // 底部快速发布按钮
+        Container(
+          padding: EdgeInsets.fromLTRB(
+            Spacing.md,
+            Spacing.sm,
+            Spacing.md,
+            Spacing.sm + MediaQuery.of(context).padding.bottom,
+          ),
+          decoration: BoxDecoration(
+            color: cs.surface,
+            border: Border(top: BorderSide(color: cs.outlineVariant)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: FilledButton.icon(
+              onPressed: _navigateToQuickPublish,
+              icon: const Icon(Icons.edit_note),
+              label: const Text('快速发布笔记'),
+              style: FilledButton.styleFrom(
+                minimumSize: const Size(double.infinity, 48),
+              ),
+            ),
+          ),
+        ),
       ],
     );
   }
 }
 
-class _UserNotesBlock extends StatefulWidget {
-  final String videoId;
-  final List<NoteItem> items;
-  const _UserNotesBlock({required this.videoId, required this.items});
-  @override
-  State<_UserNotesBlock> createState() => _UserNotesBlockState();
-}
+/// 统一样式的笔记列表项（与"我的笔记"一致）
+class _UnifiedNoteListItem extends StatelessWidget {
+  final NoteItem note;
+  final VoidCallback onTap;
 
-class _UserNotesBlockState extends State<_UserNotesBlock> with AutomaticKeepAliveClientMixin {
-  bool _editingNew = false;
-  final TextEditingController _title = TextEditingController();
-  final TextEditingController _content = TextEditingController();
-
-  Future<void> _save() async {
-    final title = _title.text.trim();
-    final content = _content.text.trim();
-    if (title.isEmpty || content.isEmpty) return;
-    try {
-      final repo = NotesRepository(api: NotesService(AppBootstrap.apiClient.dio));
-      await repo.create(videoId: widget.videoId, title: title, content: content, seconds: 0);
-      if (mounted) {
-        setState(() {
-          _editingNew = false;
-          _title.clear();
-          _content.clear();
-          // 本地追加到列表（后端未就绪时的前端演示）
-          widget.items.add(NoteItem(id: 'local_${DateTime.now().millisecondsSinceEpoch}', videoId: widget.videoId, title: title, content: content, seconds: 0, createAt: DateTime.now().millisecondsSinceEpoch ~/ 1000));
-        });
-      }
-    } catch (_) {
-      if (mounted) ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('保存失败'), duration: Duration(milliseconds: 1200)));
-    }
-  }
-
-  @override
-  void dispose() {
-    _title.dispose();
-    _content.dispose();
-    super.dispose();
-  }
-
-  @override
-  bool get wantKeepAlive => true;
+  const _UnifiedNoteListItem({required this.note, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    super.build(context); // 保持状态
+    final cs = Theme.of(context).colorScheme;
     final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(children: [
-          Container(width: 4, height: 18, decoration: BoxDecoration(color: Colors.orange, borderRadius: Radii.sm)),
-          const SizedBox(width: 8),
-          Text('用户关联笔记', style: theme.textTheme.titleSmall),
-          const Spacer(),
-          TextButton.icon(onPressed: () => setState(() => _editingNew = !_editingNew), icon: const Icon(Icons.add), label: const Text('新增')),
-        ]),
-        const SizedBox(height: Spacing.sm),
-        if (_editingNew)
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.08), borderRadius: Radii.md),
-            child: Column(
-              children: [
-                TextField(controller: _title, decoration: const InputDecoration(labelText: '标题')),
-                const SizedBox(height: 8),
-                TextField(controller: _content, decoration: const InputDecoration(labelText: '内容'), maxLines: 3),
-                const SizedBox(height: 8),
-                Row(children: [
-                  ElevatedButton(onPressed: _save, child: const Text('保存')),
-                  const SizedBox(width: 8),
-                  TextButton(onPressed: () => setState(() { _editingNew = false; _title.clear(); _content.clear(); }), child: const Text('取消')),
-                ]),
-              ],
-            ),
-          ),
-        const SizedBox(height: Spacing.sm),
-        if (widget.items.isEmpty)
-          Text('暂无内容', style: theme.textTheme.bodySmall)
-        else
-          Column(
+
+    return Card(
+      elevation: 0,
+      color: cs.surfaceContainerLow,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.all(Spacing.md),
+          child: Row(
             children: [
-              for (final n in widget.items)
-                Container(
-                  width: double.infinity,
-                  margin: const EdgeInsets.symmetric(vertical: 6),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.orange.withValues(alpha: 0.08), borderRadius: Radii.md),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(children: [
-                        Expanded(child: Text(n.title, style: theme.textTheme.titleSmall)),
-                        IconButton(onPressed: () {/* 预留编辑入口 */}, icon: const Icon(Icons.edit)),
-                      ]),
-                      const SizedBox(height: 6),
-                      Text(n.content, style: theme.textTheme.bodySmall),
-                    ],
-                  ),
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(8),
                 ),
+                child: Icon(Icons.article_outlined, color: cs.onPrimaryContainer, size: 24),
+              ),
+              const SizedBox(width: Spacing.md),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      note.title.isNotEmpty ? note.title : '无标题笔记',
+                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.thumb_up_outlined, size: 14, color: cs.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Text('${note.likeCount}', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                        const SizedBox(width: 12),
+                        Icon(Icons.star_outline, size: 14, color: cs.onSurfaceVariant),
+                        const SizedBox(width: 4),
+                        Text('${note.favoriteCount}', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                        // 如果有时间戳，显示
+                        if (note.seconds > 0) ...[
+                          const SizedBox(width: 12),
+                          Icon(Icons.schedule, size: 14, color: cs.onSurfaceVariant),
+                          const SizedBox(width: 4),
+                          Text('${note.seconds}s', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                        ],
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
             ],
           ),
-      ],
+        ),
+      ),
     );
   }
 }

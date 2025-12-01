@@ -180,7 +180,7 @@ class _FeaturedHeroCard extends StatelessWidget {
                     const SizedBox(height: Spacing.sm),
                     Row(
                       children: [
-                        const Icon(Icons.favorite, size: 14, color: Colors.white70),
+                        const Icon(Icons.thumb_up_outlined, size: 14, color: Colors.white70),
                         const SizedBox(width: 4),
                         Text('${video.likes ?? 0}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white70)),
                         const SizedBox(width: 12),
@@ -227,7 +227,7 @@ class _FeaturedListItem extends StatelessWidget {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(Icons.favorite, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      Icon(Icons.thumb_up_outlined, size: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                       const SizedBox(width: 4),
                       Text(fmt(video.likes ?? 0), style: Theme.of(context).textTheme.bodySmall),
                       const SizedBox(width: 12),

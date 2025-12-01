@@ -592,7 +592,7 @@ class _VideoManagePageState extends State<VideoManagePage> {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _StatItem(
-                  icon: Icons.thumb_up,
+                  icon: Icons.thumb_up_outlined,
                   label: '点赞',
                   value: widget.likes.toString(),
                   color: Colors.blue,

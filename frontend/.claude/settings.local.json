@@ -9,7 +9,8 @@
       "Bash(flutter build:*)",
       "Bash(dart analyze:*)",
       "Bash(dart format:*)",
-      "Bash(cat:*)"
+      "Bash(cat:*)",
+      "Bash(dir:*)"
     ],
     "deny": [],
     "ask": []
