@@ -13,14 +13,18 @@ func Register(r *server.Hertz) {
 		{
 			_v1 := _api.Group("/v1", _v1Mw()...)
 			{
+				// 需要认证的路由
+				authGroup := _v1.Group("/note", authMw()...)
+				{
+					authGroup.POST("/create", append(_createNoteMw(), notes.CreateNote)...)
+					authGroup.POST("/delete", append(_deleteNoteMw(), notes.DeleteNote)...)
+					authGroup.POST("/like", append(_likeNoteMw(), notes.LikeNote)...)
+					authGroup.POST("/favorite", append(_favoriteNoteMw(), notes.FavoriteNote)...)
+				}
 
-				// 公开路由
+				// 公开路由（不需要认证）
 				publicGroup := _v1.Group("/note", publicMw()...)
 				{
-					publicGroup.POST("/create", append(_createNoteMw(), notes.CreateNote)...)
-					publicGroup.POST("/delete", append(_deleteNoteMw(), notes.DeleteNote)...)
-					publicGroup.POST("/like", append(_likeNoteMw(), notes.LikeNote)...)
-					publicGroup.POST("/favorite", append(_favoriteNoteMw(), notes.FavoriteNote)...)
 					publicGroup.GET("/video", append(_getVideoNotesMw(), notes.GetVideoNotes)...)
 					publicGroup.GET("/user", append(_getUserNotesMw(), notes.GetUserNotes)...)
 					// 添加对/api/v1/note路径的支持，根据type参数转发

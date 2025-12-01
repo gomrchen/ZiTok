@@ -68,11 +68,11 @@ func CreateNote(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// 获取用户ID，绕过认证时使用默认用户ID 1
+	// 获取用户ID（通过认证中间件设置）
 	userID, err := metainfoContext.GetUserID(ctx)
 	if err != nil {
-		// 认证失败时使用默认用户ID 1
-		userID = 1
+		pack.RespError(c, errno.AuthInvalid.WithMessage("获取用户ID失败"))
+		return
 	}
 	req.UserId = userID
 
@@ -115,11 +115,11 @@ func DeleteNote(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// 获取用户ID，绕过认证时使用默认用户ID 1
+	// 获取用户ID（通过认证中间件设置）
 	userID, err := metainfoContext.GetUserID(ctx)
 	if err != nil {
-		// 认证失败时使用默认用户ID 1
-		userID = 1
+		pack.RespError(c, errno.AuthInvalid.WithMessage("获取用户ID失败"))
+		return
 	}
 	req.UserId = userID
 
@@ -254,11 +254,11 @@ func LikeNote(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// 获取用户ID，绕过认证时使用默认用户ID 1
+	// 获取用户ID（通过认证中间件设置）
 	userID, err := metainfoContext.GetUserID(ctx)
 	if err != nil {
-		// 认证失败时使用默认用户ID 1
-		userID = 1
+		pack.RespError(c, errno.AuthInvalid.WithMessage("获取用户ID失败"))
+		return
 	}
 	req.UserId = userID
 
@@ -299,11 +299,11 @@ func FavoriteNote(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// 获取用户ID，绕过认证时使用默认用户ID 1
+	// 获取用户ID（通过认证中间件设置）
 	userID, err := metainfoContext.GetUserID(ctx)
 	if err != nil {
-		// 认证失败时使用默认用户ID 1
-		userID = 1
+		pack.RespError(c, errno.AuthInvalid.WithMessage("获取用户ID失败"))
+		return
 	}
 	req.UserId = userID
 
