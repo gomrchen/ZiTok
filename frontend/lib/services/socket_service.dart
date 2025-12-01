@@ -1,6 +1,6 @@
 import 'dart:convert';
-import 'dart:developer' as developer;
 import 'package:web_socket_channel/web_socket_channel.dart';
+import '../utils/app_config.dart';
 import 'package:web_socket_channel/status.dart' as status;
 
 class SocketService {
@@ -18,23 +18,14 @@ class SocketService {
             (message) {
           if (onMessage != null) {
             // 调试日志：打印原始消息
-            developer.log(
-              '[SocketService] 收到原始消息: ${message.runtimeType} = ${message.toString().substring(0, message.toString().length > 500 ? 500 : message.toString().length)}',
-              name: 'WebSocket',
-            );
+            AppConfig.netLog('[SocketService] 收到原始消息: ${message.runtimeType}');
 
             try {
               final data = jsonDecode(message);
-              developer.log(
-                '[SocketService] JSON解析成功: ${data.runtimeType}',
-                name: 'WebSocket',
-              );
+              AppConfig.netLog('[SocketService] JSON解析成功');
               onMessage!(data);
             } catch (e) {
-              developer.log(
-                '[SocketService] JSON解析失败，传递原始消息: $e',
-                name: 'WebSocket',
-              );
+              AppConfig.netLog('[SocketService] JSON解析失败，传递原始消息');
               onMessage!(message);
             }
           }
@@ -43,11 +34,11 @@ class SocketService {
           if (onDisconnect != null) onDisconnect!();
         },
         onError: (error) {
-          developer.log('[SocketService] WebSocket错误: $error', name: 'WebSocket');
+          AppConfig.netLog('[SocketService] WebSocket错误: $error');
         },
       );
     } catch (e) {
-      developer.log('[SocketService] 连接错误: $e', name: 'WebSocket');
+      AppConfig.netLog('[SocketService] 连接错误: $e');
     }
   }
 

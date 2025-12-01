@@ -3,6 +3,7 @@ import 'package:video_player/video_player.dart';
 import '../services/video/video_preload_manager.dart';
 import '../services/video/video_cache_service.dart';
 import '../services/video/video_performance_monitor.dart';
+import '../utils/app_config.dart';
 
 /// 播放状态
 enum PlaybackState {
@@ -270,7 +271,7 @@ class VideoPlayerProvider extends ChangeNotifier {
       if (_currentController?.value.isPlaying ?? false) {
         _wasPlayingBeforeHide = true;
         pause();
-        debugPrint('VideoPlayerProvider: paused due to app hidden');
+        AppConfig.videoLog('VideoPlayerProvider: paused due to app hidden');
       } else {
         _wasPlayingBeforeHide = false;
       }
@@ -280,7 +281,7 @@ class VideoPlayerProvider extends ChangeNotifier {
       // 应用回到前台，恢复播放
       if (_wasPlayingBeforeHide) {
         resume();
-        debugPrint('VideoPlayerProvider: resumed due to app visible');
+        AppConfig.videoLog('VideoPlayerProvider: resumed due to app visible');
       }
     }
   }
@@ -293,14 +294,14 @@ class VideoPlayerProvider extends ChangeNotifier {
       if (_currentController?.value.isPlaying ?? false) {
         _wasPlayingBeforeHide = true;
         pause();
-        debugPrint('VideoPlayerProvider: paused due to page hidden');
+        AppConfig.videoLog('VideoPlayerProvider: paused due to page hidden');
       } else {
         _wasPlayingBeforeHide = false;
       }
     } else {
       if (_wasPlayingBeforeHide) {
         resume();
-        debugPrint('VideoPlayerProvider: resumed due to page visible');
+        AppConfig.videoLog('VideoPlayerProvider: resumed due to page visible');
       }
     }
   }

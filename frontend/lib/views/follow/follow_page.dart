@@ -11,6 +11,7 @@ import '../../widgets/comment_sheet.dart';
 import '../../widgets/video_stats.dart';
 import '../../widgets/animated_like_button.dart';
 import '../../utils/url_utils.dart';
+import '../../utils/app_config.dart';
 import '../../services/user_service.dart';
 import '../../app.dart';
 
@@ -60,7 +61,7 @@ class _FollowPageState extends State<FollowPage> with AutomaticKeepAliveClientMi
 
     // 如果返回空，尝试使用备用方案
     if (vp.follow.isEmpty && mounted) {
-      debugPrint('FollowPage: /feed/follow returned empty, trying fallback');
+      AppConfig.log('FollowPage: /feed/follow returned empty, trying fallback');
       await _loadFallbackVideos();
     }
   }
@@ -73,11 +74,11 @@ class _FollowPageState extends State<FollowPage> with AutomaticKeepAliveClientMi
     // 获取关注列表
     final following = mp.following;
     if (following.isEmpty) {
-      debugPrint('FollowPage: no following users');
+      AppConfig.log('FollowPage: no following users');
       return;
     }
 
-    debugPrint('FollowPage: fallback - fetching videos from ${following.length} users');
+    AppConfig.log('FollowPage: fallback - fetching videos from ${following.length} users');
 
     // 获取关注用户的ID列表
     final userIds = following.map((f) => f.id).toList();
@@ -90,7 +91,7 @@ class _FollowPageState extends State<FollowPage> with AutomaticKeepAliveClientMi
         _usingFallback = true;
         _fallbackVideos = videos;
       });
-      debugPrint('FollowPage: fallback got ${videos.length} videos');
+      AppConfig.log('FollowPage: fallback got ${videos.length} videos');
     }
   }
 
@@ -265,7 +266,7 @@ class _FollowListItemState extends State<_FollowListItem> {
         }
       }
     } catch (e) {
-      debugPrint('_FollowListItem: fetch author error: $e');
+      AppConfig.log('_FollowListItem: fetch author error: $e');
     } finally {
       _fetchingAuthor = false;
     }

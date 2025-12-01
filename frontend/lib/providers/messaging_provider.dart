@@ -1,12 +1,13 @@
 // 文件路径: lib/providers/messaging_provider.dart
 
-import 'dart:developer' as developer;
+// developer.log replaced with AppConfig conditional logging
 import 'package:flutter/foundation.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import '../repositories/relation_repository.dart';
 import '../services/socket_service.dart';
 import '../services/user_session.dart';
 import '../models/social_models.dart';
+import '../utils/app_config.dart';
 
 /// 消息去重和管理的日志标签
 const String _logTag = 'MsgDedup';
@@ -86,7 +87,7 @@ class MessagingProvider extends ChangeNotifier {
     for (var msg in serverMsgs) {
       final sig = _contentSignature(msg);
       merged[sig] = msg;
-      developer.log('[$_logTag] 添加服务器消息: id=${msg.id}, sig=$sig, content="${msg.content.substring(0, msg.content.length > 20 ? 20 : msg.content.length)}"', name: _logTag);
+      AppConfig.log('[$_logTag] 添加服务器消息: id=${msg.id}, sig=$sig');
     }
 
     // 再添加本地消息（只有没有对应服务器消息时才添加）
@@ -94,9 +95,9 @@ class MessagingProvider extends ChangeNotifier {
       final sig = _contentSignature(msg);
       if (!merged.containsKey(sig)) {
         merged[sig] = msg;
-        developer.log('[$_logTag] 添加本地消息: id=${msg.id}, sig=$sig', name: _logTag);
+        AppConfig.log('[$_logTag] 添加本地消息: id=${msg.id}, sig=$sig');
       } else {
-        developer.log('[$_logTag] 跳过重复本地消息: id=${msg.id}, sig=$sig（已有服务器消息）', name: _logTag);
+        AppConfig.log('[$_logTag] 跳过重复本地消息: id=${msg.id}, sig=$sig');
       }
     }
 
@@ -104,7 +105,7 @@ class MessagingProvider extends ChangeNotifier {
     final result = merged.values.toList();
     result.sort((a, b) => a.createdAt.compareTo(b.createdAt));
 
-    developer.log('[$_logTag] 合并结果: 服务器=${serverMsgs.length}, 本地=${localMsgs.length}, 合并后=${result.length}', name: _logTag);
+    AppConfig.log('[$_logTag] 合并结果: 服务器=${serverMsgs.length}, 本地=${localMsgs.length}, 合并后=${result.length}');
     return result;
   }
 
@@ -136,7 +137,7 @@ class MessagingProvider extends ChangeNotifier {
         // 调用关注API（使用sendFriendRequest）
         final result = await relationRepository!.sendFriendRequest(uid, targetId, '');
         if (result['success'] != true) {
-          debugPrint('toggleFollow: ${result['message']}');
+          AppConfig.log('toggleFollow: ${result['message']}');
           // 如果是"已经关注对方"的错误，仍然添加到本地列表
           if (result['message']?.toString().contains('已经关注') != true) {
             return false;
@@ -152,7 +153,7 @@ class MessagingProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      debugPrint('toggleFollow error: $e');
+      AppConfig.log('toggleFollow error: $e');
       return false;
     }
   }
@@ -309,44 +310,35 @@ class MessagingProvider extends ChangeNotifier {
     _socketService.connect(uri.toString());
 
     _socketService.onMessage = (dynamic rawData) {
-      developer.log(
-        '[MessagingProvider] onMessage收到数据: ${rawData.runtimeType}',
-        name: 'Chat',
-      );
+      AppConfig.log('[MessagingProvider] onMessage收到数据: ${rawData.runtimeType}');
 
       Map<String, dynamic>? data;
 
       // 尝试将rawData转换为Map
       if (rawData is Map) {
         data = Map<String, dynamic>.from(rawData);
-        developer.log('[MessagingProvider] rawData是Map类型', name: 'Chat');
+        AppConfig.log('[MessagingProvider] rawData是Map类型');
       } else if (rawData is String) {
         final trimmed = rawData.trim();
-        developer.log(
-          '[MessagingProvider] rawData是String: ${trimmed.substring(0, trimmed.length > 200 ? 200 : trimmed.length)}',
-          name: 'Chat',
-        );
+        AppConfig.log('[MessagingProvider] rawData是String: ${trimmed.substring(0, trimmed.length > 200 ? 200 : trimmed.length)}');
         // 处理Go map格式的字符串（支持换行符）
         if (trimmed.startsWith('map[')) {
           data = parseGoMapString(trimmed);
-          developer.log('[MessagingProvider] 解析Go map结果: $data', name: 'Chat');
+          AppConfig.log('[MessagingProvider] 解析Go map结果: $data');
         }
       }
 
       if (data == null) {
-        developer.log('[MessagingProvider] data为null，跳过处理', name: 'Chat');
+        AppConfig.log('[MessagingProvider] data为null，跳过处理');
         return;
       }
 
       final type = data['type'];
-      developer.log('[MessagingProvider] 消息类型: $type', name: 'Chat');
+      AppConfig.log('[MessagingProvider] 消息类型: $type');
 
       if (type == 'history') {
         final messages = data['messages'];
-        developer.log(
-          '[MessagingProvider] 收到history消息，messages类型: ${messages.runtimeType}, 长度: ${messages is List ? messages.length : "N/A"}',
-          name: 'Chat',
-        );
+        AppConfig.log('[MessagingProvider] 收到history消息，messages类型: ${messages.runtimeType}, 长度: ${messages is List ? messages.length : "N/A"}');
         _handleHistoryMessage(messages);
       } else if (data.containsKey('content') && data.containsKey('from')) {
         _handleSingleMessage(data);
@@ -357,7 +349,7 @@ class MessagingProvider extends ChangeNotifier {
   void _handleHistoryMessage(dynamic rawMessages) {
     final uid = currentUid;
     if (rawMessages == null || uid == null) {
-      developer.log('[_handleHistoryMessage] rawMessages或uid为null', name: 'Chat');
+      AppConfig.log('[_handleHistoryMessage] rawMessages或uid为null');
       return;
     }
 
@@ -366,11 +358,11 @@ class MessagingProvider extends ChangeNotifier {
     if (rawMessages is List) {
       messageList = rawMessages;
     } else {
-      developer.log('[_handleHistoryMessage] rawMessages不是List: ${rawMessages.runtimeType}', name: 'Chat');
+      AppConfig.log('[_handleHistoryMessage] rawMessages不是List: ${rawMessages.runtimeType}');
       return;
     }
 
-    developer.log('[_handleHistoryMessage] 开始处理 ${messageList.length} 条消息', name: 'Chat');
+    AppConfig.log('[_handleHistoryMessage] 开始处理 ${messageList.length} 条消息');
 
     final Map<String, List<ChatMessage>> serverMsgMap = {};
 
@@ -378,10 +370,7 @@ class MessagingProvider extends ChangeNotifier {
       final item = messageList[i];
       try {
         // 调试日志：打印每条消息的原始数据
-        developer.log(
-          '[_handleHistoryMessage] 消息[$i] 类型: ${item.runtimeType}, 值: ${item.toString().substring(0, item.toString().length > 300 ? 300 : item.toString().length)}',
-          name: 'Chat',
-        );
+        AppConfig.log('[_handleHistoryMessage] 消息[$i] 类型: ${item.runtimeType}');
 
         ChatMessage? msg;
 
@@ -389,25 +378,19 @@ class MessagingProvider extends ChangeNotifier {
         msg = ChatMessage.tryParse(item);
 
         if (msg != null) {
-          developer.log(
-            '[_handleHistoryMessage] 消息[$i] tryParse成功: content="${msg.content}", from=${msg.senderId}, createdAt=${msg.createdAt}',
-            name: 'MsgTime',
-          );
+          AppConfig.log('[_handleHistoryMessage] 消息[$i] tryParse成功');
         } else {
-          developer.log('[_handleHistoryMessage] 消息[$i] tryParse返回null', name: 'Chat');
+          AppConfig.log('[_handleHistoryMessage] 消息[$i] tryParse返回null');
         }
 
         // 如果tryParse失败，尝试直接解析
         if (msg == null && item is Map) {
           msg = ChatMessage.fromJson(Map<String, dynamic>.from(item));
-          developer.log(
-            '[_handleHistoryMessage] 消息[$i] fromJson成功: content="${msg.content}", createdAt=${msg.createdAt}',
-            name: 'MsgTime',
-          );
+          AppConfig.log('[_handleHistoryMessage] 消息[$i] fromJson成功');
         }
 
         if (msg == null) {
-          developer.log('[_handleHistoryMessage] 消息[$i] 解析失败，跳过', name: 'Chat');
+          AppConfig.log('[_handleHistoryMessage] 消息[$i] 解析失败，跳过');
           continue;
         }
 
@@ -424,17 +407,17 @@ class MessagingProvider extends ChangeNotifier {
         }
         serverMsgMap[key]!.add(msg);
       } catch (e) {
-        developer.log('[_handleHistoryMessage] 消息[$i] 解析异常: $e', name: 'Chat');
+        AppConfig.log('[_handleHistoryMessage] 消息[$i] 解析异常: $e');
       }
     }
 
-    developer.log('[_handleHistoryMessage] 解析完成，共 ${serverMsgMap.length} 个会话', name: 'Chat');
-    developer.log('[$_logTag] ========== 开始合并历史消息 ==========', name: _logTag);
+    AppConfig.log('[_handleHistoryMessage] 解析完成，共 ${serverMsgMap.length} 个会话');
+    AppConfig.log('[$_logTag] ========== 开始合并历史消息 ==========');
 
     // 使用新的去重方法合并消息
     serverMsgMap.forEach((key, serverMsgs) {
       final localMsgs = _messages[key] ?? [];
-      developer.log('[$_logTag] 会话[$key]: 服务器消息=${serverMsgs.length}, 本地消息=${localMsgs.length}', name: _logTag);
+      AppConfig.log('[$_logTag] 会话[$key]: 服务器消息=${serverMsgs.length}, 本地消息=${localMsgs.length}');
 
       // 使用统一的合并去重方法
       _messages[key] = _mergeAndDedup(serverMsgs, localMsgs);
@@ -444,12 +427,12 @@ class MessagingProvider extends ChangeNotifier {
     for (var key in _messages.keys.toList()) {
       if (!serverMsgMap.containsKey(key)) {
         final localMsgs = _messages[key]!;
-        developer.log('[$_logTag] 会话[$key]: 服务器无数据，保留本地消息=${localMsgs.length}', name: _logTag);
+        AppConfig.log('[$_logTag] 会话[$key]: 服务器无数据，保留本地消息=${localMsgs.length}');
         localMsgs.sort((a, b) => a.createdAt.compareTo(b.createdAt));
       }
     }
 
-    developer.log('[$_logTag] ========== 合并历史消息完成 ==========', name: _logTag);
+    AppConfig.log('[$_logTag] ========== 合并历史消息完成 ==========');
 
     notifyListeners();
     _saveHistoryToHive();
@@ -473,7 +456,7 @@ class MessagingProvider extends ChangeNotifier {
 
       // 使用统一的内容签名进行去重
       final newMsgSig = _contentSignature(msg);
-      developer.log('[$_logTag] 收到单条消息: id=${msg.id}, sig=$newMsgSig', name: _logTag);
+      AppConfig.log('[$_logTag] 收到单条消息: id=${msg.id}, sig=$newMsgSig');
 
       // 查找是否有匹配的临时消息（负数ID）或重复消息
       final existingIndex = list.indexWhere((m) {
@@ -485,29 +468,29 @@ class MessagingProvider extends ChangeNotifier {
 
       if (existingIndex >= 0) {
         final existing = list[existingIndex];
-        developer.log('[$_logTag] 找到匹配消息: existingId=${existing.id}, newId=${msg.id}', name: _logTag);
+        AppConfig.log('[$_logTag] 找到匹配消息: existingId=${existing.id}, newId=${msg.id}');
 
         // 如果已存在的是临时消息（负数ID），用服务器消息替换
         if (existing.id < 0 && msg.id > 0) {
-          developer.log('[$_logTag] 替换临时消息为服务器消息', name: _logTag);
+          AppConfig.log('[$_logTag] 替换临时消息为服务器消息');
           list[existingIndex] = msg;
           list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
           notifyListeners();
           _saveHistoryToHive();
         } else {
-          developer.log('[$_logTag] 跳过重复消息', name: _logTag);
+          AppConfig.log('[$_logTag] 跳过重复消息');
         }
         // 否则是重复消息，忽略
       } else {
         // 新消息，添加并排序
-        developer.log('[$_logTag] 添加新消息到列表', name: _logTag);
+        AppConfig.log('[$_logTag] 添加新消息到列表');
         list.add(msg);
         list.sort((a, b) => a.createdAt.compareTo(b.createdAt));
         notifyListeners();
         _saveHistoryToHive();
       }
     } catch (e) {
-      developer.log('[$_logTag] 处理单条消息异常: $e', name: _logTag);
+      AppConfig.log('[$_logTag] 处理单条消息异常: $e');
     }
   }
 

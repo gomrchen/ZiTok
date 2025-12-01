@@ -1,9 +1,9 @@
-import 'package:flutter/foundation.dart';
 import '../models/video.dart';
 import '../models/video_publish.dart';
 import '../services/video_service.dart';
 import '../services/cache.dart';
 import '../utils/url_utils.dart';
+import '../utils/app_config.dart';
 
 class VideoRepository {
   final VideoService api;
@@ -31,10 +31,10 @@ class VideoRepository {
             ))
         .toList();
     final hasMore = items.length == query.pageSize;
-    debugPrint('VideoRepository.fetchDiscover: page=${query.page} size=${query.pageSize} items=${items.length}');
+    AppConfig.log('VideoRepository.fetchDiscover: page=${query.page} size=${query.pageSize} items=${items.length}');
     if (items.isNotEmpty) {
       final sample = items.take(3).map((e) => e.videoUrl).toList();
-      debugPrint('VideoRepository.fetchDiscover: sampleUrls=$sample');
+      AppConfig.log('VideoRepository.fetchDiscover: sampleUrls=$sample');
     }
     return PagedResult(items: items, page: query.page, pageSize: query.pageSize, hasMore: hasMore);
   }
@@ -68,10 +68,10 @@ class VideoRepository {
     final start = (query.page - 1) * query.pageSize;
     final end = (start + query.pageSize).clamp(0, items.length);
     final sliced = start < items.length ? items.sublist(start, end) : <Video>[];
-    debugPrint('VideoRepository.fetchFeatured: page=${query.page} size=${query.pageSize} total=${items.length} sliced=${sliced.length}');
+    AppConfig.log('VideoRepository.fetchFeatured: page=${query.page} size=${query.pageSize} total=${items.length} sliced=${sliced.length}');
     if (sliced.isNotEmpty) {
       final sample = sliced.take(3).map((e) => e.videoUrl).toList();
-      debugPrint('VideoRepository.fetchFeatured: sampleUrls=$sample');
+      AppConfig.log('VideoRepository.fetchFeatured: sampleUrls=$sample');
     }
     return PagedResult(items: sliced, page: query.page, pageSize: query.pageSize, hasMore: end < items.length);
   }
@@ -80,7 +80,7 @@ class VideoRepository {
   Future<PagedResult<Video>> fetchFollow(VideoQuery query) async {
     final userId = getUserId?.call();
     if (userId == null || userId.isEmpty) {
-      debugPrint('VideoRepository.fetchFollow: no userId, returning empty');
+      AppConfig.log('VideoRepository.fetchFollow: no userId, returning empty');
       return PagedResult(items: [], page: query.page, pageSize: query.pageSize, hasMore: false);
     }
 
@@ -89,8 +89,8 @@ class VideoRepository {
       final root = resp.data as Map<String, dynamic>? ?? {};
 
       // 打印完整响应以便调试
-      debugPrint('VideoRepository.fetchFollow: API response code=${root['code']}, message=${root['message']}');
-      debugPrint('VideoRepository.fetchFollow: data type=${root['data']?.runtimeType}, data=${ root['data']?.toString().substring(0, (root['data']?.toString().length ?? 0) > 200 ? 200 : (root['data']?.toString().length ?? 0))}');
+      AppConfig.log('VideoRepository.fetchFollow: API response code=${root['code']}, message=${root['message']}');
+      AppConfig.log('VideoRepository.fetchFollow: data type=${root['data']?.runtimeType}, data=${ root['data']?.toString().substring(0, (root['data']?.toString().length ?? 0) > 200 ? 200 : (root['data']?.toString().length ?? 0))}');
 
       List<dynamic> raw = [];
       if (root['data'] is List) {
@@ -114,14 +114,14 @@ class VideoRepository {
               ))
           .toList();
       final hasMore = items.length == query.pageSize;
-      debugPrint('VideoRepository.fetchFollow: page=${query.page} size=${query.pageSize} items=${items.length} hasMore=$hasMore');
+      AppConfig.log('VideoRepository.fetchFollow: page=${query.page} size=${query.pageSize} items=${items.length} hasMore=$hasMore');
       if (items.isNotEmpty) {
         final sample = items.take(3).map((e) => '${e.title}(${e.uid})').toList();
-        debugPrint('VideoRepository.fetchFollow: sample=$sample');
+        AppConfig.log('VideoRepository.fetchFollow: sample=$sample');
       }
       return PagedResult(items: items, page: query.page, pageSize: query.pageSize, hasMore: hasMore);
     } catch (e) {
-      debugPrint('VideoRepository.fetchFollow: API error=$e');
+      AppConfig.log('VideoRepository.fetchFollow: API error=$e');
       return PagedResult(items: [], page: query.page, pageSize: query.pageSize, hasMore: false);
     }
   }
@@ -132,7 +132,7 @@ class VideoRepository {
   Future<List<Video>> fetchVideosFromUsers(List<String> userIds, {int limit = 5}) async {
     if (userIds.isEmpty) return [];
 
-    debugPrint('VideoRepository.fetchVideosFromUsers: fetching videos for ${userIds.length} users');
+    AppConfig.log('VideoRepository.fetchVideosFromUsers: fetching videos for ${userIds.length} users');
 
     final List<Video> allVideos = [];
 
@@ -149,7 +149,7 @@ class VideoRepository {
         }
         return raw.map((e) => Video.fromJson(e as Map<String, dynamic>)).toList();
       } catch (e) {
-        debugPrint('VideoRepository.fetchVideosFromUsers: error fetching for user $uid: $e');
+        AppConfig.log('VideoRepository.fetchVideosFromUsers: error fetching for user $uid: $e');
         return <Video>[];
       }
     });
@@ -172,7 +172,7 @@ class VideoRepository {
     final seen = <String>{};
     items = items.where((v) => seen.add(v.id)).toList();
 
-    debugPrint('VideoRepository.fetchVideosFromUsers: got ${items.length} total videos');
+    AppConfig.log('VideoRepository.fetchVideosFromUsers: got ${items.length} total videos');
     return items;
   }
 
@@ -204,7 +204,7 @@ class VideoRepository {
             ))
         .toList();
     final hasMore = items.length == pageSize;
-    debugPrint('VideoRepository.fetchSearch: keyword=$keyword page=$page size=$pageSize items=${items.length}');
+    AppConfig.log('VideoRepository.fetchSearch: keyword=$keyword page=$page size=$pageSize items=${items.length}');
     return PagedResult(items: items, page: page, pageSize: pageSize, hasMore: hasMore);
   }
 
@@ -236,12 +236,12 @@ class VideoRepository {
       if (response.isSuccess) {
         // 发布成功后清除缓存，以便刷新列表时获取最新数据
         await cache.remove('video_hot');
-        debugPrint('VideoRepository.publish: success, cache cleared');
+        AppConfig.log('VideoRepository.publish: success, cache cleared');
       }
 
       return response;
     } catch (e) {
-      debugPrint('VideoRepository.publish: error=$e');
+      AppConfig.log('VideoRepository.publish: error=$e');
       rethrow;
     }
   }
@@ -261,17 +261,17 @@ class VideoRepository {
     try {
       final id = int.tryParse(videoId);
       if (id == null) {
-        debugPrint('VideoRepository.favorite: invalid videoId=$videoId');
+        AppConfig.log('VideoRepository.favorite: invalid videoId=$videoId');
         return false;
       }
       final resp = await api.favorite(videoId: id);
       final data = resp.data as Map<String, dynamic>? ?? {};
       final code = data['code'];
       final success = _isSuccessCode(code);
-      debugPrint('VideoRepository.favorite: videoId=$videoId code=$code success=$success');
+      AppConfig.log('VideoRepository.favorite: videoId=$videoId code=$code success=$success');
       return success;
     } catch (e) {
-      debugPrint('VideoRepository.favorite: error=$e');
+      AppConfig.log('VideoRepository.favorite: error=$e');
       return false;
     }
   }
@@ -281,17 +281,17 @@ class VideoRepository {
     try {
       final id = int.tryParse(videoId);
       if (id == null) {
-        debugPrint('VideoRepository.unfavorite: invalid videoId=$videoId');
+        AppConfig.log('VideoRepository.unfavorite: invalid videoId=$videoId');
         return false;
       }
       final resp = await api.unfavorite(videoId: id);
       final data = resp.data as Map<String, dynamic>? ?? {};
       final code = data['code'];
       final success = _isSuccessCode(code);
-      debugPrint('VideoRepository.unfavorite: videoId=$videoId code=$code success=$success');
+      AppConfig.log('VideoRepository.unfavorite: videoId=$videoId code=$code success=$success');
       return success;
     } catch (e) {
-      debugPrint('VideoRepository.unfavorite: error=$e');
+      AppConfig.log('VideoRepository.unfavorite: error=$e');
       return false;
     }
   }
@@ -320,7 +320,7 @@ class VideoRepository {
         raw = root['VideoList'] as List;
       }
 
-      debugPrint('VideoRepository.fetchFavorites: raw data=$raw');
+      AppConfig.log('VideoRepository.fetchFavorites: raw data=$raw');
 
       List<Video> items = [];
 
@@ -334,7 +334,7 @@ class VideoRepository {
 
           if (needFetchDetail) {
             // 关键字段缺失，需要获取详情
-            debugPrint('VideoRepository.fetchFavorites: video ${video.id} incomplete, fetching detail');
+            AppConfig.log('VideoRepository.fetchFavorites: video ${video.id} incomplete, fetching detail');
             final detailVideo = await _fetchVideoDetail(video.id);
             if (detailVideo != null) {
               video = detailVideo.copyWith(isFavorited: true);
@@ -362,10 +362,10 @@ class VideoRepository {
       }
 
       final hasMore = raw.length == pageSize;
-      debugPrint('VideoRepository.fetchFavorites: page=$page size=$pageSize items=${items.length}');
+      AppConfig.log('VideoRepository.fetchFavorites: page=$page size=$pageSize items=${items.length}');
       return PagedResult(items: items, page: page, pageSize: pageSize, hasMore: hasMore);
     } catch (e) {
-      debugPrint('VideoRepository.fetchFavorites: error=$e');
+      AppConfig.log('VideoRepository.fetchFavorites: error=$e');
       return PagedResult(items: [], page: page, pageSize: pageSize, hasMore: false);
     }
   }
@@ -402,7 +402,7 @@ class VideoRepository {
       }
       return null;
     } catch (e) {
-      debugPrint('VideoRepository._fetchVideoDetail: failed for $videoId: $e');
+      AppConfig.log('VideoRepository._fetchVideoDetail: failed for $videoId: $e');
       return null;
     }
   }
@@ -443,10 +443,10 @@ class VideoRepository {
           .toList();
 
       final hasMore = items.length == limit;
-      debugPrint('VideoRepository.fetchRecommend: limit=$limit items=${items.length}');
+      AppConfig.log('VideoRepository.fetchRecommend: limit=$limit items=${items.length}');
       return PagedResult(items: items, page: 1, pageSize: limit, hasMore: hasMore);
     } catch (e) {
-      debugPrint('VideoRepository.fetchRecommend: error=$e');
+      AppConfig.log('VideoRepository.fetchRecommend: error=$e');
       return PagedResult(items: [], page: 1, pageSize: limit, hasMore: false);
     }
   }

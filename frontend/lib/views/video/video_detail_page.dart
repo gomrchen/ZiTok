@@ -15,6 +15,7 @@ import '../../services/user_service.dart';
 import '../../services/notes_service.dart';
 import '../../repositories/notes_repository.dart';
 import '../../utils/url_utils.dart';
+import '../../utils/app_config.dart';
 import '../../app.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:io';
@@ -125,7 +126,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> with WidgetsBindingOb
         return;
       }
     } catch (e) {
-      debugPrint('VideoDetailPage: probe error $e');
+      AppConfig.videoLog('VideoDetailPage: probe error $e');
     }
 
     _videoController = VideoPlayerController.networkUrl(Uri.parse(url));
@@ -150,7 +151,7 @@ class _VideoDetailPageState extends State<VideoDetailPage> with WidgetsBindingOb
         context.read<VideoProvider>().visit(video.id);
       }
     } catch (e) {
-      debugPrint('VideoDetailPage: initialize error $e');
+      AppConfig.videoLog('VideoDetailPage: initialize error $e');
       setState(() => _error = '播放器初始化失败');
     }
   }
@@ -1359,7 +1360,7 @@ class _AuthorInfoCardState extends State<_AuthorInfoCard> {
         }
       }
     } catch (e) {
-      debugPrint('_AuthorInfoCard: fetch error: $e');
+      AppConfig.log('_AuthorInfoCard: fetch error: $e');
     } finally {
       _fetching = false;
     }

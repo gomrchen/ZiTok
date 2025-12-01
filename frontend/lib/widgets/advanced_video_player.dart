@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:chewie/chewie.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:io';
+import '../utils/app_config.dart';
 
 /// 轻量封装：高级视频播放器组件
 /// - 支持全屏（Chewie 内置）
@@ -64,20 +65,20 @@ class _AdvancedVideoPlayerState extends State<AdvancedVideoPlayer> {
     // 探测资源可达性（Range: bytes=0-1）
     try {
       final ok = await _probeUrl(src.url);
-      debugPrint('AdvancedVideoPlayer: probe ${src.url} ok=$ok');
+      AppConfig.videoLog('AdvancedVideoPlayer: probe ${src.url} ok=$ok');
       if (!ok) {
         _error = '视频资源不可访问';
         setState(() {});
         return;
       }
     } catch (e) {
-      debugPrint('AdvancedVideoPlayer: probe error $e');
+      AppConfig.videoLog('AdvancedVideoPlayer: probe error $e');
     }
     _vp = VideoPlayerController.networkUrl(Uri.parse(src.url));
     try {
       await _vp!.initialize();
     } catch (e) {
-      debugPrint('AdvancedVideoPlayer: initialize error $e');
+      AppConfig.videoLog('AdvancedVideoPlayer: initialize error $e');
       _error = '播放器初始化失败';
       setState(() {});
       oldChewie?.dispose();
@@ -162,17 +163,17 @@ class _AdvancedVideoPlayerState extends State<AdvancedVideoPlayer> {
                     child: InkWell(
                       customBorder: const CircleBorder(),
                       onTap: () async {
-                        debugPrint('AdvancedVideoPlayer: back pressed');
+                        AppConfig.videoLog('AdvancedVideoPlayer: back pressed');
                         // 优先使用外部回调；否则尝试页面返回
                         if (widget.onBack != null) {
-                          debugPrint('AdvancedVideoPlayer: delegate to external onBack');
+                          AppConfig.videoLog('AdvancedVideoPlayer: delegate to external onBack');
                           widget.onBack!();
                           return;
                         }
                         final popped = await Navigator.of(context).maybePop();
-                        debugPrint('AdvancedVideoPlayer: Navigator.maybePop result=$popped');
+                        AppConfig.videoLog('AdvancedVideoPlayer: Navigator.maybePop result=$popped');
                         if (!popped) {
-                          debugPrint('AdvancedVideoPlayer: no route to pop');
+                          AppConfig.videoLog('AdvancedVideoPlayer: no route to pop');
                         }
                       },
                       child: Container(

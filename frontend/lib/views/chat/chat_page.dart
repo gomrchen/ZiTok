@@ -1,4 +1,3 @@
-import 'dart:developer' as developer;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -8,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../providers/messaging_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../utils/url_utils.dart';
+import '../../utils/app_config.dart';
 import 'friend_search_page.dart';
 
 class ChatPage extends StatefulWidget {
@@ -125,13 +125,10 @@ class _ChatPageState extends State<ChatPage> {
     final messages = mp.messagesFor(widget.conversationId);
 
     // 调试日志：打印所有消息内容
-    developer.log('[ChatPage] 会话${widget.conversationId} 共${messages.length}条消息', name: 'UI');
+    AppConfig.log('[ChatPage] 会话${widget.conversationId} 共${messages.length}条消息');
     for (int i = 0; i < messages.length; i++) {
       final m = messages[i];
-      developer.log(
-        '[ChatPage] 消息[$i] senderId=${m.senderId}, content="${m.content.substring(0, m.content.length > 100 ? 100 : m.content.length)}"',
-        name: 'UI',
-      );
+      AppConfig.log('[ChatPage] 消息[$i] senderId=${m.senderId}, content="${m.content.substring(0, m.content.length > 100 ? 100 : m.content.length)}"');
     }
 
     final myId = mp.currentUid?.toString() ?? '';

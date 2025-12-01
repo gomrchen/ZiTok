@@ -3,9 +3,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:logger/logger.dart';
 import '../config/env.dart';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'mock/mock_video_service.dart';
 import 'user_session.dart';
+import '../utils/app_config.dart';
 
 /// 统一网络客户端
 ///
@@ -24,9 +24,9 @@ class ApiClient {
         _dio = Dio(
           BaseOptions(
             baseUrl: baseUrl,
-            connectTimeout: const Duration(seconds: 10),
-            receiveTimeout: const Duration(seconds: 20),
-            sendTimeout: const Duration(seconds: 20),
+            connectTimeout: NetworkConfig.connectTimeout,
+            receiveTimeout: NetworkConfig.receiveTimeout,
+            sendTimeout: NetworkConfig.receiveTimeout,
             headers: {
               'Accept-Language': 'zh-CN',
             },
@@ -35,8 +35,8 @@ class ApiClient {
     _setupInterceptors();
   }
 
-  /// 是否输出调试日志
-  bool get _shouldLog => Env.isDev || kDebugMode;
+  /// 是否输出调试日志（生产模式关闭）
+  bool get _shouldLog => AppConfig.enableNetworkLogging;
 
   /// 安装统一拦截器：请求头、日志、业务码与错误处理
   void _setupInterceptors() {

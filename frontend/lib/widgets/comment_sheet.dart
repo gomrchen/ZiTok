@@ -7,6 +7,7 @@ import '../models/video.dart';
 import '../theme/theme_tokens.dart';
 import '../services/user_service.dart';
 import '../utils/url_utils.dart';
+import '../utils/app_config.dart';
 import '../app.dart';
 import 'video_stats.dart';
 import 'package:go_router/go_router.dart';
@@ -428,7 +429,7 @@ class _CommentSheetContentState extends State<_CommentSheetContent> with TickerP
         }
       }
     } catch (e) {
-      debugPrint('_CommentSheetContent: fetch author error: $e');
+      AppConfig.log('_CommentSheetContent: fetch author error: $e');
     } finally {
       _fetchingAuthor = false;
     }
@@ -911,7 +912,7 @@ class _CommentTileState extends State<_CommentTile> {
         }
       }
     } catch (e) {
-      debugPrint('_CommentTile: fetch user info error: $e');
+      AppConfig.log('_CommentTile: fetch user info error: $e');
     } finally {
       _fetching = false;
     }
@@ -1111,7 +1112,7 @@ class _ReplyTileState extends State<_ReplyTile> {
         }
       }
     } catch (e) {
-      debugPrint('_ReplyTile: fetch user info error: $e');
+      AppConfig.log('_ReplyTile: fetch user info error: $e');
     } finally {
       _fetching = false;
     }

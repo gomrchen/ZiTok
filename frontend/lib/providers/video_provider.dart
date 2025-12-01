@@ -3,6 +3,7 @@ import '../repositories/video_repository.dart';
 import '../models/video.dart';
 import '../models/video_publish.dart';
 import '../services/user_session.dart';
+import '../utils/app_config.dart';
 
 class VideoProvider extends ChangeNotifier {
   final VideoRepository repo;
@@ -66,7 +67,7 @@ class VideoProvider extends ChangeNotifier {
 
     // 检测用户 ID 是否变化（包括登出变为 null）
     if (currentUserId != _lastUserId) {
-      debugPrint('VideoProvider: 用户切换 $_lastUserId -> $currentUserId，清理缓存数据');
+      AppConfig.log('VideoProvider: 用户切换 $_lastUserId -> $currentUserId，清理缓存数据');
       _lastUserId = currentUserId;
       clearUserData();
     }
@@ -382,24 +383,24 @@ class VideoProvider extends ChangeNotifier {
     _featuredPage += 1;
     _loadingFeatured = false;
     notifyListeners();
-    debugPrint('VideoProvider.loadMoreFeatured: page=$_featuredPage items_now=${_featured.length} hasMore=$_featuredHasMore');
+    AppConfig.log('VideoProvider.loadMoreFeatured: page=$_featuredPage items_now=${_featured.length} hasMore=$_featuredHasMore');
   }
   
   /// 刷新搜索结果
   Future<void> refreshSearch(String keyword) async {
-    debugPrint('VideoProvider.refreshSearch: start keyword=$keyword');
+    AppConfig.log('VideoProvider.refreshSearch: start keyword=$keyword');
     _searchPage = 1;
     _searchKeyword = keyword;
     _searchResults = [];
     _searchHasMore = true;
     await loadMoreSearch();
-    debugPrint('VideoProvider.refreshSearch: done items=${_searchResults.length}');
+    AppConfig.log('VideoProvider.refreshSearch: done items=${_searchResults.length}');
   }
   
   /// 加载更多搜索结果
   Future<void> loadMoreSearch() async {
     if (_loadingSearch || !_searchHasMore || _searchKeyword == null) return;
-    debugPrint('VideoProvider.loadMoreSearch: page=$_searchPage keyword=$_searchKeyword');
+    AppConfig.log('VideoProvider.loadMoreSearch: page=$_searchPage keyword=$_searchKeyword');
     _loadingSearch = true;
     notifyListeners();
     
@@ -409,11 +410,11 @@ class VideoProvider extends ChangeNotifier {
       _searchHasMore = res.hasMore;
       _searchPage += 1;
     } catch (e) {
-      debugPrint('VideoProvider.loadMoreSearch: error=$e');
+      AppConfig.log('VideoProvider.loadMoreSearch: error=$e');
     } finally {
       _loadingSearch = false;
       notifyListeners();
-      debugPrint('VideoProvider.loadMoreSearch: page=$_searchPage items_now=${_searchResults.length} hasMore=$_searchHasMore');
+      AppConfig.log('VideoProvider.loadMoreSearch: page=$_searchPage items_now=${_searchResults.length} hasMore=$_searchHasMore');
     }
   }
 
@@ -517,9 +518,9 @@ class VideoProvider extends ChangeNotifier {
         _lastVisit = items.last.views ?? DateTime.now().millisecondsSinceEpoch;
       }
 
-      debugPrint('VideoProvider.loadMoreRecommend: items=${items.length} total=${_recommend.length} hasMore=$_recommendHasMore');
+      AppConfig.log('VideoProvider.loadMoreRecommend: items=${items.length} total=${_recommend.length} hasMore=$_recommendHasMore');
     } catch (e) {
-      debugPrint('VideoProvider.loadMoreRecommend: error=$e');
+      AppConfig.log('VideoProvider.loadMoreRecommend: error=$e');
     } finally {
       _loadingRecommend = false;
       notifyListeners();
@@ -553,9 +554,9 @@ class VideoProvider extends ChangeNotifier {
 
       _favoritesHasMore = res.hasMore;
       _favoritesPage += 1;
-      debugPrint('VideoProvider.loadMoreFavorites: page=$_favoritesPage items=${res.items.length} total=${_favorites.length}');
+      AppConfig.log('VideoProvider.loadMoreFavorites: page=$_favoritesPage items=${res.items.length} total=${_favorites.length}');
     } catch (e) {
-      debugPrint('VideoProvider.loadMoreFavorites: error=$e');
+      AppConfig.log('VideoProvider.loadMoreFavorites: error=$e');
     } finally {
       _loadingFavorites = false;
       notifyListeners();

@@ -4,6 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/video_provider.dart';
 import '../../models/video.dart';
 import '../../theme/theme_tokens.dart';
+import '../../utils/app_config.dart';
 import 'package:go_router/go_router.dart';
 
 class FeaturedPage extends StatelessWidget {
@@ -53,7 +54,7 @@ class _FeaturedBodyState extends State<FeaturedBody> {
     }
     try {
       final repo = context.read<VideoProvider>().repo;
-      debugPrint('FeaturedBody: fetch page=$_page size=$_pageSize');
+      AppConfig.log('FeaturedBody: fetch page=$_page size=$_pageSize');
       final res = await repo.fetchFeatured(VideoQuery(page: _page, pageSize: _pageSize));
       if (refresh) {
         _items = res.items;
@@ -62,7 +63,7 @@ class _FeaturedBodyState extends State<FeaturedBody> {
       }
       _hasMore = res.hasMore;
       _page += 1;
-      debugPrint('FeaturedBody: fetched=${res.items.length} total=${_items.length} hasMore=$_hasMore');
+      AppConfig.log('FeaturedBody: fetched=${res.items.length} total=${_items.length} hasMore=$_hasMore');
     } catch (e) {
       _error = e.toString();
     } finally {

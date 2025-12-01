@@ -10,6 +10,7 @@ import '../../providers/messaging_provider.dart';
 import '../../services/user_service.dart';
 import '../../theme/theme_tokens.dart';
 import '../../utils/url_utils.dart';
+import '../../utils/app_config.dart';
 
 /// 访客个人主页（只读）
 class VisitorProfilePage extends StatefulWidget {
@@ -83,7 +84,7 @@ class _VisitorProfilePageState extends State<VisitorProfilePage> {
         )).toList();
       });
     } catch (e) {
-      debugPrint('加载用户视频失败: $e');
+      AppConfig.log('加载用户视频失败: $e');
     } finally {
       setState(() => _loadingVideos = false);
     }

@@ -1,5 +1,5 @@
 import 'dart:collection';
-import 'package:flutter/foundation.dart';
+import '../../utils/app_config.dart';
 
 /// 播放事件类型
 enum PlaybackEventType {
@@ -228,7 +228,7 @@ class VideoPerformanceMonitor {
 
     final ttff = metrics.timeToFirstFrame;
     if (ttff != null) {
-      debugPrint('VideoPerformanceMonitor: TTFF for $videoId = ${ttff.inMilliseconds}ms');
+      AppConfig.perfLog('VideoPerformanceMonitor: TTFF for $videoId = ${ttff.inMilliseconds}ms');
     }
 
     _emitEvent(PlaybackEvent(
@@ -319,7 +319,7 @@ class VideoPerformanceMonitor {
     _aggregateMetrics.addSample(metrics);
 
     _emitEvent(PlaybackEvent(type: PlaybackEventType.playComplete, videoId: videoId));
-    debugPrint('VideoPerformanceMonitor: play complete for $videoId, metrics=${metrics.toJson()}');
+    AppConfig.perfLog('VideoPerformanceMonitor: play complete for $videoId, metrics=${metrics.toJson()}');
   }
 
   /// 记录错误
@@ -387,7 +387,7 @@ class VideoPerformanceMonitor {
       try {
         listener(event);
       } catch (e) {
-        debugPrint('VideoPerformanceMonitor: listener error: $e');
+        AppConfig.perfLog('VideoPerformanceMonitor: listener error: $e');
       }
     }
   }

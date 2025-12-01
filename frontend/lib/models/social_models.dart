@@ -1,7 +1,7 @@
 // 文件路径: lib/models/social_models.dart
 
-import 'dart:developer' as developer;
-import '../utils/url_utils.dart'; // 如果没有这个文件，可以暂时注释掉这一行，改用下方的备用逻辑
+import '../utils/url_utils.dart';
+import '../utils/app_config.dart';
 
 /// 解析Go语言map格式的字符串
 /// 例如: "map[content:急急急 from:7 room_id:1 timestamp:1.764435002e+09 type:group]"
@@ -13,18 +13,18 @@ Map<String, dynamic>? parseGoMapString(dynamic input) {
 
   String str = input.toString().trim();
 
-  developer.log('[parseGoMapString] 输入: ${str.substring(0, str.length > 200 ? 200 : str.length)}', name: 'Parse');
+  AppConfig.log('[parseGoMapString] 输入: ${str.substring(0, str.length > 200 ? 200 : str.length)}');
 
   // 检查是否是Go map格式
   if (!str.startsWith('map[') || !str.endsWith(']')) {
-    developer.log('[parseGoMapString] 不是Go map格式', name: 'Parse');
+    AppConfig.log('[parseGoMapString] 不是Go map格式');
     return null;
   }
 
   // 去掉 "map[" 和 "]"
   String inner = str.substring(4, str.length - 1);
   if (inner.isEmpty) {
-    developer.log('[parseGoMapString] inner为空', name: 'Parse');
+    AppConfig.log('[parseGoMapString] inner为空');
     return null;
   }
 
@@ -32,7 +32,7 @@ Map<String, dynamic>? parseGoMapString(dynamic input) {
   inner = inner.replaceAll(RegExp(r'[\r\n\t]+'), ' ');
   inner = inner.replaceAll(RegExp(r'\s+'), ' ').trim();
 
-  developer.log('[parseGoMapString] 规范化后: $inner', name: 'Parse');
+  AppConfig.log('[parseGoMapString] 规范化后: $inner');
 
   // 已知的所有可能的key（按长度降序排列，避免短key匹配到长key的一部分）
   final knownKeys = [
@@ -61,14 +61,14 @@ Map<String, dynamic>? parseGoMapString(dynamic input) {
   }
 
   if (keyPositions.isEmpty) {
-    developer.log('[parseGoMapString] 未找到任何已知key', name: 'Parse');
+    AppConfig.log('[parseGoMapString] 未找到任何已知key');
     return null;
   }
 
   // 按位置排序
   keyPositions.sort((a, b) => a.key.compareTo(b.key));
 
-  developer.log('[parseGoMapString] 找到keys: ${keyPositions.map((e) => "${e.value}@${e.key}").join(", ")}', name: 'Parse');
+  AppConfig.log('[parseGoMapString] 找到keys: ${keyPositions.map((e) => "${e.value}@${e.key}").join(", ")}');
 
   final Map<String, dynamic> result = {};
 
@@ -89,12 +89,12 @@ Map<String, dynamic>? parseGoMapString(dynamic input) {
       result[key] = value;
       // 特别记录时间戳字段
       if (key == 'timestamp' || key == 'created_at') {
-        developer.log('[parseGoMapString] 时间戳字段: $key = "$value"', name: 'MsgTime');
+        AppConfig.log('[parseGoMapString] 时间戳字段: $key = "$value"');
       }
     }
   }
 
-  developer.log('[parseGoMapString] 最终结果keys: ${result.keys.toList()}', name: 'Parse');
+  AppConfig.log('[parseGoMapString] 最终结果keys: ${result.keys.toList()}');
   return result.isNotEmpty ? result : null;
 }
 
@@ -212,7 +212,7 @@ class ChatMessage {
   /// 从WebSocket消息创建ChatMessage
   /// 支持标准JSON格式和Go map格式字符串
   factory ChatMessage.fromSocketJson(Map<String, dynamic> json) {
-    developer.log('[ChatMessage.fromSocketJson] 输入json: $json', name: 'MsgTime');
+    AppConfig.log('[ChatMessage.fromSocketJson] 输入json: $json');
 
     // 解析消息ID（优先使用服务器ID）
     int msgId = 0;
@@ -223,36 +223,36 @@ class ChatMessage {
     // 解析timestamp，支持科学计数法
     int createdAtMs = 0;
     final tsValue = json['timestamp'];
-    developer.log('[ChatMessage.fromSocketJson] timestamp原始值: $tsValue (${tsValue.runtimeType})', name: 'MsgTime');
+    AppConfig.log('[ChatMessage.fromSocketJson] timestamp原始值: $tsValue (${tsValue.runtimeType})');
 
     if (tsValue != null) {
       int ts = 0;
       if (tsValue is int) {
         ts = tsValue;
-        developer.log('[ChatMessage.fromSocketJson] timestamp是int: $ts', name: 'MsgTime');
+        AppConfig.log('[ChatMessage.fromSocketJson] timestamp是int: $ts');
       } else if (tsValue is double) {
         ts = tsValue.toInt();
-        developer.log('[ChatMessage.fromSocketJson] timestamp是double: $ts', name: 'MsgTime');
+        AppConfig.log('[ChatMessage.fromSocketJson] timestamp是double: $ts');
       } else {
         // 支持科学计数法字符串，如 "1.764435002e+09"
         final tsStr = tsValue.toString();
         final parsed = double.tryParse(tsStr);
-        developer.log('[ChatMessage.fromSocketJson] timestamp是String "$tsStr", 解析为double: $parsed', name: 'MsgTime');
+        AppConfig.log('[ChatMessage.fromSocketJson] timestamp是String "$tsStr", 解析为double: $parsed');
         if (parsed != null) {
           ts = parsed.toInt();
         }
       }
       // 将秒级时间戳转为毫秒级
       createdAtMs = _normalizeTimestamp(ts);
-      developer.log('[ChatMessage.fromSocketJson] ts=$ts, 规范化后createdAtMs=$createdAtMs', name: 'MsgTime');
+      AppConfig.log('[ChatMessage.fromSocketJson] ts=$ts, 规范化后createdAtMs=$createdAtMs');
     }
     // 也检查 created_at 字段
     if (createdAtMs == 0 && json['created_at'] != null) {
       createdAtMs = _normalizeTimestamp(_parseIntField(json['created_at']));
-      developer.log('[ChatMessage.fromSocketJson] 使用created_at: $createdAtMs', name: 'MsgTime');
+      AppConfig.log('[ChatMessage.fromSocketJson] 使用created_at: $createdAtMs');
     }
 
-    developer.log('[ChatMessage.fromSocketJson] 最终: id=$msgId, createdAtMs=$createdAtMs', name: 'MsgTime');
+    AppConfig.log('[ChatMessage.fromSocketJson] 最终: id=$msgId, createdAtMs=$createdAtMs');
 
     // 解析fromId
     int fromId = 0;
@@ -321,45 +321,45 @@ class ChatMessage {
   /// 支持: Map, Go map格式字符串, 普通字符串
   static ChatMessage? tryParse(dynamic data) {
     if (data == null) {
-      developer.log('[ChatMessage.tryParse] data为null', name: 'Parse');
+      AppConfig.log('[ChatMessage.tryParse] data为null');
       return null;
     }
 
-    developer.log('[ChatMessage.tryParse] 输入类型: ${data.runtimeType}', name: 'Parse');
+    AppConfig.log('[ChatMessage.tryParse] 输入类型: ${data.runtimeType}');
 
     Map<String, dynamic>? json;
 
     if (data is Map) {
       json = Map<String, dynamic>.from(data);
-      developer.log('[ChatMessage.tryParse] 已是Map类型，keys: ${json.keys.toList()}', name: 'Parse');
+      AppConfig.log('[ChatMessage.tryParse] 已是Map类型，keys: ${json.keys.toList()}');
     } else if (data is String) {
       final trimmed = data.trim();
-      developer.log('[ChatMessage.tryParse] 是String，开头: ${trimmed.substring(0, trimmed.length > 50 ? 50 : trimmed.length)}', name: 'Parse');
+      AppConfig.log('[ChatMessage.tryParse] 是String，开头: ${trimmed.substring(0, trimmed.length > 50 ? 50 : trimmed.length)}');
       // 检查是否是Go map格式（支持换行符在中间的情况）
       if (trimmed.startsWith('map[')) {
-        developer.log('[ChatMessage.tryParse] 检测到Go map格式，调用parseGoMapString', name: 'Parse');
+        AppConfig.log('[ChatMessage.tryParse] 检测到Go map格式，调用parseGoMapString');
         json = parseGoMapString(trimmed);
       } else {
-        developer.log('[ChatMessage.tryParse] 不是Go map格式', name: 'Parse');
+        AppConfig.log('[ChatMessage.tryParse] 不是Go map格式');
       }
     } else {
-      developer.log('[ChatMessage.tryParse] 未知类型: ${data.runtimeType}', name: 'Parse');
+      AppConfig.log('[ChatMessage.tryParse] 未知类型: ${data.runtimeType}');
     }
 
     if (json == null) {
-      developer.log('[ChatMessage.tryParse] json为null，解析失败', name: 'Parse');
+      AppConfig.log('[ChatMessage.tryParse] json为null，解析失败');
       return null;
     }
 
-    developer.log('[ChatMessage.tryParse] 解析后json: $json', name: 'Parse');
+    AppConfig.log('[ChatMessage.tryParse] 解析后json: $json');
 
     // 根据字段判断使用哪个解析方法
     // WebSocket消息通常包含 'from' 和 'timestamp' 字段
     if (json.containsKey('from') || json.containsKey('timestamp')) {
-      developer.log('[ChatMessage.tryParse] 使用fromSocketJson解析', name: 'Parse');
+      AppConfig.log('[ChatMessage.tryParse] 使用fromSocketJson解析');
       return ChatMessage.fromSocketJson(json);
     } else {
-      developer.log('[ChatMessage.tryParse] 使用fromJson解析', name: 'Parse');
+      AppConfig.log('[ChatMessage.tryParse] 使用fromJson解析');
       return ChatMessage.fromJson(json);
     }
   }
@@ -388,7 +388,7 @@ class ChatMessage {
             contentTimestamp = tsDouble.toInt();
           }
         }
-        developer.log('[ChatMessage.fromJson] content是Go map格式，解析后: content="$rawContent", timestamp=$contentTimestamp', name: 'MsgTime');
+        AppConfig.log('[ChatMessage.fromJson] content是Go map格式，解析后: content="$rawContent", timestamp=$contentTimestamp');
       }
     }
 
@@ -401,7 +401,7 @@ class ChatMessage {
     // 1. 优先使用从content Go map中提取的timestamp
     if (contentTimestamp > 0) {
       createdAtMs = _normalizeTimestamp(contentTimestamp);
-      developer.log('[ChatMessage.fromJson] 使用content内的timestamp: $contentTimestamp -> $createdAtMs', name: 'MsgTime');
+      AppConfig.log('[ChatMessage.fromJson] 使用content内的timestamp: $contentTimestamp -> $createdAtMs');
     }
 
     // 2. 其次使用json的created_at
@@ -414,7 +414,7 @@ class ChatMessage {
       createdAtMs = _normalizeTimestamp(_parseIntField(json['timestamp']));
     }
 
-    developer.log('[ChatMessage.fromJson] 最终: id=$msgId, createdAtMs=$createdAtMs', name: 'MsgTime');
+    AppConfig.log('[ChatMessage.fromJson] 最终: id=$msgId, createdAtMs=$createdAtMs');
 
     return ChatMessage(
       id: msgId > 0 ? msgId : -DateTime.now().millisecondsSinceEpoch, // 无服务器ID时使用负数临时ID

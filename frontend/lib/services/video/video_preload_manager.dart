@@ -1,30 +1,25 @@
 import 'dart:async';
 import 'dart:collection';
-import 'package:flutter/foundation.dart';
 import 'package:video_player/video_player.dart';
 import 'video_cache_service.dart';
 import 'video_performance_monitor.dart';
+import '../../utils/app_config.dart';
 
-/// 视频预加载配置
+/// 视频预加载配置（从 AppConfig 读取生产/开发模式配置）
 class PreloadConfig {
   /// 预加载窗口大小（当前视频前后各预加载几个）
-  final int preloadWindow;
+  int get preloadWindow => VideoPerformanceConfig.preloadWindow;
 
   /// 最大同时保持的控制器数量
-  final int maxControllers;
+  int get maxControllers => VideoPerformanceConfig.controllerPoolSize;
 
   /// 预加载延迟（毫秒），避免快速滑动时频繁加载
-  final int preloadDelayMs;
+  int get preloadDelayMs => VideoPerformanceConfig.preloadDelayMs;
 
   /// 是否启用智能预加载（根据网络状况调整）
-  final bool smartPreload;
+  bool get smartPreload => VideoPerformanceConfig.enableSmartPreload;
 
-  const PreloadConfig({
-    this.preloadWindow = 2,
-    this.maxControllers = 5,
-    this.preloadDelayMs = 300,
-    this.smartPreload = true,
-  });
+  const PreloadConfig();
 }
 
 /// 预加载视频项
@@ -97,13 +92,13 @@ class VideoPreloadManager {
   }) {
     _cacheService = cacheService;
     _monitor = monitor;
-    debugPrint('VideoPreloadManager: initialized');
+    AppConfig.videoLog('VideoPreloadManager: initialized');
   }
 
   /// 设置视频列表
   void setVideoList(List<PreloadItem> videos) {
     _videoList = videos;
-    debugPrint('VideoPreloadManager: video list updated, count=${videos.length}');
+    AppConfig.videoLog('VideoPreloadManager: video list updated, count=${videos.length}');
   }
 
   /// 更新当前播放索引，触发预加载
@@ -121,7 +116,7 @@ class VideoPreloadManager {
       // 移到末尾（LRU）
       _controllers.remove(videoId);
       _controllers[videoId] = existing;
-      debugPrint('VideoPreloadManager: reuse controller for $videoId');
+      AppConfig.videoLog('VideoPreloadManager: reuse controller for $videoId');
       return existing.controller;
     }
 
@@ -174,7 +169,7 @@ class VideoPreloadManager {
       wrapper.controller.pause();
       wrapper.isPlaying = false;
     }
-    debugPrint('VideoPreloadManager: all videos paused');
+    AppConfig.videoLog('VideoPreloadManager: all videos paused');
   }
 
   /// 释放指定控制器
@@ -182,7 +177,7 @@ class VideoPreloadManager {
     final wrapper = _controllers.remove(videoId);
     if (wrapper != null) {
       wrapper.controller.dispose();
-      debugPrint('VideoPreloadManager: released controller for $videoId');
+      AppConfig.videoLog('VideoPreloadManager: released controller for $videoId');
     }
   }
 
@@ -194,7 +189,7 @@ class VideoPreloadManager {
     _controllers.clear();
     _preloading.clear();
     _preloadDebouncer?.cancel();
-    debugPrint('VideoPreloadManager: all controllers released');
+    AppConfig.videoLog('VideoPreloadManager: all controllers released');
   }
 
   /// 调度预加载（防抖）
@@ -234,7 +229,7 @@ class VideoPreloadManager {
     final preloadCount = _config.smartPreload ? _getSmartPreloadCount() : toPreload.length;
     final limited = toPreload.take(preloadCount);
 
-    debugPrint('VideoPreloadManager: preloading ${limited.length} videos around index $_currentIndex');
+    AppConfig.videoLog('VideoPreloadManager: preloading ${limited.length} videos around index $_currentIndex');
 
     // 并行预加载
     await Future.wait(limited.map((item) => _preloadVideo(item)));
@@ -258,10 +253,10 @@ class VideoPreloadManager {
     try {
       final controller = await _createController(item.videoId, item.videoUrl, isPreload: true);
       if (controller != null) {
-        debugPrint('VideoPreloadManager: preloaded ${item.videoId}');
+        AppConfig.videoLog('VideoPreloadManager: preloaded ${item.videoId}');
       }
     } catch (e) {
-      debugPrint('VideoPreloadManager: preload failed for ${item.videoId}: $e');
+      AppConfig.videoLog('VideoPreloadManager: preload failed for ${item.videoId}: $e');
     } finally {
       _preloading.remove(item.videoId);
     }
@@ -286,7 +281,7 @@ class VideoPreloadManager {
         final cachedPath = await _cacheService!.getCachedVideoPath(videoUrl);
         if (cachedPath != null) {
           actualUrl = cachedPath;
-          debugPrint('VideoPreloadManager: using cached video for $videoId');
+          AppConfig.videoLog('VideoPreloadManager: using cached video for $videoId');
         }
       }
 
@@ -305,11 +300,11 @@ class VideoPreloadManager {
 
       _controllers[videoId] = wrapper;
 
-      debugPrint('VideoPreloadManager: created controller for $videoId in ${loadTime.inMilliseconds}ms');
+      AppConfig.videoLog('VideoPreloadManager: created controller for $videoId in ${loadTime.inMilliseconds}ms');
       return controller;
     } catch (e) {
       _monitor?.recordLoadError(videoId, e.toString());
-      debugPrint('VideoPreloadManager: failed to create controller for $videoId: $e');
+      AppConfig.videoLog('VideoPreloadManager: failed to create controller for $videoId: $e');
       return null;
     }
   }
@@ -329,13 +324,13 @@ class VideoPreloadManager {
       if (toRemove != null) {
         final wrapper = _controllers.remove(toRemove);
         wrapper?.controller.dispose();
-        debugPrint('VideoPreloadManager: evicted controller for $toRemove (capacity)');
+        AppConfig.videoLog('VideoPreloadManager: evicted controller for $toRemove (capacity)');
       } else {
         // 所有控制器都在播放，强制移除最老的
         final oldest = _controllers.entries.first;
         _controllers.remove(oldest.key);
         oldest.value.controller.dispose();
-        debugPrint('VideoPreloadManager: force evicted controller for ${oldest.key}');
+        AppConfig.videoLog('VideoPreloadManager: force evicted controller for ${oldest.key}');
       }
     }
   }
@@ -359,7 +354,7 @@ class VideoPreloadManager {
     for (final id in toRemove) {
       final wrapper = _controllers.remove(id);
       wrapper?.controller.dispose();
-      debugPrint('VideoPreloadManager: cleaned up controller for $id (out of range)');
+      AppConfig.videoLog('VideoPreloadManager: cleaned up controller for $id (out of range)');
     }
   }
 

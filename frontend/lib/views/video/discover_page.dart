@@ -11,6 +11,7 @@ import '../../app.dart';
 import '../../utils/url_utils.dart';
 import '../../widgets/video_stats.dart';
 import '../../widgets/animated_like_button.dart';
+import '../../utils/app_config.dart';
 import 'featured_page.dart';
 import 'widgets/md_notes_sheet.dart';
 import '../../widgets/comment_sheet.dart';
@@ -320,7 +321,7 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
         }
       }
     } catch (e) {
-      debugPrint('_FullScreenVideoItem: fetch author error: $e');
+      AppConfig.log('_FullScreenVideoItem: fetch author error: $e');
     } finally {
       _fetchingAuthor = false;
     }
@@ -362,7 +363,7 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
         _fadeController.forward();
         context.read<VideoProvider>().visit(widget.video.id);
       }
-      debugPrint('_FullScreenVideoItem: using preloaded controller');
+      AppConfig.videoLog('_FullScreenVideoItem: using preloaded controller');
       return;
     }
 
@@ -387,7 +388,7 @@ class _FullScreenVideoItemState extends State<_FullScreenVideoItem> with Widgets
         newController.dispose();
       }
     } catch (e) {
-      debugPrint('FullScreenVideoItem: initialize error $e');
+      AppConfig.videoLog('FullScreenVideoItem: initialize error $e');
       if (mounted && !_isDisposed) setState(() => _error = '视频加载失败');
     }
   }
@@ -819,7 +820,7 @@ class _PublisherAvatarState extends State<_PublisherAvatar> {
         }
       }
     } catch (e) {
-      debugPrint('_PublisherAvatar: fetch avatar error: $e');
+      AppConfig.log('_PublisherAvatar: fetch avatar error: $e');
     } finally {
       _fetchingAvatar = false;
     }

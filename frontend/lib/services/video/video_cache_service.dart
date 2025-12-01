@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 import 'dart:convert';
+import '../../utils/app_config.dart';
 
 /// 视频缓存配置
 class VideoCacheConfig {
@@ -114,9 +115,9 @@ class VideoCacheService {
       }
 
       _initialized = true;
-      debugPrint('VideoCacheService: initialized, cache size=${_formatSize(_currentCacheSize)}');
+      AppConfig.videoLog('VideoCacheService: initialized, cache size=${_formatSize(_currentCacheSize)}');
     } catch (e) {
-      debugPrint('VideoCacheService: init failed: $e');
+      AppConfig.videoLog('VideoCacheService: init failed: $e');
     }
   }
 
@@ -128,7 +129,7 @@ class VideoCacheService {
     if (_config.enableMemoryCache && _memoryCache.containsKey(url)) {
       final path = _memoryCache[url]!;
       if (await File(path).exists()) {
-        debugPrint('VideoCacheService: memory cache hit for $url');
+        AppConfig.videoLog('VideoCacheService: memory cache hit for $url');
         return path;
       } else {
         _memoryCache.remove(url);
@@ -149,7 +150,7 @@ class VideoCacheService {
             _addToMemoryCache(url, entry.localPath);
           }
 
-          debugPrint('VideoCacheService: disk cache hit for $url');
+          AppConfig.videoLog('VideoCacheService: disk cache hit for $url');
           return entry.localPath;
         } else {
           // 文件不存在，移除索引
@@ -202,13 +203,13 @@ class VideoCacheService {
         // 保存索引
         await _saveCacheIndex();
 
-        debugPrint('VideoCacheService: cached video $url, size=${_formatSize(totalSize)}');
+        AppConfig.videoLog('VideoCacheService: cached video $url, size=${_formatSize(totalSize)}');
         return localPath;
       }
 
       return null;
     } catch (e) {
-      debugPrint('VideoCacheService: cache failed for $url: $e');
+      AppConfig.videoLog('VideoCacheService: cache failed for $url: $e');
       return null;
     }
   }
@@ -220,7 +221,7 @@ class VideoCacheService {
     for (final url in urls) {
       if (!_diskCacheIndex.containsKey(url)) {
         // TODO: 实现后台下载
-        debugPrint('VideoCacheService: warmUp scheduled for $url');
+        AppConfig.videoLog('VideoCacheService: warmUp scheduled for $url');
       }
     }
   }
@@ -240,7 +241,7 @@ class VideoCacheService {
     _currentCacheSize = 0;
 
     await _saveCacheIndex();
-    debugPrint('VideoCacheService: all cache cleared');
+    AppConfig.videoLog('VideoCacheService: all cache cleared');
   }
 
   /// 获取缓存大小
@@ -298,9 +299,9 @@ class VideoCacheService {
           }
         }
 
-        debugPrint('VideoCacheService: loaded ${_diskCacheIndex.length} cache entries');
+        AppConfig.videoLog('VideoCacheService: loaded ${_diskCacheIndex.length} cache entries');
       } catch (e) {
-        debugPrint('VideoCacheService: failed to load cache index: $e');
+        AppConfig.videoLog('VideoCacheService: failed to load cache index: $e');
       }
     }
   }
@@ -314,7 +315,7 @@ class VideoCacheService {
       final list = _diskCacheIndex.values.map((e) => e.toJson()).toList();
       await indexFile.writeAsString(json.encode(list));
     } catch (e) {
-      debugPrint('VideoCacheService: failed to save cache index: $e');
+      AppConfig.videoLog('VideoCacheService: failed to save cache index: $e');
     }
   }
 
@@ -340,7 +341,7 @@ class VideoCacheService {
 
     if (expired.isNotEmpty) {
       await _saveCacheIndex();
-      debugPrint('VideoCacheService: cleaned up ${expired.length} expired entries');
+      AppConfig.videoLog('VideoCacheService: cleaned up ${expired.length} expired entries');
     }
   }
 
@@ -363,7 +364,7 @@ class VideoCacheService {
         try {
           await File(oldest.localPath).delete();
           _currentCacheSize -= oldest.fileSize;
-          debugPrint('VideoCacheService: evicted ${_formatSize(oldest.fileSize)} to free space');
+          AppConfig.videoLog('VideoCacheService: evicted ${_formatSize(oldest.fileSize)} to free space');
         } catch (_) {}
       } else {
         break;
