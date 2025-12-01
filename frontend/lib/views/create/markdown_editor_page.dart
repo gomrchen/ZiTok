@@ -245,56 +245,86 @@ class _MarkdownEditorPageState extends State<MarkdownEditorPage>
         }
       },
       child: Scaffold(
-        appBar: AppBar(
-          leading: IconButton(
-            icon: const Icon(Icons.close),
-            onPressed: _handleClose,
-            tooltip: '取消',
+        body: SafeArea(
+          child: Column(
+            children: [
+              // 自定义顶部栏（替代 AppBar 解决显示问题）
+              Container(
+                height: 56,
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                decoration: BoxDecoration(
+                  color: cs.surface,
+                  border: Border(
+                    bottom: BorderSide(color: cs.outlineVariant, width: 0.5),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    // 关闭按钮
+                    IconButton(
+                      icon: Icon(Icons.close, color: cs.onSurface, size: 24),
+                      onPressed: _handleClose,
+                      tooltip: '取消',
+                    ),
+                    // 标题
+                    Expanded(
+                      child: Text(
+                        widget.title ?? 'Markdown 笔记编辑',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: cs.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                    // 完成按钮
+                    Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: FilledButton.icon(
+                        onPressed: _saveAndReturn,
+                        icon: const Icon(Icons.check, size: 18),
+                        label: const Text('完成'),
+                        style: FilledButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          minimumSize: const Size(0, 36),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // 模式切换栏（均匀排布占满一行）
+              _ModeToggleBar(
+                currentMode: _mode,
+                onModeChanged: _setMode,
+              ),
+              // 功能工具栏
+              _ToolBar(
+                onHeading1: () => _insertHeading(1),
+                onHeading2: () => _insertHeading(2),
+                onHeading3: () => _insertHeading(3),
+                onBold: _insertBold,
+                onItalic: _insertItalic,
+                onCode: _insertCode,
+                onCodeBlock: _insertCodeBlock,
+                onLink: _insertLink,
+                onBullet: _insertBullet,
+                onNumbered: _insertNumbered,
+                onQuote: _insertQuote,
+                onDivider: _insertDivider,
+                onImage: _uploadImage,
+              ),
+              const Divider(height: 1),
+              // 编辑区域
+              Expanded(
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 300),
+                  child: _buildEditorArea(cs, theme),
+                ),
+              ),
+            ],
           ),
-          title: Text(widget.title ?? 'Markdown 编辑器'),
-          actions: [
-            // 保存按钮
-            FilledButton.icon(
-              onPressed: _saveAndReturn,
-              icon: const Icon(Icons.check, size: 18),
-              label: const Text('完成'),
-            ),
-            const SizedBox(width: 12),
-          ],
         ),
-      body: Column(
-        children: [
-          // 模式切换栏（均匀排布占满一行）
-          _ModeToggleBar(
-            currentMode: _mode,
-            onModeChanged: _setMode,
-          ),
-          // 功能工具栏
-          _ToolBar(
-            onHeading1: () => _insertHeading(1),
-            onHeading2: () => _insertHeading(2),
-            onHeading3: () => _insertHeading(3),
-            onBold: _insertBold,
-            onItalic: _insertItalic,
-            onCode: _insertCode,
-            onCodeBlock: _insertCodeBlock,
-            onLink: _insertLink,
-            onBullet: _insertBullet,
-            onNumbered: _insertNumbered,
-            onQuote: _insertQuote,
-            onDivider: _insertDivider,
-            onImage: _uploadImage,
-          ),
-          const Divider(height: 1),
-          // 编辑区域
-          Expanded(
-            child: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              child: _buildEditorArea(cs, theme),
-            ),
-          ),
-        ],
-      ),
       ),
     );
   }

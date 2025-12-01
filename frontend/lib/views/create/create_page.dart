@@ -9,6 +9,7 @@ import '../../utils/content_validator.dart';
 import '../../providers/video_provider.dart';
 import '../../services/user_session.dart';
 import '../../services/user_service.dart';
+import '../../services/video_service.dart';
 import '../../services/notes_service.dart';
 import '../../repositories/notes_repository.dart';
 import '../../models/video_publish.dart';
@@ -25,7 +26,17 @@ enum CreateStep { modeSelect, prepare, edit, publish }
 enum PublishMode { mixed, noteOnly }
 
 class CreatePage extends StatefulWidget {
-  const CreatePage({super.key});
+  /// 初始发布模式（可选）：noteOnly 表示笔记单独发布模式
+  final PublishMode? initialMode;
+
+  /// 预设关联的视频（可选）：用于快速发布笔记时自动关联视频
+  final Video? initialLinkedVideo;
+
+  const CreatePage({
+    super.key,
+    this.initialMode,
+    this.initialLinkedVideo,
+  });
 
   @override
   State<CreatePage> createState() => _CreatePageState();
@@ -52,9 +63,26 @@ class _CreatePageState extends State<CreatePage> {
   final List<String> _tags = [];
   VideoPlayerController? _vc;
   bool _vcReady = false;
-  final PageController _pageController = PageController(initialPage: 0);
+  late final PageController _pageController;
   double _dragDx = 0;
   bool _boundarySnackShown = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 根据传入的初始参数设置状态
+    if (widget.initialMode != null) {
+      publishMode = widget.initialMode;
+      // 如果预设了笔记模式，直接进入素材准备阶段
+      step = CreateStep.prepare;
+    }
+    if (widget.initialLinkedVideo != null) {
+      _linkedVideo = widget.initialLinkedVideo;
+    }
+    // 根据初始状态决定 PageController 的初始页面
+    final initialPage = step == CreateStep.prepare ? 1 : 0;
+    _pageController = PageController(initialPage: initialPage);
+  }
 
   @override
   void dispose() {
@@ -338,22 +366,8 @@ class _CreatePageState extends State<CreatePage> {
       for (final t in tags) {
         if (!_tags.contains(t)) _tags.add(t);
       }
-    } else {
-      // Fallback: 允许粘贴文本
-      if (!mounted) return;
-      final text = await _askForText(context, title: '粘贴 Markdown 文本', hint: '# 标题\n内容...');
-      if (text != null) {
-        setState(() {
-          mdContent = text;
-          mdFileName = 'note_${DateTime.now().millisecondsSinceEpoch}.md';
-        });
-        // 从MD中提取标签
-        final tags = ContentValidator.extractTags(text);
-        for (final t in tags) {
-          if (!_tags.contains(t)) _tags.add(t);
-        }
-      }
     }
+    // 用户取消文件选择时不做任何操作
   }
 
   Future<void> _initVideoController() async {
@@ -1785,10 +1799,13 @@ class _VideoSearchDialog extends StatefulWidget {
 
 class _VideoSearchDialogState extends State<_VideoSearchDialog> {
   final TextEditingController _searchController = TextEditingController();
-  List<Video> _videos = [];
+  List<Video> _myVideos = [];      // 我的视频列表
+  List<Video> _searchResults = []; // 全站搜索结果
   bool _loading = false;
+  bool _searching = false;         // 是否正在搜索全站
   String? _error;
   String? _userId;
+  bool _isSearchMode = false;      // 是否为搜索模式
 
   @override
   void initState() {
@@ -1828,7 +1845,7 @@ class _VideoSearchDialogState extends State<_VideoSearchDialog> {
       );
 
       setState(() {
-        _videos = videos;
+        _myVideos = videos;
         _loading = false;
       });
     } catch (e) {
@@ -1839,14 +1856,80 @@ class _VideoSearchDialogState extends State<_VideoSearchDialog> {
     }
   }
 
-  List<Video> get _filteredVideos {
+  /// 搜索全站视频
+  Future<void> _searchAllVideos(String query) async {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _isSearchMode = false;
+        _searchResults = [];
+      });
+      return;
+    }
+
+    setState(() {
+      _searching = true;
+      _isSearchMode = true;
+      _error = null;
+    });
+
+    try {
+      final videoService = VideoService(AppBootstrap.apiClient.dio);
+      final response = await videoService.search(
+        keywords: query.trim(),
+        pageSize: 50,
+        pageNum: 1,
+      );
+
+      if (response.statusCode == 200) {
+        final data = response.data;
+        List<Video> videos = [];
+
+        if (data is Map<String, dynamic>) {
+          final code = data['code'];
+          if (code == '10000' || code == 10000) {
+            final videoList = data['data'];
+            if (videoList is List) {
+              videos = videoList.map((v) => Video.fromJson(v as Map<String, dynamic>)).toList();
+            }
+          }
+        }
+
+        setState(() {
+          _searchResults = videos;
+          _searching = false;
+        });
+      } else {
+        setState(() {
+          _error = '搜索失败';
+          _searching = false;
+        });
+      }
+    } catch (e) {
+      setState(() {
+        _error = '搜索失败: $e';
+        _searching = false;
+      });
+    }
+  }
+
+  /// 获取本地过滤后的视频列表（仅用于非搜索模式）
+  List<Video> get _filteredMyVideos {
     final query = _searchController.text.trim().toLowerCase();
-    if (query.isEmpty) return _videos;
-    return _videos.where((v) {
+    if (query.isEmpty) return _myVideos;
+    return _myVideos.where((v) {
       final title = (v.title ?? '').toLowerCase();
       final intro = (v.intro ?? '').toLowerCase();
       return title.contains(query) || intro.contains(query);
     }).toList();
+  }
+
+  /// 清除搜索，返回我的视频列表
+  void _clearSearch() {
+    _searchController.clear();
+    setState(() {
+      _isSearchMode = false;
+      _searchResults = [];
+    });
   }
 
   @override
@@ -1885,14 +1968,71 @@ class _VideoSearchDialogState extends State<_VideoSearchDialog> {
               child: TextField(
                 controller: _searchController,
                 decoration: InputDecoration(
-                  hintText: '搜索我的视频...',
+                  hintText: '搜索全站视频（按回车搜索）',
                   prefixIcon: const Icon(Icons.search),
+                  suffixIcon: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (_searchController.text.isNotEmpty)
+                        IconButton(
+                          icon: const Icon(Icons.clear, size: 20),
+                          onPressed: _clearSearch,
+                          tooltip: '清除',
+                        ),
+                      IconButton(
+                        icon: Icon(Icons.search, color: cs.primary),
+                        onPressed: () => _searchAllVideos(_searchController.text),
+                        tooltip: '搜索全站',
+                      ),
+                    ],
+                  ),
                   border: OutlineInputBorder(borderRadius: Radii.md),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
-                onChanged: (_) => setState(() {}),
+                onChanged: (value) {
+                  // 如果清空了搜索框，退出搜索模式
+                  if (value.isEmpty && _isSearchMode) {
+                    _clearSearch();
+                  } else {
+                    setState(() {});
+                  }
+                },
+                onSubmitted: _searchAllVideos,
               ),
             ),
+            // 模式提示
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+              child: Row(
+                children: [
+                  Icon(
+                    _isSearchMode ? Icons.public : Icons.person,
+                    size: 16,
+                    color: cs.primary,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    _isSearchMode ? '全站搜索结果' : '我的视频',
+                    style: theme.textTheme.labelMedium?.copyWith(
+                      color: cs.primary,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  if (_isSearchMode) ...[
+                    const Spacer(),
+                    TextButton.icon(
+                      onPressed: _clearSearch,
+                      icon: const Icon(Icons.arrow_back, size: 16),
+                      label: const Text('返回我的视频'),
+                      style: TextButton.styleFrom(
+                        visualDensity: VisualDensity.compact,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: Spacing.xs),
             // 视频列表
             Expanded(
               child: _buildVideoList(cs, theme),
@@ -1904,7 +2044,11 @@ class _VideoSearchDialogState extends State<_VideoSearchDialog> {
   }
 
   Widget _buildVideoList(ColorScheme cs, ThemeData theme) {
-    if (_loading) {
+    if (_loading && !_isSearchMode) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_searching) {
       return const Center(child: CircularProgressIndicator());
     }
 
@@ -1917,13 +2061,18 @@ class _VideoSearchDialogState extends State<_VideoSearchDialog> {
             const SizedBox(height: Spacing.md),
             Text(_error!, style: TextStyle(color: cs.error)),
             const SizedBox(height: Spacing.md),
-            ElevatedButton(onPressed: _loadUserVideos, child: const Text('重试')),
+            ElevatedButton(
+              onPressed: _isSearchMode
+                  ? () => _searchAllVideos(_searchController.text)
+                  : _loadUserVideos,
+              child: const Text('重试'),
+            ),
           ],
         ),
       );
     }
 
-    final videos = _filteredVideos;
+    final videos = _isSearchMode ? _searchResults : _filteredMyVideos;
 
     if (videos.isEmpty) {
       return Center(
@@ -1933,9 +2082,21 @@ class _VideoSearchDialogState extends State<_VideoSearchDialog> {
             Icon(Icons.video_library_outlined, size: 48, color: cs.onSurfaceVariant),
             const SizedBox(height: Spacing.md),
             Text(
-              _searchController.text.isNotEmpty ? '未找到匹配的视频' : '您还没有发布任何视频',
+              _isSearchMode
+                  ? '未找到匹配的视频'
+                  : (_searchController.text.isNotEmpty
+                      ? '未找到匹配的视频'
+                      : '您还没有发布任何视频'),
               style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
             ),
+            if (!_isSearchMode && _searchController.text.isNotEmpty) ...[
+              const SizedBox(height: Spacing.md),
+              OutlinedButton.icon(
+                onPressed: () => _searchAllVideos(_searchController.text),
+                icon: const Icon(Icons.public, size: 18),
+                label: const Text('搜索全站视频'),
+              ),
+            ],
           ],
         ),
       );
@@ -1949,6 +2110,7 @@ class _VideoSearchDialogState extends State<_VideoSearchDialog> {
         return _VideoSelectItem(
           video: video,
           onTap: () => Navigator.pop(context, video),
+          showAuthor: _isSearchMode, // 搜索模式下显示作者
         );
       },
     );
@@ -1958,8 +2120,13 @@ class _VideoSearchDialogState extends State<_VideoSearchDialog> {
 class _VideoSelectItem extends StatelessWidget {
   final Video video;
   final VoidCallback onTap;
+  final bool showAuthor;
 
-  const _VideoSelectItem({required this.video, required this.onTap});
+  const _VideoSelectItem({
+    required this.video,
+    required this.onTap,
+    this.showAuthor = false,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -2008,9 +2175,29 @@ class _VideoSelectItem extends StatelessWidget {
                       overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: 4),
+                    if (showAuthor && video.authorName != null && video.authorName!.isNotEmpty) ...[
+                      Row(
+                        children: [
+                          Icon(Icons.person_outline, size: 14, color: cs.onSurfaceVariant),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              video.authorName!,
+                              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                    ],
                     Text(
                       'ID: ${video.id}',
-                      style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: cs.onSurfaceVariant,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),

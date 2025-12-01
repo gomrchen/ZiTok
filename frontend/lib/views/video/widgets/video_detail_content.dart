@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
 import '../../../models/video.dart';
 import '../../../providers/video_provider.dart';
 import 'package:provider/provider.dart';
@@ -10,6 +9,7 @@ import '../../../services/notes_service.dart';
 import '../../../app.dart';
 import '../../../models/notes_models.dart';
 import 'md_notes_sheet.dart' show NoteReaderPage;
+import '../../create/create_page.dart';
 
 /// 下半部分内容容器：评论 / 简介 / 笔记
 class VideoDetailContent extends StatefulWidget {
@@ -304,10 +304,14 @@ class _NotesTabContentState extends State<_NotesTabContent> {
 
   void _navigateToQuickPublish() {
     // 跳转到笔记发布页面，并预设关联视频
-    context.push('/create', extra: {
-      'mode': 'note_only',
-      'linkedVideo': widget.video,
-    });
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CreatePage(
+          initialMode: PublishMode.noteOnly,
+          initialLinkedVideo: widget.video,
+        ),
+      ),
+    );
   }
 
   void _openNoteReader(NoteItem note) {

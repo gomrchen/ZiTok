@@ -19,6 +19,7 @@ import '../../app.dart';
 import 'package:go_router/go_router.dart';
 import 'dart:io';
 import '../profile/note_manage_page.dart';
+import '../create/create_page.dart';
 
 /// 视频详情页 - 支持可拖拽互动区域（类似B站移动端）
 ///
@@ -989,50 +990,102 @@ class _NotesTabState extends State<_NotesTab> {
     );
   }
 
+  /// 快速发布笔记 - 跳转到笔记发布页面，预设关联当前视频
+  void _navigateToQuickPublish() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => CreatePage(
+          initialMode: PublishMode.noteOnly,
+          initialLinkedVideo: widget.video,
+        ),
+      ),
+    );
+  }
+
+  /// 构建底部快速发布按钮
+  Widget _buildQuickPublishButton(ColorScheme cs) {
+    return Container(
+      padding: const EdgeInsets.all(Spacing.sm),
+      decoration: BoxDecoration(
+        color: cs.surface,
+        border: Border(top: BorderSide(color: cs.outlineVariant)),
+      ),
+      child: FilledButton.icon(
+        onPressed: _navigateToQuickPublish,
+        icon: const Icon(Icons.edit_note, size: 20),
+        label: const Text('快速发布笔记'),
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(double.infinity, 44),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
 
     if (_loading) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(Spacing.lg),
-          child: CircularProgressIndicator(),
-        ),
+      return Column(
+        children: [
+          const Expanded(
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.all(Spacing.lg),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          ),
+          _buildQuickPublishButton(cs),
+        ],
       );
     }
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(Spacing.lg),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, color: cs.error, size: 48),
-              const SizedBox(height: Spacing.md),
-              Text('加载失败', style: theme.textTheme.bodyMedium?.copyWith(color: cs.error)),
-              const SizedBox(height: Spacing.sm),
-              TextButton(onPressed: _loadNotes, child: const Text('重试')),
-            ],
+      return Column(
+        children: [
+          Expanded(
+            child: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(Spacing.lg),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.error_outline, color: cs.error, size: 48),
+                    const SizedBox(height: Spacing.md),
+                    Text('加载失败', style: theme.textTheme.bodyMedium?.copyWith(color: cs.error)),
+                    const SizedBox(height: Spacing.sm),
+                    TextButton(onPressed: _loadNotes, child: const Text('重试')),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
+          _buildQuickPublishButton(cs),
+        ],
       );
     }
 
     if (_notes.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.note_outlined, size: 48, color: cs.onSurfaceVariant),
-            const SizedBox(height: Spacing.md),
-            Text('暂无笔记', style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
-            const SizedBox(height: Spacing.sm),
-            Text('还没有人为这个视频写笔记', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-          ],
-        ),
+      return Column(
+        children: [
+          Expanded(
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.note_outlined, size: 48, color: cs.onSurfaceVariant),
+                  const SizedBox(height: Spacing.md),
+                  Text('暂无笔记', style: theme.textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant)),
+                  const SizedBox(height: Spacing.sm),
+                  Text('成为第一个发布笔记的人吧！', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
+                ],
+              ),
+            ),
+          ),
+          _buildQuickPublishButton(cs),
+        ],
       );
     }
 
@@ -1082,6 +1135,8 @@ class _NotesTabState extends State<_NotesTab> {
             ),
           ),
         ),
+        // 底部快速发布按钮
+        _buildQuickPublishButton(cs),
       ],
     );
   }
