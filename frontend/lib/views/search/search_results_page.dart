@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/video_provider.dart';
 import '../../theme/theme_tokens.dart';
 import '../../models/video.dart';
+import '../../services/search_history_service.dart';
 
 class SearchResultsPage extends StatefulWidget {
   final String keywords;
@@ -17,11 +19,13 @@ class SearchResultsPage extends StatefulWidget {
 class _SearchResultsPageState extends State<SearchResultsPage> {
   final TextEditingController _searchController = TextEditingController();
   final ScrollController _scrollController = ScrollController();
+  SearchHistoryService? _historyService;
 
   //页面初始化
   @override
   void initState() {
     super.initState();
+    _initHistoryService();
     //初始化搜索输入框：将传入的关键词填充到输入框中
     _searchController.text = widget.keywords;
 
@@ -38,6 +42,15 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _performSearch();
     });
+  }
+
+  Future<void> _initHistoryService() async {
+    final prefs = await SharedPreferences.getInstance();
+    _historyService = SearchHistoryService(prefs);
+    // 保存当前搜索关键词到历史
+    if (widget.keywords.isNotEmpty) {
+      _historyService?.addHistory(widget.keywords);
+    }
   }
 
   //页面销毁
@@ -73,7 +86,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   void _handleSearch() {
     String query = _searchController.text.trim(); // 获取输入框文本（去除前后空格）
     if (query.isNotEmpty) {
-      // 非空校验
+      // 保存搜索历史
+      _historyService?.addHistory(query);
       // 用 GoRouter 跳转到当前搜索结果页（携带新关键词），相当于「重新搜索」
       context.push('/search/results?keywords=$query');
     }
@@ -93,6 +107,8 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       backgroundColor: cs.surface,
       body: SafeArea(
@@ -113,7 +129,7 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                 children: [
                   // 返回按钮
                   IconButton(
-                    icon: const Icon(Icons.arrow_back),
+                    icon: Icon(Icons.arrow_back, color: cs.onSurface),
                     onPressed: _handleBack,
                     padding: EdgeInsets.zero,
                   ),
@@ -122,35 +138,38 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                   Expanded(
                     child: Container(
                       height: 36,
+                      padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
                       decoration: BoxDecoration(
-                        color: cs.surfaceContainer,
+                        color: cs.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: Spacing.sm,
-                            ),
-                            child: Icon(
-                              Icons.search,
-                              size: 18,
-                              color: Color(0xFF999999),
-                            ),
+                          Icon(
+                            Icons.search,
+                            size: 18,
+                            color: cs.onSurfaceVariant,
                           ),
+                          const SizedBox(width: Spacing.xs),
                           Expanded(
                             child: TextField(
                               controller: _searchController,
+                              textAlignVertical: TextAlignVertical.center,
                               decoration: InputDecoration(
                                 hintText: '搜索视频、用户或话题',
-                                hintStyle: TextStyle(
-                                  fontSize: 14,
+                                hintStyle: textTheme.bodyMedium?.copyWith(
                                   color: cs.onSurfaceVariant,
                                 ),
                                 border: InputBorder.none,
+                                enabledBorder: InputBorder.none,
+                                focusedBorder: InputBorder.none,
                                 contentPadding: EdgeInsets.zero,
+                                isDense: true,
                               ),
-                              style: const TextStyle(fontSize: 14),
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: cs.onSurface,
+                              ),
                               onSubmitted: (_) => _handleSearch(),
                             ),
                           ),
@@ -165,10 +184,9 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
                       onPressed: _handleSearch,
                       child: Text(
                         '搜索',
-                        style: TextStyle(
+                        style: textTheme.bodyMedium?.copyWith(
                           color: cs.primary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.normal,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
@@ -295,7 +313,7 @@ class _FeaturedListItem extends StatelessWidget {
                 errorBuilder: (context, error, stackTrace) => Container(
                   width: 120,
                   height: 72,
-                  color: Colors.grey.shade200,
+                  color: cs.surfaceContainerHighest,
                   child: Icon(
                     Icons.video_library_outlined,
                     color: cs.onSurfaceVariant,

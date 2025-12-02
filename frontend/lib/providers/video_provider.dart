@@ -31,7 +31,15 @@ class VideoProvider extends ChangeNotifier {
   int _featuredPage = 1;
   int _followPage = 1;
   int _favoritesPage = 1;
-  int? _lastVisit; // 推荐接口的游标
+  int? _lastVisit; // 推荐接口的游标（后端未实现，保留兼容）
+
+  // 动态 limit 策略参数
+  static const int _baseRecommendLimit = 10;
+  static const int _maxRecommendLimit = 100;
+  static const int _limitIncrement = 10;
+  static const int _maxConsecutiveEmptyFetches = 3;
+  int _currentRecommendLimit = _baseRecommendLimit;
+  int _consecutiveEmptyFetches = 0;
   String? _keyword;
   List<String>? _filters;
   String? _followError;
@@ -99,6 +107,8 @@ class VideoProvider extends ChangeNotifier {
     _recommendHasMore = true;
     _loadingRecommend = false;
     _recommendStartIndexInFollow = null;
+    _currentRecommendLimit = _baseRecommendLimit;
+    _consecutiveEmptyFetches = 0;
 
     // 清理搜索结果
     _searchResults = [];
@@ -486,20 +496,35 @@ class VideoProvider extends ChangeNotifier {
     _recommend = [];
     _lastVisit = 0;
     _recommendHasMore = true;
+    _currentRecommendLimit = _baseRecommendLimit;
+    _consecutiveEmptyFetches = 0;
     await loadMoreRecommend(category: category);
   }
 
   /// 加载更多推荐视频
-  /// 实现无限滚动：UI层使用虚拟索引循环显示，Provider持续尝试获取新内容
+  /// 实现无限滚动：动态调整 limit 参数以获取新视频，自动去重
+  ///
+  /// 策略说明：
+  /// - 由于后端 last_visit 参数无效，通过增大 limit 来获取更多视频
+  /// - 当连续多次无法获取新视频时，逐步增大 limit 直到 _maxRecommendLimit
+  /// - 获取到新视频后重置 limit 为初始值，节省带宽
+  /// - 连续失败次数达到阈值后暂停请求，避免无效流量
   Future<void> loadMoreRecommend({String? category}) async {
     if (_loadingRecommend) return;
+
+    // 如果连续失败次数已达阈值且 limit 已达最大值，暂停请求
+    if (_consecutiveEmptyFetches >= _maxConsecutiveEmptyFetches &&
+        _currentRecommendLimit >= _maxRecommendLimit) {
+      AppConfig.log('VideoProvider.loadMoreRecommend: 已达最大重试次数，暂停请求');
+      return;
+    }
 
     _loadingRecommend = true;
     notifyListeners();
 
     try {
       final res = await repo.fetchRecommend(
-        limit: 10,
+        limit: _currentRecommendLimit,
         category: category,
         lastVisit: _lastVisit,
       );
@@ -523,18 +548,27 @@ class VideoProvider extends ChangeNotifier {
       if (newItems.isNotEmpty) {
         // 有新视频，添加到列表
         _recommend.addAll(newItems);
-        AppConfig.log('VideoProvider.loadMoreRecommend: 添加 ${newItems.length} 个新视频，总数 ${_recommend.length}');
+        // 获取到新视频，重置连续失败计数和 limit
+        _consecutiveEmptyFetches = 0;
+        _currentRecommendLimit = _baseRecommendLimit;
+        AppConfig.log('VideoProvider.loadMoreRecommend: 添加 ${newItems.length} 个新视频，总数 ${_recommend.length}，重置limit=$_currentRecommendLimit');
+      } else {
+        // 没有新视频，增加连续失败计数并增大 limit
+        _consecutiveEmptyFetches++;
+        if (_currentRecommendLimit < _maxRecommendLimit) {
+          _currentRecommendLimit = (_currentRecommendLimit + _limitIncrement)
+              .clamp(_baseRecommendLimit, _maxRecommendLimit);
+          AppConfig.log('VideoProvider.loadMoreRecommend: 无新视频，增大limit=$_currentRecommendLimit，连续失败=$_consecutiveEmptyFetches');
+        }
       }
 
-      // 更新游标
+      // 更新游标（虽然后端不支持，但保留以备后续兼容）
       if (items.isNotEmpty) {
         _lastVisit = items.last.views ?? DateTime.now().millisecondsSinceEpoch;
       }
 
-      // 如果后端没有更多数据，重置游标从头开始获取
-      // 这样下次调用时会从头开始，可能获取到之前没看过的视频
+      // 如果后端返回数据少于请求数量，重置游标准备下一轮
       if (!res.hasMore) {
-        AppConfig.log('VideoProvider.loadMoreRecommend: 后端无更多数据，重置游标准备下一轮');
         _lastVisit = 0;
       }
 
@@ -542,13 +576,21 @@ class VideoProvider extends ChangeNotifier {
       // UI 层会通过虚拟索引循环显示已有视频
       _recommendHasMore = true;
 
-      AppConfig.log('VideoProvider.loadMoreRecommend: fetched=${items.length} new=${newItems.length} total=${_recommend.length}');
+      AppConfig.log('VideoProvider.loadMoreRecommend: limit=$_currentRecommendLimit fetched=${items.length} new=${newItems.length} total=${_recommend.length}');
     } catch (e) {
       AppConfig.log('VideoProvider.loadMoreRecommend: error=$e');
     } finally {
       _loadingRecommend = false;
       notifyListeners();
     }
+  }
+
+  /// 重置推荐失败计数，允许继续获取
+  /// 当用户主动下拉刷新或长时间未操作后可调用
+  void resetRecommendRetry() {
+    _consecutiveEmptyFetches = 0;
+    _currentRecommendLimit = _baseRecommendLimit;
+    notifyListeners();
   }
 
   // ==================== 收藏列表相关方法 ====================

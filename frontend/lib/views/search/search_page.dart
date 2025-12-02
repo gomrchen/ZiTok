@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../theme/theme_tokens.dart';
+import '../../services/search_history_service.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -13,13 +15,33 @@ class _SearchPageState extends State<SearchPage> {
   final TextEditingController _searchController = TextEditingController();
   final FocusNode _searchFocusNode = FocusNode();
 
+  SearchHistoryService? _historyService;
+  List<String> _searchHistory = [];
+  bool _isLoading = true;
+
   @override
   void initState() {
     super.initState();
+    _initHistoryService();
     // 自动聚焦搜索框
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _searchFocusNode.requestFocus();
     });
+  }
+
+  Future<void> _initHistoryService() async {
+    final prefs = await SharedPreferences.getInstance();
+    _historyService = SearchHistoryService(prefs);
+    _loadHistory();
+  }
+
+  void _loadHistory() {
+    if (_historyService != null) {
+      setState(() {
+        _searchHistory = _historyService!.getHistory();
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -29,10 +51,12 @@ class _SearchPageState extends State<SearchPage> {
     super.dispose();
   }
 
-  void _handleSearch() {
-    String query = _searchController.text.trim();
+  void _handleSearch([String? keyword]) {
+    String query = keyword ?? _searchController.text.trim();
     if (query.isNotEmpty) {
-      // 导航到搜索结果页面，并传递关键词参数
+      // 保存搜索历史
+      _historyService?.addHistory(query).then((_) => _loadHistory());
+      // 导航到搜索结果页面
       context.push('/search/results?keywords=$query');
     }
   }
@@ -41,10 +65,54 @@ class _SearchPageState extends State<SearchPage> {
     context.pop();
   }
 
+  Future<void> _clearHistory() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        final cs = Theme.of(context).colorScheme;
+        return AlertDialog(
+          title: const Text('清除搜索历史'),
+          content: const Text('确定要清除所有搜索历史吗？'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: Text('取消', style: TextStyle(color: cs.onSurfaceVariant)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: Text('确定', style: TextStyle(color: cs.primary)),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (confirm == true) {
+      await _historyService?.clearHistory();
+      _loadHistory();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('搜索历史已清除'),
+            duration: Duration(milliseconds: 1500),
+          ),
+        );
+      }
+    }
+  }
+
+  Future<void> _removeHistoryItem(String keyword) async {
+    await _historyService?.removeHistory(keyword);
+    _loadHistory();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: cs.surface,
       body: SafeArea(
         child: Column(
           children: [
@@ -54,14 +122,16 @@ class _SearchPageState extends State<SearchPage> {
                 horizontal: Spacing.md,
                 vertical: Spacing.sm,
               ),
-              decoration: const BoxDecoration(
-                border: Border(bottom: BorderSide(color: Color(0xFFF0F0F0))),
+              decoration: BoxDecoration(
+                border: Border(
+                  bottom: BorderSide(color: cs.surfaceContainerHighest),
+                ),
               ),
               child: Row(
                 children: [
                   // 返回按钮
                   IconButton(
-                    icon: const Icon(Icons.arrow_back),
+                    icon: Icon(Icons.arrow_back, color: cs.onSurface),
                     onPressed: _handleBack,
                     padding: EdgeInsets.zero,
                   ),
@@ -72,16 +142,16 @@ class _SearchPageState extends State<SearchPage> {
                       height: 36,
                       padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
                       decoration: BoxDecoration(
-                        color: const Color(0xFFF2F2F2),
+                        color: cs.surfaceContainerHighest,
                         borderRadius: BorderRadius.circular(18),
                       ),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
-                          const Icon(
+                          Icon(
                             Icons.search,
                             size: 18,
-                            color: Color(0xFF999999),
+                            color: cs.onSurfaceVariant,
                           ),
                           const SizedBox(width: Spacing.xs),
                           Expanded(
@@ -89,11 +159,10 @@ class _SearchPageState extends State<SearchPage> {
                               controller: _searchController,
                               focusNode: _searchFocusNode,
                               textAlignVertical: TextAlignVertical.center,
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
                                 hintText: '搜索视频、用户或话题',
-                                hintStyle: TextStyle(
-                                  fontSize: 14,
-                                  color: Color(0xFF999999),
+                                hintStyle: textTheme.bodyMedium?.copyWith(
+                                  color: cs.onSurfaceVariant,
                                 ),
                                 border: InputBorder.none,
                                 enabledBorder: InputBorder.none,
@@ -101,7 +170,9 @@ class _SearchPageState extends State<SearchPage> {
                                 contentPadding: EdgeInsets.zero,
                                 isDense: true,
                               ),
-                              style: const TextStyle(fontSize: 14),
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: cs.onSurface,
+                              ),
                               onSubmitted: (_) => _handleSearch(),
                             ),
                           ),
@@ -113,13 +184,12 @@ class _SearchPageState extends State<SearchPage> {
                   Padding(
                     padding: const EdgeInsets.only(left: Spacing.sm),
                     child: TextButton(
-                      onPressed: _handleSearch,
-                      child: const Text(
+                      onPressed: () => _handleSearch(),
+                      child: Text(
                         '搜索',
-                        style: TextStyle(
-                          color: Colors.black,
-                          fontSize: 14,
-                          fontWeight: FontWeight.normal,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: cs.primary,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
                     ),
@@ -129,61 +199,116 @@ class _SearchPageState extends State<SearchPage> {
             ),
             // 搜索历史区域
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.all(Spacing.md),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          '搜索历史',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.black,
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            // 清除搜索历史
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('搜索历史已清除'),
-                                duration: Duration(milliseconds: 1200),
-                              ),
-                            );
-                          },
-                          child: const Text(
-                            '清除',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Color(0xFF999999),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  // 搜索历史内容区域 - 目前为空
-                  const Expanded(
-                    child: Center(
-                      child: Text(
-                        '暂无搜索历史',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFF999999),
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              child: _buildHistorySection(cs, textTheme),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildHistorySection(ColorScheme cs, TextTheme textTheme) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // 标题栏
+        Padding(
+          padding: const EdgeInsets.all(Spacing.md),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                '搜索历史',
+                style: textTheme.titleSmall?.copyWith(
+                  color: cs.onSurface,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              if (_searchHistory.isNotEmpty)
+                TextButton.icon(
+                  onPressed: _clearHistory,
+                  icon: Icon(
+                    Icons.delete_outline,
+                    size: 18,
+                    color: cs.onSurfaceVariant,
+                  ),
+                  label: Text(
+                    '清除',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: cs.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+        // 历史记录列表
+        Expanded(
+          child: _searchHistory.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.history,
+                        size: 48,
+                        color: cs.onSurfaceVariant.withValues(alpha: 0.5),
+                      ),
+                      const SizedBox(height: Spacing.md),
+                      Text(
+                        '暂无搜索历史',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: cs.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.builder(
+                  padding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+                  itemCount: _searchHistory.length,
+                  itemBuilder: (context, index) {
+                    final keyword = _searchHistory[index];
+                    return _buildHistoryItem(keyword, cs, textTheme);
+                  },
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHistoryItem(String keyword, ColorScheme cs, TextTheme textTheme) {
+    return ListTile(
+      leading: Icon(
+        Icons.history,
+        size: 20,
+        color: cs.onSurfaceVariant,
+      ),
+      title: Text(
+        keyword,
+        style: textTheme.bodyMedium?.copyWith(color: cs.onSurface),
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+      ),
+      trailing: IconButton(
+        icon: Icon(
+          Icons.close,
+          size: 18,
+          color: cs.onSurfaceVariant,
+        ),
+        onPressed: () => _removeHistoryItem(keyword),
+        tooltip: '删除',
+      ),
+      onTap: () {
+        _searchController.text = keyword;
+        _handleSearch(keyword);
+      },
+      contentPadding: const EdgeInsets.symmetric(horizontal: Spacing.sm),
+      dense: true,
     );
   }
 }

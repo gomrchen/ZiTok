@@ -29,6 +29,12 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _initialLoadComplete = false;
   int _videosCount = 0; // 添加视频计数状态
   bool _loadingVideosCount = false; // 添加视频数量加载状态
+  bool _isRefreshing = false; // 下拉刷新状态
+
+  // GlobalKey 用于访问子 Tab 的刷新方法
+  final GlobalKey<_FavoritesListState> _favoritesKey = GlobalKey();
+  final GlobalKey<_NotesTabState> _notesKey = GlobalKey();
+  final GlobalKey<_VideosTabState> _videosKey = GlobalKey();
 
   @override
   void initState() {
@@ -147,6 +153,46 @@ class _ProfilePageState extends State<ProfilePage> {
     });
   }
 
+  /// 下拉刷新：重新加载所有个人相关数据
+  Future<void> _refreshAll() async {
+    if (_isRefreshing) return;
+
+    setState(() {
+      _isRefreshing = true;
+    });
+
+    try {
+      // 1. 刷新用户信息（会自动触发统计数据加载）
+      await context.read<ProfileProvider>().loadCurrentUser();
+
+      // 2. 刷新视频数量
+      _loadVideosCount();
+
+      // 3. 刷新收藏列表
+      if (!mounted) return;
+      await context.read<VideoProvider>().refreshFavorites();
+
+      // 4. 刷新当前 Tab 的数据（通过 GlobalKey 访问）
+      _favoritesKey.currentState?._refreshData();
+      _notesKey.currentState?._refreshData();
+      _videosKey.currentState?._refreshData();
+
+    } catch (e) {
+      // 刷新失败时显示提示
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('刷新失败: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isRefreshing = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final profile = context.watch<ProfileProvider>();
@@ -203,58 +249,65 @@ class _ProfilePageState extends State<ProfilePage> {
               constraints: BoxConstraints.tightFor(width: maxW),
               child: DefaultTabController(
                 length: 3,
-                child: NestedScrollView(
-                  headerSliverBuilder: (context, innerBoxIsScrolled) => [
-                    SliverToBoxAdapter(child: _ProfileHeader(
-                        userName: user?.username ?? '用户',
-                        bio: user?.bio ?? '',
-                        avatarUrl: user?.avatarUrl,
-                        backgroundUrl: user?.profileBackgroundImageUrl,
-                        gender: user?.gender,
-                        birthday: user?.birthday,
-                        onEdit: () => context.push('/profile/edit'))),
-                          SliverToBoxAdapter(
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-                              child: _StatsRow(
-                                videosCount: _videosCount,
-                                loadingVideosCount: _loadingVideosCount,
-                              ), // 传递视频数量和加载状态
-                            ),
-                          ),
-                          SliverPersistentHeader(
-                            pinned: true,
-                            delegate: _StickyTabBarDelegate(
-                              child: Builder(
-                                builder: (context) {
-                                  final cs = Theme.of(context).colorScheme;
-                                  return Container(
-                                    color: Theme.of(context).scaffoldBackgroundColor,
-                                    child: TabBar(
-                                      labelColor: cs.primary,
-                                      unselectedLabelColor: cs.onSurfaceVariant,
-                                      labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                                      indicator: UnderlineTabIndicator(
-                                        borderSide: BorderSide(color: cs.primary, width: 2),
-                                      ),
-                                      tabs: const [
-                                        Tab(text: '我的收藏'),
-                                        Tab(text: '我的笔记'),
-                                        Tab(text: '我的视频'),
-                                      ],
-                                    ),
-                                  );
-                                },
+                child: RefreshIndicator(
+                  onRefresh: _refreshAll,
+                  notificationPredicate: (notification) {
+                    // 允许来自任何深度的滚动通知触发刷新
+                    return notification.depth == 0 || notification.depth == 1;
+                  },
+                  child: NestedScrollView(
+                    headerSliverBuilder: (context, innerBoxIsScrolled) => [
+                      SliverToBoxAdapter(child: _ProfileHeader(
+                          userName: user?.username ?? '用户',
+                          bio: user?.bio ?? '',
+                          avatarUrl: user?.avatarUrl,
+                          backgroundUrl: user?.profileBackgroundImageUrl,
+                          gender: user?.gender,
+                          birthday: user?.birthday,
+                          onEdit: () => context.push('/profile/edit'))),
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
+                                child: _StatsRow(
+                                  videosCount: _videosCount,
+                                  loadingVideosCount: _loadingVideosCount,
+                                ), // 传递视频数量和加载状态
                               ),
                             ),
-                          ),
-                        ],
-                        body: TabBarView(
-                          children: [
-                            _FavoritesList(),
-                            _NotesTab(),
-                            _VideosTab(onVideosLoaded: _updateVideosCount), // 传递回调函数
+                            SliverPersistentHeader(
+                              pinned: true,
+                              delegate: _StickyTabBarDelegate(
+                                child: Builder(
+                                  builder: (context) {
+                                    final cs = Theme.of(context).colorScheme;
+                                    return Container(
+                                      color: Theme.of(context).scaffoldBackgroundColor,
+                                      child: TabBar(
+                                        labelColor: cs.primary,
+                                        unselectedLabelColor: cs.onSurfaceVariant,
+                                        labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
+                                        indicator: UnderlineTabIndicator(
+                                          borderSide: BorderSide(color: cs.primary, width: 2),
+                                        ),
+                                        tabs: const [
+                                          Tab(text: '我的收藏'),
+                                          Tab(text: '我的笔记'),
+                                          Tab(text: '我的视频'),
+                                        ],
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
                           ],
+                          body: TabBarView(
+                            children: [
+                              _FavoritesList(key: _favoritesKey),
+                              _NotesTab(key: _notesKey),
+                              _VideosTab(key: _videosKey, onVideosLoaded: _updateVideosCount),
+                            ],
+                          ),
                         ),
                       ),
                     ),
@@ -770,7 +823,7 @@ class _StatsRowState extends State<_StatsRow> {
 }
 
 class _FavoritesList extends StatefulWidget {
-  const _FavoritesList();
+  const _FavoritesList({super.key});
 
   @override
   State<_FavoritesList> createState() => _FavoritesListState();
@@ -788,6 +841,11 @@ class _FavoritesListState extends State<_FavoritesList> {
         vp.refreshFavorites();
       }
     });
+  }
+
+  /// 供父组件调用的刷新方法
+  void _refreshData() {
+    context.read<VideoProvider>().refreshFavorites();
   }
 
   /// 根据排序方式对收藏列表排序
@@ -995,7 +1053,7 @@ class _FavoritesListState extends State<_FavoritesList> {
 }
 
 class _NotesTab extends StatefulWidget {
-  const _NotesTab();
+  const _NotesTab({super.key});
 
   @override
   State<_NotesTab> createState() => _NotesTabState();
@@ -1026,6 +1084,11 @@ class _NotesTabState extends State<_NotesTab> {
   void initState() {
     super.initState();
     _getUserIdAndLoadNotes();
+  }
+
+  /// 供父组件调用的刷新方法
+  void _refreshData() {
+    _loadNotes(refresh: true);
   }
 
   void _getUserIdAndLoadNotes() {
@@ -1353,7 +1416,7 @@ class _NoteListItem extends StatelessWidget {
 class _VideosTab extends StatefulWidget {
   final Function(int)? onVideosLoaded;
 
-  const _VideosTab({this.onVideosLoaded});
+  const _VideosTab({super.key, this.onVideosLoaded});
 
   @override
   State<_VideosTab> createState() => _VideosTabState();
@@ -1386,6 +1449,11 @@ class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _getUserIdAndLoadVideos();
+  }
+
+  /// 供父组件调用的刷新方法
+  void _refreshData() {
+    _loadVideos(refresh: true);
   }
 
   @override

@@ -58,22 +58,28 @@ class _FriendSearchPageState extends State<FriendSearchPage> {
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
       appBar: AppBar(
+        backgroundColor: cs.surface,
+        foregroundColor: cs.onSurface,
         title: TextField(
           controller: _searchCtrl,
           autofocus: true,
           // 输入变动时直接触发本地搜索
           onChanged: _onSearchChanged,
-          decoration: const InputDecoration(
+          style: textTheme.bodyLarge?.copyWith(color: cs.onSurface),
+          decoration: InputDecoration(
             hintText: '搜索本地好友 / ID...',
             border: InputBorder.none,
-            hintStyle: TextStyle(color: Colors.grey),
+            hintStyle: textTheme.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
           ),
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.close),
+            icon: Icon(Icons.close, color: cs.onSurface),
             onPressed: () {
               _searchCtrl.clear();
               _onSearchChanged("");
@@ -87,17 +93,26 @@ class _FriendSearchPageState extends State<FriendSearchPage> {
   }
 
   Widget _buildList() {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     // 1. 没输入时的提示
     if (_keyword.isEmpty) {
-      return const Center(
-        child: Text("输入关键词搜索已关注的好友", style: TextStyle(color: Colors.grey)),
+      return Center(
+        child: Text(
+          "输入关键词搜索已关注的好友",
+          style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+        ),
       );
     }
 
     // 2. 搜不到结果
     if (_searchResults.isEmpty) {
-      return const Center(
-        child: Text("未找到匹配用户", style: TextStyle(color: Colors.grey)),
+      return Center(
+        child: Text(
+          "未找到匹配用户",
+          style: textTheme.bodyMedium?.copyWith(color: cs.onSurfaceVariant),
+        ),
       );
     }
 
@@ -113,6 +128,9 @@ class _FriendSearchPageState extends State<FriendSearchPage> {
 
   // 一个绝对安全的 Tile 构建方法
   Widget _buildSafeTile(Conversation item) {
+    final cs = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     // 1. 提取数据
     final safeName = item.name;
     final safeId = item.id;
@@ -131,19 +149,25 @@ class _FriendSearchPageState extends State<FriendSearchPage> {
 
       leading: CircleAvatar(
         radius: 24,
-        backgroundColor: Colors.grey.shade200,
+        backgroundColor: cs.surfaceContainerHighest,
         // 如果图片地址有效，显示图片；否则显示 null 让它走 child 逻辑
         backgroundImage: showImage
             ? CachedNetworkImageProvider(avatarUrl)
             : null,
         // 如果没图，显示一个默认 Icon
         child: !showImage
-            ? Icon(isGroup ? Icons.group : Icons.person, color: Colors.grey)
+            ? Icon(isGroup ? Icons.group : Icons.person, color: cs.onSurfaceVariant)
             : null,
       ),
 
-      title: Text(safeName),
-      subtitle: Text(isGroup ? "群聊" : "ID: $safeId"),
+      title: Text(
+        safeName,
+        style: textTheme.bodyLarge?.copyWith(color: cs.onSurface),
+      ),
+      subtitle: Text(
+        isGroup ? "群聊" : "ID: $safeId",
+        style: textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+      ),
 
       // 点击跳转聊天
       onTap: () {
