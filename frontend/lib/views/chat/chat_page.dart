@@ -197,10 +197,17 @@ class _ChatPageState extends State<ChatPage> {
                   String? senderAvatar;
                   if (!isMine) {
                     if (widget.isGroup) {
-                      // 群聊：查找发送者信息
-                      final sender = mp.friendById(m.senderId.toString());
-                      senderName = sender?.name ?? '用户${m.senderId}';
-                      senderAvatar = sender?.avatarUrl;
+                      // 群聊：根据发送者ID获取用户信息
+                      final senderId = m.senderId.toString();
+                      final sender = mp.getUserById(senderId);
+                      if (sender != null) {
+                        senderName = sender.name;
+                        senderAvatar = sender.avatarUrl;
+                      } else {
+                        // 用户信息未缓存，触发异步获取
+                        senderName = '用户${m.senderId}';
+                        mp.fetchUserById(senderId); // 异步获取，获取后会notifyListeners刷新UI
+                      }
                     } else {
                       // 私聊：使用会话对象的名称
                       senderName = conversation?.name;

@@ -67,6 +67,12 @@ class MessagingProvider extends ChangeNotifier {
 
   final Map<String, List<ChatMessage>> _messages = {};
 
+  /// 用户信息缓存：key为用户ID，value为用户信息
+  final Map<String, Friend> _userCache = {};
+
+  /// 正在获取中的用户ID集合（防止重复请求）
+  final Set<String> _fetchingUserIds = {};
+
   // ==================== 消息去重辅助方法 ====================
 
   /// 生成消息的内容签名（不依赖时间戳，用于去重）
@@ -224,6 +230,71 @@ class MessagingProvider extends ChangeNotifier {
     return null;
   }
 
+  /// 根据用户ID获取用户信息（优先从缓存，其次从好友列表，最后从API获取）
+  Friend? getUserById(String id) {
+    // 优先从缓存中查找
+    if (_userCache.containsKey(id)) {
+      return _userCache[id];
+    }
+
+    // 其次从好友列表中查找
+    final friend = friendById(id);
+    if (friend != null) {
+      _userCache[id] = friend; // 缓存起来
+      return friend;
+    }
+
+    return null;
+  }
+
+  /// 异步获取用户信息（如果缓存中没有，则从API获取）
+  Future<Friend?> fetchUserById(String id) async {
+    // 已在缓存中
+    if (_userCache.containsKey(id)) {
+      return _userCache[id];
+    }
+
+    // 从好友列表中查找
+    final friend = friendById(id);
+    if (friend != null) {
+      _userCache[id] = friend;
+      return friend;
+    }
+
+    // 正在获取中，不重复请求
+    if (_fetchingUserIds.contains(id)) {
+      return null;
+    }
+
+    // 从API获取
+    if (relationRepository == null) return null;
+
+    final userId = int.tryParse(id);
+    if (userId == null) return null;
+
+    _fetchingUserIds.add(id);
+
+    try {
+      final users = await relationRepository!.getUsersByIds([userId]);
+      if (users.isNotEmpty) {
+        _userCache[id] = users.first;
+        notifyListeners();
+        return users.first;
+      }
+    } catch (e) {
+      AppConfig.log('[MessagingProvider] 获取用户 $id 信息失败: $e');
+    } finally {
+      _fetchingUserIds.remove(id);
+    }
+
+    return null;
+  }
+
+  /// 检查用户信息是否已缓存
+  bool hasUserCache(String id) {
+    return _userCache.containsKey(id) || friendById(id) != null;
+  }
+
   List<Conversation> searchConversations(String query) {
     if (query.isEmpty) return allConversations;
     final q = query.trim().toLowerCase();
@@ -242,6 +313,8 @@ class MessagingProvider extends ChangeNotifier {
   void logout() {
     _socketService.disconnect();
     _messages.clear();
+    _userCache.clear();
+    _fetchingUserIds.clear();
     _following = [];
     _followers = [];
     _chatRooms = [];
