@@ -92,15 +92,14 @@ class _EpisodePickerBodyState extends State<_EpisodePickerBody> {
           .toList()
         ..sort((a, b) => a.episodeNo.compareTo(b.episodeNo));
 
-      for (final ep in eps.where((e) => !e.isFree).take(12)) {
-        final info = await dp.loadPlayInfo(ep.id);
-        if (info != null && !info.locked) _unlocked.add(ep.id);
-      }
-
+      final unlocked = await probeUnlockedEpisodeIds(dp, eps);
       if (!mounted) return;
       final cur = eps.indexWhere((e) => e.id == widget.currentEpisodeId);
       setState(() {
         _episodes = eps;
+        _unlocked
+          ..clear()
+          ..addAll(unlocked);
         _loading = false;
         if (cur >= 0) _rangeIndex = cur ~/ _rangeSize;
       });

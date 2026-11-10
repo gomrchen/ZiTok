@@ -1,6 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
+import '../../models/drama_models.dart';
 import '../../providers/drama_provider.dart';
+
+/// 探测已解锁集（限量并发探测，避免详情/选集重复实现）
+Future<Set<int>> probeUnlockedEpisodeIds(
+  DramaProvider dp,
+  List<Episode> episodes, {
+  int limit = 12,
+}) async {
+  final unlocked = <int>{};
+  for (final ep in episodes.where((e) => !e.isFree).take(limit)) {
+    final info = await dp.loadPlayInfo(ep.id);
+    if (info != null && !info.locked) unlocked.add(ep.id);
+  }
+  return unlocked;
+}
 
 Future<bool?> showUnlockSheet(
   BuildContext context, {

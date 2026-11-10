@@ -272,6 +272,23 @@
       "id": {"type": "String"}
     }
   },
+
+  "playerNewDrama": "新剧",
+  "playerExpand": "展开",
+  "playerCollapse": "收起",
+  "playerWatchFull": "观看完整短剧 · 全{count}集",
+  "@playerWatchFull": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "playerDanmaku": "弹",
+  "playerEpisodeNo": "第{episode}集",
+  "@playerEpisodeNo": {
+    "placeholders": {
+      "episode": {"type": "int"}
+    }
+  },
   "sessionExpired": "登录已失效，请重新登录",
   "settingsAboutLegalese": "沉浸竖屏短剧体验",
   "profileUserFallback": "用户",

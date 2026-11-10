@@ -691,6 +691,28 @@ class AppLocalizationsEn extends AppLocalizations {
   }
 
   @override
+  String get playerNewDrama => 'New';
+
+  @override
+  String get playerExpand => 'More';
+
+  @override
+  String get playerCollapse => 'Less';
+
+  @override
+  String playerWatchFull(int count) {
+    return 'Watch full drama · $count eps';
+  }
+
+  @override
+  String get playerDanmaku => '弹';
+
+  @override
+  String playerEpisodeNo(int episode) {
+    return 'Ep. $episode';
+  }
+
+  @override
   String get sessionExpired => 'Session expired. Please sign in again';
 
   @override

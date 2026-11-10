@@ -1,7 +1,7 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
+
+export '../../widgets/player/player_bottom_meta.dart';
 
 const kPlayerPrimary = Color(0xFFFF6B4A); // 红果偏暖橙红点缀
 const kPlayerAccent = Color(0xFF2ED3BE);
@@ -59,191 +59,6 @@ class PlayerTopScrim extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class PlayerCoinChip extends StatelessWidget {
-  final int balance;
-  final VoidCallback? onTap;
-  const PlayerCoinChip({super.key, required this.balance, this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final chip = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.35),
-        borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.monetization_on_rounded, size: 14, color: Colors.amber.shade300),
-          const SizedBox(width: 4),
-          Text(
-            '$balance',
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12.5),
-          ),
-        ],
-      ),
-    );
-    if (onTap == null) return chip;
-    return GestureDetector(onTap: onTap, behavior: HitTestBehavior.opaque, child: chip);
-  }
-}
-
-/// 红果风顶部「更多」收纳：真毛玻璃 + 柔和背影
-class PlayerMoreButton extends StatelessWidget {
-  final VoidCallback onTap;
-  const PlayerMoreButton({super.key, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      button: true,
-      label: '更多',
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: SizedBox(
-          width: 36,
-          height: 36,
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // 背影光晕
-              Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.35),
-                      blurRadius: 14,
-                      spreadRadius: 0.5,
-                      offset: const Offset(0, 4),
-                    ),
-                    BoxShadow(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      blurRadius: 6,
-                      offset: const Offset(0, -1),
-                    ),
-                  ],
-                ),
-              ),
-              ClipOval(
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                  child: Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white.withValues(alpha: 0.28),
-                          Colors.white.withValues(alpha: 0.08),
-                          Colors.black.withValues(alpha: 0.28),
-                        ],
-                        stops: const [0.0, 0.45, 1.0],
-                      ),
-                      border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.28),
-                        width: 0.9,
-                      ),
-                    ),
-                    child: Center(
-                      child: CustomPaint(
-                        size: const Size(15, 15),
-                        painter: _MoreDotsPainter(
-                          color: Colors.white.withValues(alpha: 0.95),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _MoreDotsPainter extends CustomPainter {
-  final Color color;
-  _MoreDotsPainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final fill = Paint()..color = color;
-    final glow = Paint()
-      ..color = color.withValues(alpha: 0.35)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2);
-    final r = size.shortestSide * 0.125;
-    final gap = size.shortestSide * 0.26;
-    final cx = size.width / 2;
-    final cy = size.height / 2;
-    for (final dx in [-gap, gap]) {
-      for (final dy in [-gap, gap]) {
-        final o = Offset(cx + dx, cy + dy);
-        canvas.drawCircle(o, r + 0.6, glow);
-        canvas.drawCircle(o, r, fill);
-      }
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant _MoreDotsPainter oldDelegate) => oldDelegate.color != color;
-}
-
-/// 顶部集数胶囊：第 N / 总集
-class PlayerEpisodeIndexChip extends StatelessWidget {
-  final int current;
-  final int total;
-  final VoidCallback? onTap;
-
-  const PlayerEpisodeIndexChip({
-    super.key,
-    required this.current,
-    required this.total,
-    this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final chip = Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-      decoration: BoxDecoration(
-        color: Colors.black.withValues(alpha: 0.38),
-        borderRadius: BorderRadius.circular(99),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.movie_filter_rounded, size: 13, color: Colors.white.withValues(alpha: 0.88)),
-          const SizedBox(width: 5),
-          Text(
-            '$current / $total',
-            style: const TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-              letterSpacing: 0.3,
-              fontFeatures: [FontFeature.tabularFigures()],
-            ),
-          ),
-        ],
-      ),
-    );
-    if (onTap == null) return chip;
-    return GestureDetector(onTap: onTap, behavior: HitTestBehavior.opaque, child: chip);
   }
 }
 
@@ -359,195 +174,17 @@ class PlayerPauseHint extends StatelessWidget {
   }
 }
 
-class PlayerBottomMeta extends StatelessWidget {
-  final String title;
-  final String subtitle;
-  final VoidCallback? onTitleTap;
-  final VoidCallback? onEpisodeTap;
-  final ValueChanged<String>? onTagTap;
-
-  const PlayerBottomMeta({
-    super.key,
-    required this.title,
-    required this.subtitle,
-    this.onTitleTap,
-    this.onEpisodeTap,
-    this.onTagTap,
-  });
-
-  static const _titleShadow = <Shadow>[
-    Shadow(color: Color(0xCC000000), blurRadius: 12, offset: Offset(0, 2)),
-    Shadow(color: Color(0x66000000), blurRadius: 3, offset: Offset(0, 1)),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final parts = subtitle
-        .split('·')
-        .map((e) => e.trim())
-        .where((e) => e.isNotEmpty)
-        .toList();
-    final ep = parts.isNotEmpty ? parts.first : '';
-    final tags = parts.length > 1 ? parts.sublist(1) : const <String>[];
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        GestureDetector(
-          onTap: onTitleTap,
-          behavior: HitTestBehavior.opaque,
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Container(
-                width: 3,
-                height: 16,
-                margin: const EdgeInsets.only(right: 8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(99),
-                  gradient: const LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Color(0xFFFF8A6B), kPlayerPrimary],
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: kPlayerPrimary.withValues(alpha: 0.45),
-                      blurRadius: 6,
-                      offset: const Offset(0, 1),
-                    ),
-                  ],
-                ),
-              ),
-              Flexible(
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Flexible(
-                      child: Text(
-                        title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFFFAFAFA),
-                          fontSize: 18,
-                          fontWeight: FontWeight.w700,
-                          height: 1.15,
-                          letterSpacing: 0.8,
-                          fontFamily: 'PingFang SC',
-                          fontFamilyFallback: ['SF Pro Display', 'Microsoft YaHei', 'sans-serif'],
-                          shadows: _titleShadow,
-                        ),
-                      ),
-                    ),
-                    if (onTitleTap != null)
-                      Padding(
-                        padding: const EdgeInsets.only(left: 1),
-                        child: Transform.translate(
-                          // chevron_right 字形略偏上，光学贴齐标题中线
-                          offset: const Offset(-1, 0.5),
-                          child: Icon(
-                            Icons.chevron_right_rounded,
-                            size: 18,
-                            color: Colors.white.withValues(alpha: 0.55),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        if (ep.isNotEmpty || tags.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              if (ep.isNotEmpty)
-                GestureDetector(
-                  onTap: onEpisodeTap,
-                  behavior: HitTestBehavior.opaque,
-                  child: Container(
-                    padding: EdgeInsets.fromLTRB(8, 3, onEpisodeTap != null ? 4 : 8, 3),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(99),
-                      color: Colors.white.withValues(alpha: 0.12),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          ep,
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.92),
-                            fontSize: 11,
-                            fontWeight: FontWeight.w600,
-                            height: 1.1,
-                            letterSpacing: 0.3,
-                            fontFamily: 'PingFang SC',
-                            fontFamilyFallback: const ['SF Pro Text', 'Microsoft YaHei', 'sans-serif'],
-                          ),
-                        ),
-                        if (onEpisodeTap != null)
-                          Icon(
-                            Icons.expand_more_rounded,
-                            size: 14,
-                            color: Colors.white.withValues(alpha: 0.7),
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              for (final tag in tags) ...[
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Text(
-                    '·',
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.35),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-                Flexible(
-                  child: GestureDetector(
-                    onTap: onTagTap == null ? null : () => onTagTap!(tag),
-                    behavior: HitTestBehavior.opaque,
-                    child: Text(
-                      tag,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: onTagTap != null ? 0.88 : 0.72),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        height: 1.1,
-                        letterSpacing: 0.4,
-                        decoration: onTagTap != null ? TextDecoration.underline : null,
-                        decorationColor: Colors.white.withValues(alpha: 0.28),
-                        fontFamily: 'PingFang SC',
-                        fontFamilyFallback: const ['SF Pro Text', 'Microsoft YaHei', 'sans-serif'],
-                        shadows: const [
-                          Shadow(color: Color(0x88000000), blurRadius: 6, offset: Offset(0, 1)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ],
-      ],
-    );
-  }
-}
-
+/// 播放侧栏统一组件（首页 / 剧集页共用同一套槽位与图标规格）
 class PlayerSideAction extends StatelessWidget {
+  static const double slotWidth = 52;
+  static const double _circleSize = 44;
+  static const double _iconSize = 24;
+  static const double _labelHeight = 16;
+  static const double _gap = 4;
+  static const double _vPad = 6;
+
+  static const double itemExtent = _vPad * 2 + _circleSize + _gap + _labelHeight;
+
   final IconData icon;
   final String label;
   final VoidCallback onTap;
@@ -561,52 +198,55 @@ class PlayerSideAction extends StatelessWidget {
     this.iconColor,
   });
 
-  /// Material 书签字形视觉重心偏左，圆内光学居中需微右移
-  Offset get _opticalNudge {
-    if (icon == Icons.bookmark_rounded || icon == Icons.bookmark_border_rounded) {
-      return const Offset(1.2, 0);
-    }
-    if (icon == Icons.list_alt_rounded) {
-      return const Offset(0.4, 0);
-    }
-    return Offset.zero;
-  }
-
   @override
   Widget build(BuildContext context) {
     final color = iconColor ?? Colors.white;
-    final nudge = _opticalNudge;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 8),
+    return SizedBox(
+      width: slotWidth,
+      height: itemExtent,
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
         child: Column(
           children: [
-            Container(
-              width: 46,
-              height: 46,
-              alignment: Alignment.center,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.black.withValues(alpha: 0.22),
-                border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-              ),
-              child: Transform.translate(
-                offset: nudge,
-                child: Icon(icon, color: color, size: 26),
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              label,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.92),
-                fontSize: 11,
-                fontWeight: FontWeight.w600,
-                shadows: const [Shadow(color: Color(0x99000000), blurRadius: 4)],
+            const SizedBox(height: _vPad),
+            SizedBox(
+              width: slotWidth,
+              height: _circleSize,
+              child: Center(
+                child: Container(
+                  width: _circleSize,
+                  height: _circleSize,
+                  alignment: Alignment.center,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: Colors.black.withValues(alpha: 0.22),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                  ),
+                  child: Icon(icon, color: color, size: _iconSize),
+                ),
               ),
             ),
+            const SizedBox(height: _gap),
+            SizedBox(
+              width: slotWidth,
+              height: _labelHeight,
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.clip,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.92),
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  height: 1.0,
+                  leadingDistribution: TextLeadingDistribution.even,
+                  shadows: const [Shadow(color: Color(0x99000000), blurRadius: 4)],
+                ),
+              ),
+            ),
+            const SizedBox(height: _vPad),
           ],
         ),
       ),

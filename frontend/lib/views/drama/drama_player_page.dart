@@ -434,6 +434,21 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
     await _resumeIfActive();
   }
 
+  /// 「观看完整短剧」→ 沉浸剧集播放页（非整页详情）
+  Future<void> _openFullDrama() async {
+    await _pauseForOverlay();
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => EpisodePlayPage(
+          drama: widget.item.drama,
+          episode: widget.item.episode,
+        ),
+      ),
+    );
+    await _resumeIfActive();
+  }
+
   Future<void> _openCategory(String tag) async {
     final q = tag.trim();
     if (q.isEmpty) return;
@@ -566,7 +581,7 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
               child: FilledButton(onPressed: _showUnlock, child: const Text('解锁本集')),
             ),
           ),
-        const Positioned(left: 0, right: 0, bottom: 0, height: 260, child: PlayerBottomScrim()),
+        const Positioned(left: 0, right: 0, bottom: 0, height: 340, child: PlayerBottomScrim()),
         if (_showPauseHint && !_locked && !_loading && !_speedUp) PlayerPauseHint(paused: _paused),
         if (_speedUp)
           const Positioned(
@@ -576,9 +591,12 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
             child: PlayerSpeedBadge(),
           ),
         Positioned(
-          right: 6,
-          bottom: inset + 72,
+          right: 10,
+          bottom: inset + 96,
+          width: PlayerSideAction.slotWidth,
           child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               PlayerSideAction(
                 icon: _liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
@@ -607,17 +625,23 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
         ),
         Positioned(
           left: 16,
-          right: 88,
+          right: 10 + PlayerSideAction.slotWidth + 10,
           bottom: inset + 8,
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               PlayerBottomMeta(
                 title: item.drama.title,
-                subtitle: episodeSubtitle(item.episode, category: item.drama.category),
+                episodeNo: item.episode.episodeNo,
+                synopsis: dramaSynopsis(item.drama, item.episode),
+                tags: dramaMetaTags(item.drama),
+                totalEpisodes: item.drama.totalEpisodes,
+                showNewBadge: dramaShowNewBadge(item.drama),
                 onTitleTap: _openTitle,
                 onEpisodeTap: _openPicker,
+                onWatchFull: _openFullDrama,
                 onTagTap: _openCategory,
+                onDanmakuTap: _openComments,
               ),
               const SizedBox(height: 8),
               PlayerProgressBar(

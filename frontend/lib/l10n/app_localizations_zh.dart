@@ -682,6 +682,28 @@ class AppLocalizationsZh extends AppLocalizations {
   }
 
   @override
+  String get playerNewDrama => '新剧';
+
+  @override
+  String get playerExpand => '展开';
+
+  @override
+  String get playerCollapse => '收起';
+
+  @override
+  String playerWatchFull(int count) {
+    return '观看完整短剧 · 全$count集';
+  }
+
+  @override
+  String get playerDanmaku => '弹';
+
+  @override
+  String playerEpisodeNo(int episode) {
+    return '第$episode集';
+  }
+
+  @override
   String get sessionExpired => '登录已失效，请重新登录';
 
   @override

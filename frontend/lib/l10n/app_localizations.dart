@@ -1412,6 +1412,42 @@ abstract class AppLocalizations {
   /// **'ID: {id}'**
   String userIdLabel(String id);
 
+  /// No description provided for @playerNewDrama.
+  ///
+  /// In zh, this message translates to:
+  /// **'新剧'**
+  String get playerNewDrama;
+
+  /// No description provided for @playerExpand.
+  ///
+  /// In zh, this message translates to:
+  /// **'展开'**
+  String get playerExpand;
+
+  /// No description provided for @playerCollapse.
+  ///
+  /// In zh, this message translates to:
+  /// **'收起'**
+  String get playerCollapse;
+
+  /// No description provided for @playerWatchFull.
+  ///
+  /// In zh, this message translates to:
+  /// **'观看完整短剧 · 全{count}集'**
+  String playerWatchFull(int count);
+
+  /// No description provided for @playerDanmaku.
+  ///
+  /// In zh, this message translates to:
+  /// **'弹'**
+  String get playerDanmaku;
+
+  /// No description provided for @playerEpisodeNo.
+  ///
+  /// In zh, this message translates to:
+  /// **'第{episode}集'**
+  String playerEpisodeNo(int episode);
+
   /// No description provided for @sessionExpired.
   ///
   /// In zh, this message translates to:

@@ -272,6 +272,23 @@
       "id": {"type": "String"}
     }
   },
+
+  "playerNewDrama": "New",
+  "playerExpand": "More",
+  "playerCollapse": "Less",
+  "playerWatchFull": "Watch full drama · {count} eps",
+  "@playerWatchFull": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "playerDanmaku": "弹",
+  "playerEpisodeNo": "Ep. {episode}",
+  "@playerEpisodeNo": {
+    "placeholders": {
+      "episode": {"type": "int"}
+    }
+  },
   "sessionExpired": "Session expired. Please sign in again",
   "settingsAboutLegalese": "Immersive vertical short dramas",
   "profileUserFallback": "User",

@@ -14,6 +14,7 @@ import '../../widgets/cover_video.dart';
 import 'episode_comments_sheet.dart';
 import 'episode_label.dart';
 import 'episode_picker_sheet.dart';
+import 'player_episode_chrome.dart';
 import 'player_extras.dart';
 import 'player_overlay.dart';
 import 'unlock_sheet.dart';
@@ -31,7 +32,6 @@ class EpisodePlayPage extends StatefulWidget {
 
 class _EpisodePlayPageState extends State<EpisodePlayPage> {
   final PageController _pageController = PageController();
-  final Map<int, Future<void> Function()> _moreHandlers = {};
   List<Episode> _episodes = [];
   int _index = 0;
   bool _loadingList = true;
@@ -124,7 +124,6 @@ class _EpisodePlayPageState extends State<EpisodePlayPage> {
   @override
   Widget build(BuildContext context) {
     final dp = context.watch<DramaProvider>();
-    final bal = dp.wallet?.balance;
     final favorited = dp.favorites.any((d) => d.id == widget.drama.id);
     final showMore = context.watch<SettingsProvider>().playerMoreButton;
 
@@ -154,119 +153,70 @@ class _EpisodePlayPageState extends State<EpisodePlayPage> {
       );
     }
 
-    final cur = _episodes[_index];
-
     return Scaffold(
       backgroundColor: Colors.black,
       extendBody: true,
       extendBodyBehindAppBar: true,
       resizeToAvoidBottomInset: false,
-      body: Stack(
-        fit: StackFit.expand,
-        children: [
-          PageView.builder(
-            scrollDirection: Axis.vertical,
-            controller: _pageController,
-            itemCount: _episodes.length,
-            onPageChanged: (i) {
-              setState(() => _index = i);
-              final ep = _episodes[i];
-              context.read<DramaProvider>().reportProgress(
-                    FeedItem(drama: widget.drama, episode: ep),
-                  );
-            },
-            itemBuilder: (_, i) {
-              final next = i + 1 < _episodes.length ? _episodes[i + 1] : null;
-              return _EpisodeSlide(
-                key: ValueKey('play-ep-${_episodes[i].id}'),
-                itemIndex: i,
-                drama: widget.drama,
-                episode: _episodes[i],
-                nextEpisode: next,
-                active: i == _index,
-                favorited: favorited,
-                onEnded: _goNext,
-                onOpenComments: () => showEpisodeCommentsSheet(context, episodeId: _episodes[i].id),
-                onOpenPicker: _openPicker,
-                onGoNext: _goNext,
-                onRegisterMore: (index, handler) {
-                  if (handler == null) {
-                    _moreHandlers.remove(index);
-                  } else {
-                    _moreHandlers[index] = handler;
-                  }
-                },
+      body: PageView.builder(
+        scrollDirection: Axis.vertical,
+        controller: _pageController,
+        itemCount: _episodes.length,
+        onPageChanged: (i) {
+          setState(() => _index = i);
+          final ep = _episodes[i];
+          context.read<DramaProvider>().reportProgress(
+                FeedItem(drama: widget.drama, episode: ep),
               );
-            },
-          ),
-          const Positioned(top: 0, left: 0, right: 0, height: 140, child: PlayerTopScrim()),
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: SafeArea(
-              bottom: false,
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(4, 2, 12, 0),
-                child: Row(
-                  children: [
-                    IconButton(
-                      onPressed: () => Navigator.of(context).maybePop(),
-                      icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
-                    ),
-                    PlayerEpisodeIndexChip(
-                      current: cur.episodeNo,
-                      total: _episodes.length,
-                      onTap: _openPicker,
-                    ),
-                    const Spacer(),
-                    if (showMore) ...[
-                      PlayerMoreButton(
-                        onTap: () => _moreHandlers[_index]?.call(),
-                      ),
-                      const SizedBox(width: 8),
-                    ],
-                    PlayerCoinChip(
-                      balance: bal ?? 0,
-                      onTap: () => context.push('/wallet'),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
+        },
+        itemBuilder: (_, i) {
+          final next = i + 1 < _episodes.length ? _episodes[i + 1] : null;
+          return _EpisodeSlide(
+            key: ValueKey('play-ep-${_episodes[i].id}'),
+            drama: widget.drama,
+            episode: _episodes[i],
+            nextEpisode: next,
+            active: i == _index,
+            favorited: favorited,
+            episodeCount: _episodes.length,
+            showMore: showMore,
+            onEnded: _goNext,
+            onOpenComments: () => showEpisodeCommentsSheet(context, episodeId: _episodes[i].id),
+            onOpenPicker: _openPicker,
+            onGoNext: _goNext,
+          );
+        },
       ),
     );
   }
 }
 
 class _EpisodeSlide extends StatefulWidget {
-  final int itemIndex;
   final Drama drama;
   final Episode episode;
   final Episode? nextEpisode;
   final bool active;
   final bool favorited;
+  final int episodeCount;
+  final bool showMore;
   final VoidCallback onEnded;
   final Future<void> Function() onOpenComments;
   final Future<void> Function() onOpenPicker;
   final VoidCallback onGoNext;
-  final void Function(int index, Future<void> Function()? handler) onRegisterMore;
 
   const _EpisodeSlide({
     super.key,
-    required this.itemIndex,
     required this.drama,
     required this.episode,
     required this.nextEpisode,
     required this.active,
     required this.favorited,
+    required this.episodeCount,
+    required this.showMore,
     required this.onEnded,
     required this.onOpenComments,
     required this.onOpenPicker,
     required this.onGoNext,
-    required this.onRegisterMore,
   });
 
   @override
@@ -286,6 +236,7 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
   bool _nearEnd = false;
   bool _awaitingNext = false;
   bool _muted = false;
+  bool _chromeHidden = false;
   double _baseSpeed = 1.0;
   int _likeCount = 0;
   int _commentCount = 0;
@@ -299,17 +250,12 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
   void initState() {
     super.initState();
     _favorited = widget.favorited;
-    widget.onRegisterMore(widget.itemIndex, _openMore);
     _prepare();
   }
 
   @override
   void didUpdateWidget(covariant _EpisodeSlide oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.itemIndex != oldWidget.itemIndex) {
-      oldWidget.onRegisterMore(oldWidget.itemIndex, null);
-      widget.onRegisterMore(widget.itemIndex, _openMore);
-    }
     if (widget.favorited != oldWidget.favorited) {
       _favorited = widget.favorited;
     }
@@ -332,7 +278,6 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
 
   @override
   void dispose() {
-    widget.onRegisterMore(widget.itemIndex, null);
     _stopProgressTimer();
     _burstTimer?.cancel();
     _tapTimer?.cancel();
@@ -581,15 +526,6 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
     await _resumeIfActive();
   }
 
-  Future<void> _openCategory(String tag) async {
-    final q = tag.trim();
-    if (q.isEmpty) return;
-    await _pauseForOverlay();
-    if (!mounted) return;
-    await context.push('/theater?category=${Uri.encodeComponent(q)}');
-    await _resumeIfActive();
-  }
-
   Future<void> _openEpisodeMeta() async {
     await _pauseForOverlay();
     await widget.onOpenPicker();
@@ -702,8 +638,10 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
 
   @override
   Widget build(BuildContext context) {
-    final inset = playerBottomInset(context, withHomeBar: false);
+    final dockH = playerEpisodeDockHeight(context);
     final next = widget.nextEpisode;
+    final likeLabel = formatPlayerCount(_likeCount);
+    final showChrome = !_chromeHidden;
 
     return Stack(
       fit: StackFit.expand,
@@ -716,7 +654,13 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
         Positioned.fill(
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
-            onTap: _onSingleTap,
+            onTap: () {
+              if (_chromeHidden) {
+                setState(() => _chromeHidden = false);
+                return;
+              }
+              _onSingleTap();
+            },
             onDoubleTapDown: _onDoubleTap,
             onLongPressStart: (_) => _onLongPressStart(),
             onLongPressEnd: (_) => _onLongPressEnd(),
@@ -729,7 +673,10 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
           enabled: !_locked && !_loading && !_awaitingNext,
         ),
         if (_burstPos != null) PlayerLikeBurst(localPos: _burstPos!),
-        const Positioned(left: 0, right: 0, bottom: 0, height: 220, child: PlayerBottomScrim()),
+        if (showChrome)
+          const Positioned(top: 0, left: 0, right: 0, height: 140, child: PlayerTopScrim()),
+        if (showChrome)
+          Positioned(left: 0, right: 0, bottom: dockH, height: 280, child: const PlayerBottomScrim()),
         if (_loading) const Center(child: CircularProgressIndicator(color: Colors.white)),
         if (_error != null)
           Center(
@@ -760,7 +707,8 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
               child: FilledButton(onPressed: _unlock, child: const Text('解锁本集')),
             ),
           ),
-        if (_showPauseHint && !_locked && !_loading && !_speedUp) PlayerPauseHint(paused: _paused),
+        if (showChrome && _showPauseHint && !_locked && !_loading && !_speedUp)
+          PlayerPauseHint(paused: _paused),
         if (_speedUp)
           const Positioned(
             top: 120,
@@ -768,70 +716,137 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
             right: 0,
             child: PlayerSpeedBadge(),
           ),
-        if (_nearEnd && next != null && !_locked && !_loading && !_awaitingNext)
+        if (showChrome) ...[
           Positioned(
-            right: 16,
-            bottom: inset + 200,
-            child: PlayerNextEpisodeHint(
-              episodeLabel: '第${next.episodeNo}集',
-              onTap: widget.onGoNext,
+            top: 0,
+            left: 0,
+            right: 0,
+            child: SafeArea(
+              bottom: false,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(4, 2, 8, 0),
+                child: Row(
+                  children: [
+                    IconButton(
+                      onPressed: () => Navigator.of(context).maybePop(),
+                      icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
+                    ),
+                    PlayerEpisodeTitleLabel(
+                      episodeNo: widget.episode.episodeNo,
+                      onTap: _openEpisodeMeta,
+                    ),
+                    const Spacer(),
+                    PlayerSpeedTextButton(
+                      speed: _baseSpeed,
+                      onTap: () async {
+                        await _pauseForOverlay();
+                        await _pickSpeed();
+                        await _resumeIfActive();
+                      },
+                    ),
+                    if (widget.showMore)
+                      IconButton(
+                        onPressed: _openMore,
+                        icon: const Icon(Icons.more_vert_rounded, color: Colors.white, size: 22),
+                      ),
+                  ],
+                ),
+              ),
             ),
           ),
-        Positioned(
-          right: 6,
-          bottom: inset + 72,
-          child: Column(
-            children: [
-              PlayerSideAction(
-                icon: _liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
-                label: _likeCount > 0 ? '$_likeCount' : '点赞',
-                iconColor: _liked ? kPlayerPrimary : Colors.white,
-                onTap: () => _toggleLike(),
+          if (_nearEnd && next != null && !_locked && !_loading && !_awaitingNext)
+            Positioned(
+              right: 16,
+              bottom: dockH + 210,
+              child: PlayerNextEpisodeHint(
+                episodeLabel: '第${next.episodeNo}集',
+                onTap: widget.onGoNext,
               ),
-              PlayerSideAction(
-                icon: Icons.chat_bubble_outline_rounded,
-                label: _commentCount > 0 ? '$_commentCount' : '评论',
-                onTap: () async {
-                  await _pauseForOverlay();
-                  await widget.onOpenComments();
-                  await _syncCommentCount();
-                  await _resumeIfActive();
-                },
-              ),
-              PlayerSideAction(
-                icon: _favorited ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                label: _favorited ? '已追' : '追剧',
-                iconColor: _favorited ? kPlayerAccent : Colors.white,
-                onTap: _toggleFavorite,
-              ),
-              PlayerSideAction(
-                icon: Icons.list_alt_rounded,
-                label: '选集',
-                onTap: _openEpisodeMeta,
-              ),
-            ],
+            ),
+          Positioned(
+            right: 10,
+            bottom: dockH + 88,
+            width: PlayerSideAction.slotWidth,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                PlayerSideAction(
+                  icon: _liked ? Icons.favorite_rounded : Icons.favorite_border_rounded,
+                  label: likeLabel.isNotEmpty ? likeLabel : '点赞',
+                  iconColor: _liked ? kPlayerPrimary : Colors.white,
+                  onTap: () => _toggleLike(),
+                ),
+                PlayerSideAction(
+                  icon: Icons.chat_bubble_outline_rounded,
+                  label: _commentCount > 0 ? '$_commentCount' : '评论',
+                  onTap: () async {
+                    await _pauseForOverlay();
+                    await widget.onOpenComments();
+                    await _syncCommentCount();
+                    await _resumeIfActive();
+                  },
+                ),
+                PlayerSideAction(
+                  icon: _favorited ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                  label: _favorited ? '已追' : '追剧',
+                  iconColor: _favorited ? kPlayerAccent : Colors.white,
+                  onTap: _toggleFavorite,
+                ),
+                PlayerSideAction(
+                  icon: Icons.ios_share_rounded,
+                  label: '分享',
+                  onTap: () => shareDramaEpisode(
+                    context,
+                    drama: widget.drama,
+                    episode: widget.episode,
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
+          Positioned(
+            left: 16,
+            right: 10 + PlayerSideAction.slotWidth + 10,
+            bottom: dockH + 10,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                PlayerBottomMeta(
+                  title: widget.drama.title,
+                  episodeNo: widget.episode.episodeNo,
+                  synopsis: dramaSynopsis(widget.drama, widget.episode),
+                  onTitleTap: _openTitle,
+                  onEpisodeTap: _openEpisodeMeta,
+                  onDanmakuTap: () async {
+                    await _pauseForOverlay();
+                    await widget.onOpenComments();
+                    await _resumeIfActive();
+                  },
+                ),
+                const SizedBox(height: 8),
+                PlayerProgressBar(
+                  controller: _controller,
+                  onSeek: (_) => _reportProgressNow(),
+                ),
+              ],
+            ),
+          ),
+        ],
         Positioned(
-          left: 16,
-          right: 88,
-          bottom: inset + 8,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              PlayerBottomMeta(
-                title: widget.drama.title,
-                subtitle: episodeSubtitle(widget.episode, category: widget.drama.category),
-                onTitleTap: _openTitle,
-                onEpisodeTap: _openEpisodeMeta,
-                onTagTap: _openCategory,
-              ),
-              const SizedBox(height: 8),
-              PlayerProgressBar(
-                controller: _controller,
-                onSeek: (_) => _reportProgressNow(),
-              ),
-            ],
+          left: 0,
+          right: 0,
+          bottom: 0,
+          child: PlayerEpisodeDock(
+            totalEpisodes: widget.episodeCount > 0 ? widget.episodeCount : widget.drama.totalEpisodes,
+            freeWatch: widget.drama.freeEpisodeCount > 0,
+            chromeHidden: _chromeHidden,
+            onPickEpisodes: () async {
+              await _pauseForOverlay();
+              await widget.onOpenPicker();
+              await _resumeIfActive();
+            },
+            onToggleChrome: () => setState(() => _chromeHidden = !_chromeHidden),
           ),
         ),
         if (_awaitingNext && next != null)
