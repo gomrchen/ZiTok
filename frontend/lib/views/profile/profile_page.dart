@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/l10n_ext.dart';
 import '../../models/drama_models.dart';
 import '../../providers/drama_provider.dart';
 import '../../providers/profile_provider.dart';
@@ -20,9 +21,6 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStateMixin {
-  static const _ink = ShellSurface.ink;
-  static const _inkSoft = Color(0xFF1C212B);
-  static const _paper = ShellSurface.canvas;
   static const _coral = ShellSurface.coral;
 
   late final AnimationController _enter;
@@ -76,24 +74,27 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
     final bottom = MediaQuery.viewPaddingOf(context).bottom;
 
     if (profile.loading && user == null) {
-      return const Scaffold(
-        backgroundColor: _paper,
-        body: Center(child: CircularProgressIndicator(color: _coral)),
+      return Scaffold(
+        backgroundColor: ShellSurface.canvasOf(context),
+        body: const Center(child: CircularProgressIndicator(color: _coral)),
       );
     }
     if (profile.error != null && user == null) {
       return Scaffold(
-        backgroundColor: _paper,
+        backgroundColor: ShellSurface.canvasOf(context),
         body: Center(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Text('${profile.error}', style: const TextStyle(color: _inkSoft)),
+              Text(
+                '${profile.error}',
+                style: TextStyle(color: ShellSurface.inkOf(context)),
+              ),
               const SizedBox(height: 12),
               FilledButton(
                 style: FilledButton.styleFrom(backgroundColor: _coral),
                 onPressed: _refresh,
-                child: const Text('重试'),
+                child: Text(context.l10n.profileRetry),
               ),
             ],
           ),
@@ -101,7 +102,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
       );
     }
 
-    final name = user?.username ?? '用户';
+    final l10n = context.l10n;
+    final name = user?.username ?? l10n.profileUserFallback;
     final avatar = user?.avatarUrl;
     final bio = (user?.bio ?? '').trim();
     final balance = drama.wallet?.balance ?? 0;
@@ -115,11 +117,11 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
         systemNavigationBarColor: Colors.transparent,
       ),
       child: Scaffold(
-        backgroundColor: _paper,
+        backgroundColor: ShellSurface.canvasOf(context),
         extendBodyBehindAppBar: true,
         body: RefreshIndicator(
           color: _coral,
-          backgroundColor: Colors.white,
+          backgroundColor: ShellSurface.cardOf(context),
           displacement: top + 12,
           onRefresh: _refresh,
           child: CustomScrollView(
@@ -132,7 +134,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                   child: _HeroBlock(
                     topInset: top,
                     name: name,
-                    bio: bio.isEmpty ? '写下你的追剧宣言' : bio,
+                    bio: bio.isEmpty ? l10n.profileWriteBio : bio,
                     avatarUrl: avatar,
                     balance: balance,
                     watching: continues.length,
@@ -178,12 +180,12 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                     padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
                     child: Row(
                       children: [
-                        const Text(
-                          '我的收藏',
+                        Text(
+                          l10n.profileFavorites,
                           style: TextStyle(
                             fontSize: 18,
                             fontWeight: FontWeight.w800,
-                            color: _ink,
+                            color: ShellSurface.inkOf(context),
                             letterSpacing: 0.2,
                           ),
                         ),
@@ -192,19 +194,19 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                           GestureDetector(
                             onTap: () => context.push('/watching'),
                             behavior: HitTestBehavior.opaque,
-                            child: const Padding(
-                              padding: EdgeInsets.symmetric(vertical: 4),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 4),
                               child: Row(
                                 children: [
                                   Text(
-                                    '全部',
-                                    style: TextStyle(
+                                    l10n.profileAll,
+                                    style: const TextStyle(
                                       fontSize: 13,
                                       fontWeight: FontWeight.w600,
                                       color: _coral,
                                     ),
                                   ),
-                                  Icon(Icons.chevron_right_rounded, size: 18, color: _coral),
+                                  const Icon(Icons.chevron_right_rounded, size: 18, color: _coral),
                                 ],
                               ),
                             ),
@@ -438,7 +440,9 @@ class _Avatar extends StatelessWidget {
         child: has
             ? Image.network(
                 UrlUtils.resolveStorageUrl(avatarUrl!, defaultDir: 'avatars'),
+                key: ValueKey(avatarUrl),
                 fit: BoxFit.cover,
+                gaplessPlayback: true,
                 errorBuilder: (_, __, ___) => _fallback(),
               )
             : _fallback(),
@@ -523,7 +527,7 @@ class _CoinStrip extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            '我的金币',
+                            context.l10n.profileCoins,
                             style: TextStyle(
                               color: Colors.white.withValues(alpha: 0.7),
                               fontSize: 11.5,
@@ -550,8 +554,8 @@ class _CoinStrip extends StatelessWidget {
                       margin: const EdgeInsets.only(right: 4),
                       color: Colors.white.withValues(alpha: 0.18),
                     ),
-                    _MiniStat(label: '续看', value: '$watching', onTap: onWatching),
-                    _MiniStat(label: '收藏', value: '$favorites', onTap: onWatching),
+                    _MiniStat(label: context.l10n.profileContinueCount, value: '$watching', onTap: onWatching),
+                    _MiniStat(label: context.l10n.profileFavCount, value: '$favorites', onTap: onWatching),
                     Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.45), size: 22),
                   ],
                 ),
@@ -621,17 +625,18 @@ class _QuickGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Padding(
-          padding: EdgeInsets.only(left: 2, bottom: 12),
+        Padding(
+          padding: const EdgeInsets.only(left: 2, bottom: 12),
           child: Text(
-            '常用入口',
+            l10n.profileQuickEntries,
             style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w800,
-              color: Color(0xFF12151C),
+              color: ShellSurface.inkOf(context),
               letterSpacing: 0.2,
             ),
           ),
@@ -640,8 +645,8 @@ class _QuickGrid extends StatelessWidget {
           children: [
             Expanded(
               child: _QuickTile(
-                title: '钱包',
-                subtitle: '充值解锁',
+                title: l10n.profileWallet,
+                subtitle: l10n.profileWalletSub,
                 icon: Icons.account_balance_wallet_rounded,
                 tint: const Color(0xFFFFE8C8),
                 iconColor: const Color(0xFFC47A12),
@@ -651,8 +656,10 @@ class _QuickGrid extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: _QuickTile(
-                title: '追剧',
-                subtitle: continueCount > 0 ? '续看 $continueCount 部' : '去发现好剧',
+                title: l10n.profileWatching,
+                subtitle: continueCount > 0
+                    ? l10n.profileWatchingSubCount(continueCount)
+                    : l10n.profileWatchingSub,
                 icon: Icons.bookmark_rounded,
                 tint: const Color(0xFFFFE0D8),
                 iconColor: const Color(0xFFFF6B4A),
@@ -666,8 +673,8 @@ class _QuickGrid extends StatelessWidget {
           children: [
             Expanded(
               child: _QuickTile(
-                title: '消息',
-                subtitle: '互动通知',
+                title: l10n.profileMessages,
+                subtitle: l10n.profileMessagesSub,
                 icon: Icons.chat_bubble_rounded,
                 tint: const Color(0xFFD8F5F0),
                 iconColor: const Color(0xFF0F9B8A),
@@ -677,8 +684,8 @@ class _QuickGrid extends StatelessWidget {
             const SizedBox(width: 10),
             Expanded(
               child: _QuickTile(
-                title: '设置',
-                subtitle: '账号与偏好',
+                title: l10n.profileSettings,
+                subtitle: l10n.profileSettingsSub,
                 icon: Icons.settings_rounded,
                 tint: const Color(0xFFE8E6E2),
                 iconColor: const Color(0xFF3D4450),
@@ -711,8 +718,9 @@ class _QuickTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ink = ShellSurface.inkOf(context);
     return Material(
-      color: Colors.white,
+      color: ShellSurface.cardOf(context),
       borderRadius: BorderRadius.circular(16),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -720,7 +728,7 @@ class _QuickTile extends StatelessWidget {
         child: Ink(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: const Color(0xFF12151C).withValues(alpha: 0.05)),
+            border: Border.all(color: ink.withValues(alpha: 0.08)),
           ),
           child: Padding(
             padding: const EdgeInsets.fromLTRB(12, 13, 10, 13),
@@ -742,10 +750,10 @@ class _QuickTile extends StatelessWidget {
                     children: [
                       Text(
                         title,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14.5,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF12151C),
+                          color: ink,
                         ),
                       ),
                       const SizedBox(height: 2),
@@ -756,7 +764,7 @@ class _QuickTile extends StatelessWidget {
                         style: TextStyle(
                           fontSize: 11,
                           fontWeight: FontWeight.w500,
-                          color: const Color(0xFF12151C).withValues(alpha: 0.42),
+                          color: ink.withValues(alpha: 0.42),
                         ),
                       ),
                     ],
@@ -784,6 +792,7 @@ class _ContinueRail extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -791,12 +800,12 @@ class _ContinueRail extends StatelessWidget {
           padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
           child: Row(
             children: [
-              const Text(
-                '继续观看',
+              Text(
+                l10n.profileContinue,
                 style: TextStyle(
                   fontSize: 18,
                   fontWeight: FontWeight.w800,
-                  color: Color(0xFF12151C),
+                  color: ShellSurface.inkOf(context),
                   letterSpacing: 0.2,
                 ),
               ),
@@ -804,19 +813,19 @@ class _ContinueRail extends StatelessWidget {
               GestureDetector(
                 onTap: onAll,
                 behavior: HitTestBehavior.opaque,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 4, horizontal: 4),
                   child: Row(
                     children: [
                       Text(
-                        '全部',
-                        style: TextStyle(
+                        l10n.profileAll,
+                        style: const TextStyle(
                           fontSize: 13,
                           fontWeight: FontWeight.w600,
                           color: Color(0xFFFF6B4A),
                         ),
                       ),
-                      Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFFFF6B4A)),
+                      const Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFFFF6B4A)),
                     ],
                   ),
                 ),
@@ -834,7 +843,7 @@ class _ContinueRail extends StatelessWidget {
             itemBuilder: (_, i) {
               final c = items[i];
               final d = c.drama;
-              final title = d?.title ?? '未知剧';
+              final title = d?.title ?? context.l10n.watchingUnknownDrama;
               final cover = d?.coverUrl ?? '';
               return GestureDetector(
                 onTap: () => onTap(c),
@@ -877,7 +886,7 @@ class _ContinueRail extends StatelessWidget {
                             ),
                             const SizedBox(height: 6),
                             Text(
-                              '看到第${c.episodeNo}集',
+                              context.l10n.profileEpisodeSeen(c.episodeNo),
                               style: TextStyle(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w600,
@@ -981,7 +990,7 @@ class _PosterCard extends StatelessWidget {
             ),
             const SizedBox(height: 2),
             Text(
-              drama.category.isEmpty ? '短剧' : drama.category,
+              drama.category.isEmpty ? context.l10n.brandSuffix : drama.category,
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(
@@ -1014,7 +1023,7 @@ class _EmptyFavorites extends StatelessWidget {
           Icon(Icons.movie_filter_outlined, size: 36, color: const Color(0xFF12151C).withValues(alpha: 0.28)),
           const SizedBox(height: 10),
           Text(
-            '还没有收藏',
+            context.l10n.profileEmptyFavTitle,
             style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w700,
@@ -1023,7 +1032,7 @@ class _EmptyFavorites extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            '去剧场挑一部心动短剧吧',
+            context.l10n.profileEmptyFavSub,
             style: TextStyle(
               fontSize: 12,
               color: const Color(0xFF12151C).withValues(alpha: 0.4),

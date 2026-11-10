@@ -14,6 +14,7 @@ import '../../providers/profile_provider.dart';
 import '../../services/user_service.dart';
 import '../../utils/image_utils.dart';
 import '../../utils/error_handler.dart';
+import '../../utils/url_utils.dart';
 import 'widgets/edit_field_dialog.dart';
 import '../../models/user_models.dart'; // 导入用户模型以使用 Gender 枚举
 
@@ -718,6 +719,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
     setState(() => _uploadingAvatar = true);
     try {
       final fileName = 'avatar_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      // Content-Type 可能为空，网关按 .jpg 扩展名兜底为 image/jpeg
       final mf = MultipartFile.fromBytes(bytes, filename: fileName);
       await _userApi.uploadAvatar(userId: _userId, avatarData: mf);
 
@@ -733,7 +735,10 @@ class _EditProfilePageState extends State<EditProfilePage> {
       // 这里可能已经不在 mounted 状态
       if (mounted) {
         setState(() {
-          _avatarUrl = profileProvider.user?.avatarUrl;
+          _avatarUrl = UrlUtils.resolveStorageUrl(
+            profileProvider.user?.avatarUrl,
+            defaultDir: 'avatars',
+          );
         });
         ErrorHandler.showSuccess(context, '头像已更新');
       }

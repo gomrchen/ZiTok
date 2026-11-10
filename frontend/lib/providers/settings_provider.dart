@@ -10,6 +10,9 @@ class SettingsProvider extends ChangeNotifier {
   static const _kPlayerMore = 'settings_player_more_button';
   static const _kAutoNextCountdown = 'settings_auto_next_countdown';
 
+  static const langZh = '简体中文';
+  static const langEn = 'English';
+
   bool pushNotifications;
   bool emailNotifications;
   bool messagePush;
@@ -25,7 +28,16 @@ class SettingsProvider extends ChangeNotifier {
         messagePush = prefs.getBool(_kMsgPush) ?? true,
         playerMoreButton = prefs.getBool(_kPlayerMore) ?? true,
         autoNextCountdown = prefs.getBool(_kAutoNextCountdown) ?? false,
-        language = prefs.getString(_kLanguage) ?? 'English';
+        language = _normalizeLanguage(prefs.getString(_kLanguage));
+
+  static String _normalizeLanguage(String? raw) {
+    if (raw == langEn || raw == 'en' || raw == 'en_US') return langEn;
+    return langZh;
+  }
+
+  /// MaterialApp / gen-l10n 使用的 Locale
+  Locale get locale =>
+      language == langEn ? const Locale('en') : const Locale('zh');
 
   Future<void> togglePush(bool v) async {
     pushNotifications = v;
@@ -58,8 +70,8 @@ class SettingsProvider extends ChangeNotifier {
   }
 
   Future<void> setLanguage(String lang) async {
-    language = lang;
-    await prefs.setString(_kLanguage, lang);
+    language = _normalizeLanguage(lang);
+    await prefs.setString(_kLanguage, language);
     notifyListeners();
   }
 }

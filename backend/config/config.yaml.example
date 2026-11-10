@@ -10,7 +10,7 @@ otel:
 user:
   name: "UserService"
   rpc_addr: ":8897"
-  default_avatar: "http://localhost:8080/avatars/default.jpg"
+  default_avatar: "/avatars/default.jpg"
 
 video:
   name: "video"
@@ -18,14 +18,14 @@ video:
 
 mysql:
   host: "127.0.0.1"
-  port: 3306
+  port: 23306
   username: "videohub"
   password: "videohub"
   database: "videohub"
 
 redis:
   host: "127.0.0.1"
-  port: 6379
+  port: 16379
   password: "videohub"
   db:
     user: 0      # 用户服务
@@ -46,7 +46,7 @@ jwt:
   expires_time: 86400  
 
 gateway:
-  addr: ":8080"
+  addr: ":28880"
 
 elasticsearch:
   addr: "127.0.0.1:9200"
@@ -63,13 +63,14 @@ upload:
     max_size: 5242880  # 5MB
     allowed_types: ["image/jpeg", "image/png"]
     upload_dir: "src/storage/avatars"
-    base_url: "http://localhost:8080/avatars"
+    # 相对路径：由前端按当前网关 origin 拼接，避免写死 localhost:8080
+    base_url: "/avatars"
   video:
     max_size: 104857600  # 100MB
     allowed_types: ["video/mp4", "video/quicktime"]
     upload_dir: "src/storage/videos"
     cover_dir: "src/storage/covers"
-    base_url: "http://localhost:8080/videos"
+    base_url: "/videos"
 
 api_key:
   key: ""
@@ -97,7 +98,7 @@ social:
       - "application/pdf"
       - "application/msword"
     upload_dir: "src/storage/chat"  # 聊天文件存储目录
-    base_url: "http://localhost:8080/chat"  # 聊天文件访问基础URL
+    base_url: "/chat"  # 聊天文件访问基础路径（相对网关）
 
 interactions:
   name: "interactions"
@@ -106,3 +107,16 @@ interactions:
 note:
   name: "note"
   rpc_addr: ":8081"
+
+# 短剧 / 商业化
+drama:
+  name: "DramaService"
+  rpc_addr: ":8898"
+  free_episode_default: 3
+
+commerce:
+  name: "CommerceService"
+  rpc_addr: ":8899"
+  register_bonus: 100
+  ad_reward: 5
+  ad_unlock_hours: 24

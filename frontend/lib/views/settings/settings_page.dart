@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/l10n_ext.dart';
 import '../../providers/settings_provider.dart';
 import '../../providers/theme_provider.dart';
 import '../home/shell_surface.dart';
@@ -14,9 +15,10 @@ class SettingsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final sp = context.watch<SettingsProvider>();
     final tp = context.watch<ThemeProvider>();
+    final l10n = context.l10n;
 
     return SettingsChrome.page(
-      title: '设置',
+      title: l10n.settingsTitle,
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
           ShellSurface.pagePad,
@@ -25,41 +27,41 @@ class SettingsPage extends StatelessWidget {
           28,
         ),
         children: [
-          _HeroBanner(),
+          const _HeroBanner(),
           const SizedBox(height: 22),
           SettingsChrome.section(
-            title: '账户与安全',
-            subtitle: '管理登录身份与密码',
+            title: l10n.settingsAccountSecurity,
+            subtitle: l10n.settingsAccountSecuritySub,
             children: [
               SettingsChrome.navTile(
                 icon: Icons.person_rounded,
                 tint: const Color(0xFFE8F7F4),
                 iconColor: ShellSurface.accent,
-                title: '账户',
-                subtitle: '切换账号 / 退出登录',
+                title: l10n.settingsAccount,
+                subtitle: l10n.settingsAccountSub,
                 onTap: () => context.push('/settings/account-settings'),
               ),
               SettingsChrome.navTile(
                 icon: Icons.lock_rounded,
                 tint: const Color(0xFFFFE8C8),
                 iconColor: const Color(0xFFC47A12),
-                title: '安全',
-                subtitle: '邮箱验证重置密码',
+                title: l10n.settingsSecurity,
+                subtitle: l10n.settingsSecuritySub,
                 onTap: () => context.push('/settings/change-password'),
               ),
             ],
           ),
           const SizedBox(height: ShellSurface.sectionGap),
           SettingsChrome.section(
-            title: '通知与消息',
-            subtitle: '控制提醒触达方式',
+            title: l10n.settingsNotify,
+            subtitle: l10n.settingsNotifySub,
             children: [
               SettingsChrome.switchTile(
                 icon: Icons.notifications_active_rounded,
                 tint: const Color(0xFFFFE0D8),
                 iconColor: ShellSurface.coral,
-                title: '铃声通知',
-                subtitle: '重要互动即时提醒',
+                title: l10n.settingsRing,
+                subtitle: l10n.settingsRingSub,
                 value: sp.pushNotifications,
                 onChanged: sp.togglePush,
               ),
@@ -67,8 +69,8 @@ class SettingsPage extends StatelessWidget {
                 icon: Icons.mail_rounded,
                 tint: const Color(0xFFE8E6E2),
                 iconColor: ShellSurface.muted,
-                title: '邮件通知',
-                subtitle: '账单与安全邮件',
+                title: l10n.settingsEmailNotify,
+                subtitle: l10n.settingsEmailNotifySub,
                 value: sp.emailNotifications,
                 onChanged: sp.toggleEmail,
               ),
@@ -76,8 +78,8 @@ class SettingsPage extends StatelessWidget {
                 icon: Icons.chat_bubble_rounded,
                 tint: const Color(0xFFD8F5F0),
                 iconColor: const Color(0xFF0F9B8A),
-                title: '消息推送',
-                subtitle: '系统与运营推送',
+                title: l10n.settingsMsgPush,
+                subtitle: l10n.settingsMsgPushSub,
                 value: sp.messagePush,
                 onChanged: sp.toggleMessagePush,
               ),
@@ -85,14 +87,14 @@ class SettingsPage extends StatelessWidget {
           ),
           const SizedBox(height: ShellSurface.sectionGap),
           SettingsChrome.section(
-            title: '播放与偏好',
-            subtitle: '短剧观看体验细调',
+            title: l10n.settingsPlayback,
+            subtitle: l10n.settingsPlaybackSub,
             children: [
               SettingsChrome.navTile(
                 icon: Icons.language_rounded,
                 tint: const Color(0xFFE8F0FF),
                 iconColor: const Color(0xFF3B6FD9),
-                title: '语言',
+                title: l10n.settingsLanguage,
                 subtitle: sp.language,
                 onTap: () async {
                   final lang = await _showLanguageSheet(context, sp.language);
@@ -103,8 +105,8 @@ class SettingsPage extends StatelessWidget {
                 icon: Icons.dark_mode_rounded,
                 tint: const Color(0xFFE8E6E2),
                 iconColor: ShellSurface.ink,
-                title: '夜晚模式',
-                subtitle: '降低屏幕亮度刺激',
+                title: l10n.settingsNightMode,
+                subtitle: l10n.settingsNightModeSub,
                 value: tp.themeName == 'dark',
                 onChanged: (_) => tp.toggleDark(),
               ),
@@ -112,8 +114,8 @@ class SettingsPage extends StatelessWidget {
                 icon: Icons.apps_rounded,
                 tint: const Color(0xFFFFE0D8),
                 iconColor: ShellSurface.coral,
-                title: '内页更多入口',
-                subtitle: '详情播放右上角收纳图标，默认开启',
+                title: l10n.settingsPlayerMore,
+                subtitle: l10n.settingsPlayerMoreSub,
                 value: sp.playerMoreButton,
                 onChanged: sp.togglePlayerMoreButton,
               ),
@@ -121,8 +123,8 @@ class SettingsPage extends StatelessWidget {
                 icon: Icons.timer_outlined,
                 tint: const Color(0xFFFFE8C8),
                 iconColor: const Color(0xFFC47A12),
-                title: '片尾倒计时切集',
-                subtitle: '3 秒确认；关闭则直接下一集',
+                title: l10n.settingsAutoNext,
+                subtitle: l10n.settingsAutoNextSub,
                 value: sp.autoNextCountdown,
                 onChanged: sp.toggleAutoNextCountdown,
               ),
@@ -130,24 +132,24 @@ class SettingsPage extends StatelessWidget {
           ),
           const SizedBox(height: ShellSurface.sectionGap),
           SettingsChrome.section(
-            title: '合规与关于',
+            title: l10n.settingsCompliance,
             children: [
               SettingsChrome.navTile(
                 icon: Icons.child_care_rounded,
                 tint: const Color(0xFFE8F7F4),
                 iconColor: ShellSurface.accent,
-                title: '青少年模式',
-                subtitle: '限制付费与社交（一期占位）',
+                title: l10n.settingsYouth,
+                subtitle: l10n.settingsYouthSub,
                 onTap: () => _showYouthDialog(context),
               ),
               SettingsChrome.navTile(
                 icon: Icons.flag_rounded,
                 tint: const Color(0xFFFFE0D8),
                 iconColor: ShellSurface.coral,
-                title: '举报与反馈',
+                title: l10n.settingsFeedback,
                 onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('已记录反馈入口'),
+                  SnackBar(
+                    content: Text(l10n.settingsFeedbackDone),
                     behavior: SnackBarBehavior.floating,
                   ),
                 ),
@@ -156,13 +158,13 @@ class SettingsPage extends StatelessWidget {
                 icon: Icons.info_rounded,
                 tint: const Color(0xFFE8E6E2),
                 iconColor: ShellSurface.muted,
-                title: '关于 ZiTok',
-                subtitle: '短剧 · v0.1.0',
+                title: l10n.settingsAbout,
+                subtitle: l10n.settingsAboutSub,
                 onTap: () => showAboutDialog(
                   context: context,
-                  applicationName: 'ZiTok 短剧',
+                  applicationName: l10n.appTitle,
                   applicationVersion: '0.1.0',
-                  applicationLegalese: '沉浸竖屏短剧体验',
+                  applicationLegalese: l10n.settingsAboutLegalese,
                 ),
               ),
             ],
@@ -173,20 +175,23 @@ class SettingsPage extends StatelessWidget {
   }
 
   void _showYouthDialog(BuildContext context) {
+    final l10n = context.l10n;
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ShellSurface.card,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('青少年模式', style: TextStyle(fontWeight: FontWeight.w800)),
+      builder: (ctx) => SettingsChrome.dialog(
+        context: ctx,
+        title: l10n.settingsYouth,
         content: Text(
-          '一期占位：开启后将限制付费解锁与私信功能。',
-          style: ShellSurface.caption.copyWith(fontSize: 14, height: 1.4),
+          l10n.settingsYouthDialog,
+          style: ShellSurface.captionOf(ctx).copyWith(fontSize: 14, height: 1.4),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('知道了', style: TextStyle(color: ShellSurface.coral, fontWeight: FontWeight.w800)),
+            child: Text(
+              l10n.settingsGotIt,
+              style: const TextStyle(color: ShellSurface.coral, fontWeight: FontWeight.w800),
+            ),
           ),
         ],
       ),
@@ -194,14 +199,16 @@ class SettingsPage extends StatelessWidget {
   }
 
   Future<String?> _showLanguageSheet(BuildContext context, String current) {
-    const langs = ['简体中文', 'English'];
+    final l10n = context.l10n;
+    final langs = [SettingsProvider.langZh, SettingsProvider.langEn];
     return showModalBottomSheet<String>(
       context: context,
-      backgroundColor: ShellSurface.card,
+      backgroundColor: ShellSurface.cardOf(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
       builder: (ctx) {
+        final ink = ShellSurface.inkOf(ctx);
         return SafeArea(
           child: Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 20),
@@ -212,20 +219,23 @@ class SettingsPage extends StatelessWidget {
                   width: 36,
                   height: 4,
                   decoration: BoxDecoration(
-                    color: ShellSurface.ink.withValues(alpha: 0.12),
+                    color: ink.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(99),
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Align(
+                Align(
                   alignment: Alignment.centerLeft,
-                  child: Text('选择语言', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 16)),
+                  child: Text(
+                    l10n.settingsSelectLanguage,
+                    style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 16),
+                  ),
                 ),
                 const SizedBox(height: 8),
                 for (final lang in langs)
                   ListTile(
                     contentPadding: EdgeInsets.zero,
-                    title: Text(lang, style: ShellSurface.bodyStrong),
+                    title: Text(lang, style: ShellSurface.bodyStrongOf(ctx)),
                     trailing: current == lang
                         ? const Icon(Icons.check_rounded, color: ShellSurface.coral)
                         : null,
@@ -241,8 +251,11 @@ class SettingsPage extends StatelessWidget {
 }
 
 class _HeroBanner extends StatelessWidget {
+  const _HeroBanner();
+
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(18, 18, 18, 16),
@@ -279,14 +292,22 @@ class _HeroBanner extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
-                  '个性化你的短剧',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 16),
+                Text(
+                  l10n.settingsHeroTitle,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '通知、播放手势与账户安全一站管理',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.62), fontSize: 12.5, height: 1.3),
+                  l10n.settingsHeroSubtitle,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.62),
+                    fontSize: 12.5,
+                    height: 1.3,
+                  ),
                 ),
               ],
             ),

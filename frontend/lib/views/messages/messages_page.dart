@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../l10n/l10n_ext.dart';
 import '../../providers/messaging_provider.dart';
 import '../../models/social_models.dart'; // 确保引入了模型文件以识别 Friend/Conversation
 import '../../services/user_session.dart';
@@ -91,11 +92,12 @@ class _MessagesPageState extends State<MessagesPage> {
     final List<Conversation> filteredConversations = _getFilteredConversations(mp);
 
     return AnnotatedRegion(
-      value: ShellSurface.systemUi,
+      value: ShellSurface.systemUiOf(context),
       child: Scaffold(
-        backgroundColor: ShellSurface.canvas,
+        backgroundColor: ShellSurface.canvasOf(context),
         appBar: ShellSurface.appBar(
           title: _getFilterTitle(),
+          context: context,
           actions: [
             IconButton(
               tooltip: '筛选',
@@ -123,9 +125,10 @@ class _MessagesPageState extends State<MessagesPage> {
 
   /// 获取筛选标题
   String _getFilterTitle() {
+    final l10n = context.l10n;
     switch (_currentFilter) {
       case MessageFilter.all:
-        return '消息';
+        return l10n.messagesTitle;
       case MessageFilter.following:
         return '我关注的';
       case MessageFilter.mutual:

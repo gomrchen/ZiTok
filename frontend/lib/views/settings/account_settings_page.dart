@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/l10n_ext.dart';
 import '../../providers/auth_provider.dart';
 import '../home/shell_surface.dart';
 import 'settings_chrome.dart';
@@ -11,8 +12,9 @@ class AccountSettingsPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
     return SettingsChrome.page(
-      title: '账户设置',
+      title: l10n.settingsAccountTitle,
       body: ListView(
         padding: const EdgeInsets.fromLTRB(
           ShellSurface.pagePad,
@@ -25,8 +27,8 @@ class AccountSettingsPage extends StatelessWidget {
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(18),
-              color: ShellSurface.card,
-              border: Border.all(color: ShellSurface.line),
+              color: ShellSurface.cardOf(context),
+              border: Border.all(color: ShellSurface.lineOf(context)),
             ),
             child: Row(
               children: [
@@ -47,7 +49,14 @@ class AccountSettingsPage extends StatelessWidget {
                     ],
                   ),
                   child: const Center(
-                    child: Text('Z', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
+                    child: Text(
+                      'Z',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 22,
+                      ),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 14),
@@ -55,9 +64,12 @@ class AccountSettingsPage extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text('当前账号', style: ShellSurface.caption),
+                      Text(l10n.settingsCurrentAccount, style: ShellSurface.captionOf(context)),
                       const SizedBox(height: 4),
-                      Text('ZiTok 演示账号', style: ShellSurface.bodyStrong.copyWith(fontSize: 16)),
+                      Text(
+                        l10n.profileDemoBio,
+                        style: ShellSurface.bodyStrongOf(context).copyWith(fontSize: 16),
+                      ),
                     ],
                   ),
                 ),
@@ -66,23 +78,23 @@ class AccountSettingsPage extends StatelessWidget {
           ),
           const SizedBox(height: ShellSurface.sectionGap),
           SettingsChrome.section(
-            title: '账户管理',
-            subtitle: '切换或退出当前登录态',
+            title: l10n.settingsAccountManage,
+            subtitle: l10n.settingsAccountManageSub,
             children: [
               SettingsChrome.navTile(
                 icon: Icons.switch_account_rounded,
                 tint: const Color(0xFFE8F0FF),
                 iconColor: const Color(0xFF3B6FD9),
-                title: '切换账号',
-                subtitle: '在已保存账号间快速切换',
+                title: l10n.settingsSwitchAccount,
+                subtitle: l10n.settingsSwitchAccountSub,
                 onTap: () => context.push('/settings/account-switcher'),
               ),
               SettingsChrome.navTile(
                 icon: Icons.logout_rounded,
                 tint: const Color(0xFFFFE0D8),
                 iconColor: ShellSurface.coral,
-                title: '退出当前账号',
-                subtitle: '清除本机登录态',
+                title: l10n.settingsLogoutCurrent,
+                subtitle: l10n.settingsLogoutSub,
                 titleColor: ShellSurface.coral,
                 showChevron: false,
                 onTap: () => _confirmLogout(context),
@@ -95,17 +107,24 @@ class AccountSettingsPage extends StatelessWidget {
   }
 
   void _confirmLogout(BuildContext context) {
+    final l10n = context.l10n;
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: ShellSurface.card,
+        backgroundColor: ShellSurface.cardOf(context),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: const Text('退出登录', style: TextStyle(fontWeight: FontWeight.w800)),
-        content: Text('确定要退出当前账号吗？', style: ShellSurface.caption.copyWith(fontSize: 14)),
+        title: Text(l10n.settingsLogout, style: const TextStyle(fontWeight: FontWeight.w800)),
+        content: Text(
+          l10n.settingsLogoutConfirm,
+          style: ShellSurface.captionOf(context).copyWith(fontSize: 14),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text('取消', style: TextStyle(color: ShellSurface.ink.withValues(alpha: 0.55))),
+            child: Text(
+              l10n.commonCancel,
+              style: TextStyle(color: ShellSurface.inkOf(context).withValues(alpha: 0.55)),
+            ),
           ),
           TextButton(
             onPressed: () {
@@ -113,30 +132,43 @@ class AccountSettingsPage extends StatelessWidget {
               _logout(context);
             },
             style: TextButton.styleFrom(foregroundColor: ShellSurface.coral),
-            child: const Text('确定', style: TextStyle(fontWeight: FontWeight.w800)),
+            child: Text(
+              l10n.commonConfirm,
+              style: const TextStyle(fontWeight: FontWeight.w800),
+            ),
           ),
         ],
       ),
     );
   }
 
-  void _logout(BuildContext context) {
+  Future<void> _logout(BuildContext context) async {
+    final l10n = context.l10n;
     final authProvider = context.read<AuthProvider>();
+    final nav = Navigator.of(context, rootNavigator: true);
     showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => const Center(child: CircularProgressIndicator(color: ShellSurface.coral)),
+      useRootNavigator: true,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: ShellSurface.coral),
+      ),
     );
 
-    authProvider.logout().then((_) {
+    try {
+      await authProvider.logout();
       if (!context.mounted) return;
+      if (nav.canPop()) nav.pop();
       context.go('/welcome');
-    }).catchError((error) {
+    } catch (error) {
       if (!context.mounted) return;
-      Navigator.pop(context);
+      if (nav.canPop()) nav.pop();
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('登出失败: $error'), behavior: SnackBarBehavior.floating),
+        SnackBar(
+          content: Text(l10n.settingsLogoutFailed('$error')),
+          behavior: SnackBarBehavior.floating,
+        ),
       );
-    });
+    }
   }
 }

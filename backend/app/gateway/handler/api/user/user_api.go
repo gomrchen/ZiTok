@@ -5,7 +5,10 @@ package user
 import (
 	"context"
 	"io"
+	"mime/multipart"
+	"path/filepath"
 	"strconv"
+	"strings"
 
 	"github.com/cloudwego/hertz/pkg/app"
 	api "github.com/yxrxy/videoHub/app/gateway/model/user"
@@ -14,6 +17,27 @@ import (
 	"github.com/yxrxy/videoHub/kitex_gen/user"
 	"github.com/yxrxy/videoHub/pkg/errno"
 )
+
+// inferImageContentType：Flutter MultipartFile.fromBytes 常不带 Content-Type，需按扩展名兜底
+func inferImageContentType(header *multipart.FileHeader) string {
+	ct := strings.TrimSpace(header.Header.Get("Content-Type"))
+	if ct != "" && ct != "application/octet-stream" {
+		return ct
+	}
+	ext := strings.ToLower(filepath.Ext(header.Filename))
+	switch ext {
+	case ".png":
+		return "image/png"
+	case ".gif":
+		return "image/gif"
+	case ".webp":
+		return "image/webp"
+	case ".jpg", ".jpeg":
+		return "image/jpeg"
+	default:
+		return "image/jpeg"
+	}
+}
 
 // Register .
 // @router /api/v1/user/register [POST]
@@ -151,7 +175,7 @@ func UploadAvatar(ctx context.Context, c *app.RequestContext) {
 
 	resp, err := rpc.UploadAvatarRPC(ctx, &user.UploadAvatarRequest{
 		AvatarData:  avatarData,
-		ContentType: fileHeader.Header.Get("Content-Type"),
+		ContentType: inferImageContentType(fileHeader),
 	})
 	if err != nil {
 		pack.RespError(c, err)
@@ -215,10 +239,9 @@ func UploadBackground(ctx context.Context, c *app.RequestContext) {
 		return
 	}
 
-	// 调用 RPC
 	resp, err := rpc.UploadBackgroundRPC(ctx, &user.UploadBackgroundRequest{
 		BackgroundData: backgroundData,
-		ContentType:    fileHeader.Header.Get("Content-Type"),
+		ContentType:    inferImageContentType(fileHeader),
 	})
 	if err != nil {
 		pack.RespError(c, err)

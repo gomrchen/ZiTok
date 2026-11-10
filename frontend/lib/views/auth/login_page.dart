@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../../l10n/l10n_ext.dart';
 import '../../providers/auth_provider.dart';
-import '../../theme/theme_tokens.dart';
+import '../home/shell_surface.dart';
+import 'auth_chrome.dart';
 
 class LoginPage extends StatefulWidget {
   const LoginPage({super.key});
@@ -14,6 +17,15 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final _usernameCtrl = TextEditingController(text: 'zitok');
   final _pwdCtrl = TextEditingController(text: 'demo1234');
+  bool _obscure = true;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<AuthProvider>().clearError();
+    });
+  }
 
   @override
   void dispose() {
@@ -22,126 +34,92 @@ class _LoginPageState extends State<LoginPage> {
     super.dispose();
   }
 
+  Future<void> _submit(AuthProvider auth) async {
+    final u = _usernameCtrl.text.trim();
+    final p = _pwdCtrl.text;
+    if (u.isEmpty || p.isEmpty) {
+      auth.setLocalError(context.l10n.loginNeedCredentials);
+      return;
+    }
+    await auth.login(u, p);
+    if (!mounted) return;
+    if (auth.isAuthenticated) context.go('/home');
+  }
+
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final theme = Theme.of(context);
-    return Scaffold(
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: Spacing.xl),
-                    // 标题与副标题
-                    Text('ZiTok 短剧', style: theme.textTheme.titleLarge),
-                    const SizedBox(height: Spacing.sm),
-                    Text('竖屏连播 · 热门短剧', style: theme.textTheme.bodySmall),
-                    const SizedBox(height: Spacing.xs),
-                    Text('演示：zitok / demo1234', style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
-                    const SizedBox(height: Spacing.lg),
-                    // 表单
-                    TextField(
-                      controller: _usernameCtrl,
-                      keyboardType: TextInputType.text,
-                      decoration: const InputDecoration(
-                        labelText: '用户名',
-                        hintText: 'Enter your username',
-                      ),
-                    ),
-                    const SizedBox(height: Spacing.md),
-                    TextField(
-                      controller: _pwdCtrl,
-                      obscureText: true,
-                      decoration: const InputDecoration(
-                        labelText: '密码',
-                        hintText: 'Enter your password',
-                      ),
-                    ),
-                    const SizedBox(height: Spacing.lg),
-                    if (auth.error != null)
-                      Text(
-                        auth.error!,
-                        style: const TextStyle(color: Color(0xFFEF4444)),
-                      ),
-                    const SizedBox(height: Spacing.md),
-                    // 主按钮
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: auth.loading
-                            ? null
-                            : () async {
-                                await context.read<AuthProvider>().login(
-                                  _usernameCtrl.text.trim(),
-                                  _pwdCtrl.text,
-                                );
-                                if (!context.mounted) return;
-                                if (context
-                                    .read<AuthProvider>()
-                                    .isAuthenticated) {
-                                  context.go('/home');
-                                }
-                              },
-                        child: auth.loading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            : const Text('登录'),
-                      ),
-                    ),
-                    const SizedBox(height: Spacing.md),
-                    // 次级按钮：描边，文案高亮"注册一个"
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () => context.go('/auth/register'),
-                        child: RichText(
-                          text: TextSpan(
-                            text: '没有账号？',
-                            style: theme.textTheme.bodyMedium,
-                            children: [
-                              TextSpan(
-                                text: ' 注册一个',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: theme.colorScheme.primary,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: Spacing.md),
-                    // 忘记密码按钮
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () => context.go('/auth/forgot-password'),
-                        child: Text(
-                          '忘记密码',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: theme.colorScheme.primary,
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: Spacing.xl),
-                  ],
+    final l10n = context.l10n;
+    return AuthScaffold(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AuthBrandHeader(
+            title: l10n.loginWelcomeBack,
+            subtitle: l10n.tagline,
+            tip: l10n.demoHint,
+          ),
+          const SizedBox(height: 28),
+          TextField(
+            controller: _usernameCtrl,
+            textInputAction: TextInputAction.next,
+            onChanged: (_) => auth.clearError(),
+            decoration: AuthChrome.fieldDecoration(
+              context: context,
+              label: l10n.loginUsername,
+              hint: l10n.loginUsernameHint,
+            ),
+          ),
+          const SizedBox(height: 14),
+          TextField(
+            controller: _pwdCtrl,
+            obscureText: _obscure,
+            textInputAction: TextInputAction.done,
+            onChanged: (_) => auth.clearError(),
+            onSubmitted: (_) => _submit(auth),
+            decoration: AuthChrome.fieldDecoration(
+              context: context,
+              label: l10n.loginPassword,
+              hint: l10n.loginPasswordHint,
+              suffix: IconButton(
+                onPressed: () => setState(() => _obscure = !_obscure),
+                icon: Icon(
+                  _obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                  color: ShellSurface.ink.withValues(alpha: 0.45),
                 ),
               ),
             ),
           ),
-        ),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => context.go('/auth/forgot-password'),
+              child: Text(
+                l10n.loginForgot,
+                style: TextStyle(
+                  color: ShellSurface.ink.withValues(alpha: 0.48),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
+              ),
+            ),
+          ),
+          if (auth.error != null) ...[
+            AuthErrorBanner(message: auth.error!),
+            const SizedBox(height: 14),
+          ],
+          AuthPrimaryButton(
+            label: l10n.loginAction,
+            loading: auth.loading,
+            onPressed: () => _submit(auth),
+          ),
+          const SizedBox(height: 12),
+          AuthSecondaryLink(
+            prefix: l10n.loginNoAccount,
+            action: l10n.loginRegisterNow,
+            onTap: () => context.go('/auth/register'),
+          ),
+        ],
       ),
     );
   }

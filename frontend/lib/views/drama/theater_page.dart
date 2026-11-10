@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/l10n_ext.dart';
 import '../../providers/drama_provider.dart';
 import '../home/shell_surface.dart';
 
@@ -17,7 +18,8 @@ class TheaterPage extends StatefulWidget {
 class _TheaterPageState extends State<TheaterPage> {
   String? _category;
 
-  static const categories = ['全部', '甜宠', '古装', '青春'];
+  /// API 分类值（与库内 category 一致）；展示文案走 l10n
+  static const _apiCats = [null, '甜宠', '古装', '青春'];
 
   @override
   void initState() {
@@ -33,17 +35,25 @@ class _TheaterPageState extends State<TheaterPage> {
 
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final labels = {
+      null: l10n.theaterCatAll,
+      '甜宠': l10n.theaterCatRomance,
+      '古装': l10n.theaterCatCostume,
+      '青春': l10n.theaterCatYouth,
+    };
     final dp = context.watch<DramaProvider>();
-    final cats = <String>[
-      ...categories,
-      if (_category != null && !categories.contains(_category)) _category!,
+    final cats = <String?>[
+      ..._apiCats,
+      if (_category != null && !_apiCats.contains(_category)) _category,
     ];
     return AnnotatedRegion(
-      value: ShellSurface.systemUi,
+      value: ShellSurface.systemUiOf(context),
       child: Scaffold(
-        backgroundColor: ShellSurface.canvas,
+        backgroundColor: ShellSurface.canvasOf(context),
         appBar: ShellSurface.appBar(
-          title: '剧场',
+          title: l10n.theaterTitle,
+          context: context,
           actions: [
             IconButton(
               icon: const Icon(Icons.search_rounded),
@@ -63,12 +73,12 @@ class _TheaterPageState extends State<TheaterPage> {
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (_, i) {
                   final c = cats[i];
-                  final selected = (_category == null && c == '全部') || _category == c;
+                  final selected = _category == c;
                   return _CategoryPill(
-                    label: c,
+                    label: labels[c] ?? c ?? l10n.theaterCatAll,
                     selected: selected,
                     onTap: () {
-                      setState(() => _category = c == '全部' ? null : c);
+                      setState(() => _category = c);
                       dp.refreshTheater(category: _category);
                     },
                   );
@@ -81,7 +91,7 @@ class _TheaterPageState extends State<TheaterPage> {
                   ? const Center(child: CircularProgressIndicator(color: ShellSurface.coral))
                   : RefreshIndicator(
                       color: ShellSurface.coral,
-                      backgroundColor: ShellSurface.card,
+                      backgroundColor: ShellSurface.cardOf(context),
                       onRefresh: () => dp.refreshTheater(category: _category),
                       child: GridView.builder(
                         padding: const EdgeInsets.fromLTRB(
@@ -111,7 +121,8 @@ class _TheaterPageState extends State<TheaterPage> {
                                       borderRadius: BorderRadius.circular(12),
                                       boxShadow: [
                                         BoxShadow(
-                                          color: ShellSurface.ink.withValues(alpha: 0.06),
+                                          color: ShellSurface.inkOf(context)
+                                              .withValues(alpha: 0.06),
                                           blurRadius: 10,
                                           offset: const Offset(0, 4),
                                         ),
@@ -120,7 +131,11 @@ class _TheaterPageState extends State<TheaterPage> {
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.circular(12),
                                       child: d.coverUrl.isEmpty
-                                          ? const ColoredBox(color: Color(0xFFD9D4CC))
+                                          ? ColoredBox(
+                                              color: ShellSurface.isDark(context)
+                                                  ? const Color(0xFF1F2937)
+                                                  : const Color(0xFFD9D4CC),
+                                            )
                                           : Image.network(
                                               d.coverUrl,
                                               fit: BoxFit.cover,
@@ -135,14 +150,15 @@ class _TheaterPageState extends State<TheaterPage> {
                                   d.title,
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: ShellSurface.bodyStrong.copyWith(fontSize: 13),
+                                  style: ShellSurface.bodyStrongOf(context)
+                                      .copyWith(fontSize: 13),
                                 ),
                                 const SizedBox(height: 2),
                                 Text(
-                                  '${d.totalEpisodes}集 · ${d.category}',
+                                  '${l10n.watchingEpisodes(d.totalEpisodes)} · ${d.category}',
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
-                                  style: ShellSurface.caption,
+                                  style: ShellSurface.captionOf(context),
                                 ),
                               ],
                             ),
@@ -171,6 +187,8 @@ class _CategoryPill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final ink = ShellSurface.inkOf(context);
+    final selectedFg = ShellSurface.isDark(context) ? ShellSurface.canvasDark : Colors.white;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -180,22 +198,22 @@ class _CategoryPill extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(99),
-            color: selected ? ShellSurface.ink : ShellSurface.card,
+            color: selected ? ink : ShellSurface.cardOf(context),
             border: Border.all(
-              color: selected ? ShellSurface.ink : ShellSurface.line,
+              color: selected ? ink : ShellSurface.lineOf(context),
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (selected) ...[
-                const Icon(Icons.check_rounded, size: 14, color: Colors.white),
+                Icon(Icons.check_rounded, size: 14, color: selectedFg),
                 const SizedBox(width: 4),
               ],
               Text(
                 label,
                 style: TextStyle(
-                  color: selected ? Colors.white : ShellSurface.muted,
+                  color: selected ? selectedFg : ShellSurface.mutedOf(context),
                   fontWeight: FontWeight.w700,
                   fontSize: 13,
                 ),

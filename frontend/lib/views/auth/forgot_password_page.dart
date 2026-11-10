@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+
+import '../../l10n/l10n_ext.dart';
 import '../../providers/auth_provider.dart';
-import '../../theme/theme_tokens.dart';
-import '../../utils/validators.dart';
 import '../../utils/error_handler.dart';
+import '../../utils/validators.dart';
+import '../home/shell_surface.dart';
+import 'auth_chrome.dart';
 
 class ForgotPasswordPage extends StatefulWidget {
   const ForgotPasswordPage({super.key});
@@ -13,280 +16,194 @@ class ForgotPasswordPage extends StatefulWidget {
   State<ForgotPasswordPage> createState() => _ForgotPasswordPageState();
 }
 
-class _ForgotPasswordPageState extends State<ForgotPasswordPage> {
-  final _newPasswordCtrl = TextEditingController();
+class _ForgotPasswordPageState extends State<ForgotPasswordPage>
+    with AuthCodeCountdown {
   final _emailCtrl = TextEditingController();
   final _codeCtrl = TextEditingController();
-  bool _isSendingCode = false;
-  int _countdown = 0;
-  bool _isNewPasswordVisible = false;
- // bool _isConfirmPasswordVisible = false;
+  final _pwdCtrl = TextEditingController();
+  bool _obscure = true;
+  String? _localError;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) context.read<AuthProvider>().clearError();
+    });
+  }
 
   @override
   void dispose() {
-    _newPasswordCtrl.dispose();
     _emailCtrl.dispose();
     _codeCtrl.dispose();
+    _pwdCtrl.dispose();
     super.dispose();
   }
-  
-  void _showError(String message) {
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
-    }
-  }
-  
-  bool _validateSendCodeInputs() {
-    if (_emailCtrl.text.trim().isEmpty) {
-      _showError('请输入邮箱');
-      return false;
-    }
-    
-    if (!isValidEmail(_emailCtrl.text)) {
-      _showError('请输入有效的邮箱地址');
-      return false;
-    }
-    
-    return true;
-  }
-  
-  bool _validateResetPasswordInputs() {
-    if (_emailCtrl.text.trim().isEmpty) {
-      _showError('请输入邮箱');
-      return false;
-    }
-    
-    if (!isValidEmail(_emailCtrl.text)) {
-      _showError('请输入有效的邮箱地址');
-      return false;
-    }
-    
-    if (_codeCtrl.text.trim().isEmpty) {
-      _showError('请输入验证码');
-      return false;
-    }
-    
-    if (!isValidOtp(_codeCtrl.text)) {
-      _showError('验证码必须为6位数字');
-      return false;
-    }
-    
-    if (_newPasswordCtrl.text.trim().isEmpty) {
-      _showError('请输入新密码');
-      return false;
-    }
-    
-    if (!isValidPassword(_newPasswordCtrl.text)) {
-      _showError('新密码必须包含字母和数字，长度8-20位');
-      return false;
-    }
-    
 
-    
-    
-    return true;
-  }
+  void _setLocalError(String? msg) => setState(() => _localError = msg);
 
-  void _startCountdown() {
+  Future<void> _sendCode() async {
+    final l10n = context.l10n;
+    final email = _emailCtrl.text.trim();
+    if (email.isEmpty) {
+      _setLocalError(l10n.forgotNeedEmail);
+      return;
+    }
+    if (!isValidEmail(email)) {
+      _setLocalError(l10n.registerInvalidEmail);
+      return;
+    }
     setState(() {
-      _countdown = 60;
-      _isSendingCode = true;
+      authCodeSending = true;
+      _localError = null;
     });
-    
-    // 倒计时逻辑
-    Future.doWhile(() async {
-      await Future.delayed(const Duration(seconds: 1));
-      if (mounted) {
-        setState(() {
-          _countdown--;
-        });
-        return _countdown > 0;
-      }
-      return false;
-    }).whenComplete(() {
-      if (mounted) {
-        setState(() {
-          _isSendingCode = false;
-        });
-      }
-    });
-  }
-
-  Future<void> _sendVerificationCode() async {
-    // 验证输入
-    if (!_validateSendCodeInputs()) {
-      return;
-    }
-
     try {
-      final authProvider = Provider.of<AuthProvider>(context, listen: false);
-      await authProvider.sendVerificationCode(_emailCtrl.text);
-
-      _startCountdown();
-
-      if (mounted) {
-        ErrorHandler.showSuccess(context, '验证码已发送，请查收邮箱');
-      }
+      await context.read<AuthProvider>().sendVerificationCode(email);
+      if (!mounted) return;
+      startAuthCodeCountdown();
+      ErrorHandler.showSuccess(context, context.l10n.codeSent);
     } catch (e) {
-      if (mounted) {
-        ErrorHandler.showError(context, e, prefix: '发送失败');
-      }
-    }
-  }
-
-  Future<void> _resetPassword() async {
-    // 验证输入
-    if (!_validateResetPasswordInputs()) {
-      return;
-    }
-
-    try {
-      await context.read<AuthProvider>().changePassword(
-        _emailCtrl.text.trim(),
-         _codeCtrl.text.trim(),
-         _newPasswordCtrl.text.trim(),
+      if (!mounted) return;
+      _setLocalError(
+        ErrorHandler.getErrorMessage(e, defaultMessage: context.l10n.codeSendFailed),
       );
+      setState(() => authCodeSending = false);
+    }
+  }
 
-      if (mounted) {
-        ErrorHandler.showSuccess(context, '密码重置成功，请登录');
-
-        // 返回登录页面
-        Future.delayed(const Duration(seconds: 1), () {
-          if (mounted) {
-            context.go('/auth/login');
-          }
-        });
-      }
+  Future<void> _reset() async {
+    final l10n = context.l10n;
+    final email = _emailCtrl.text.trim();
+    final code = _codeCtrl.text.trim();
+    final pwd = _pwdCtrl.text;
+    if (email.isEmpty) {
+      _setLocalError(l10n.forgotNeedEmail);
+      return;
+    }
+    if (!isValidEmail(email)) {
+      _setLocalError(l10n.registerInvalidEmail);
+      return;
+    }
+    if (code.isEmpty) {
+      _setLocalError(l10n.forgotNeedCode);
+      return;
+    }
+    if (!isValidOtp(code)) {
+      _setLocalError(l10n.registerInvalidCode);
+      return;
+    }
+    if (pwd.isEmpty) {
+      _setLocalError(l10n.forgotNeedPassword);
+      return;
+    }
+    if (!isValidPassword(pwd)) {
+      _setLocalError(l10n.forgotInvalidPassword);
+      return;
+    }
+    _setLocalError(null);
+    try {
+      await context.read<AuthProvider>().changePassword(email, code, pwd);
+      if (!mounted) return;
+      ErrorHandler.showSuccess(context, context.l10n.forgotSuccess);
+      await Future<void>.delayed(const Duration(milliseconds: 600));
+      if (mounted) context.go('/auth/login');
     } catch (e) {
-      if (mounted) {
-        ErrorHandler.showError(context, e, prefix: '重置失败');
-      }
+      if (!mounted) return;
+      _setLocalError(
+        ErrorHandler.getErrorMessage(e, defaultMessage: context.l10n.forgotFailed),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final auth = context.watch<AuthProvider>();
-    final theme = Theme.of(context);
-    
-    return Scaffold(
-
-      body: SafeArea(
-        child: Center(
-          child: SingleChildScrollView(
-            child: ConstrainedBox(
-              constraints: const BoxConstraints(maxWidth: 420),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: Spacing.lg),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const SizedBox(height: Spacing.xl),
-                    // 标题与副标题
-                    Text('重置密码', style: theme.textTheme.titleLarge),
-                    const SizedBox(height: Spacing.sm),
-                    Text('请填写以下信息重置您的密码', style: theme.textTheme.bodySmall),
-                    const SizedBox(height: Spacing.lg),
-                    // 表单
-                    TextField(
-                      controller: _newPasswordCtrl,
-                      keyboardType: TextInputType.visiblePassword,
-                      obscureText: !_isNewPasswordVisible,
-                      decoration: InputDecoration(
-                        labelText: '新密码',
-                        hintText: '请设置新密码',
-                        suffixIcon: IconButton(
-                          icon: Icon(
-                            _isNewPasswordVisible
-                                ? Icons.visibility
-                                : Icons.visibility_off,
-                          ),
-                          onPressed: () {
-                            setState(() {
-                              _isNewPasswordVisible = !_isNewPasswordVisible;
-                            });
-                          },
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: Spacing.md),
-                    TextField(
-                      controller: _emailCtrl,
-                      keyboardType: TextInputType.emailAddress,
-                      decoration: const InputDecoration(
-                        labelText: '邮箱',
-                        hintText: '请输入您的注册邮箱',
-                      ),
-                    ),
-                    const SizedBox(height: Spacing.md),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextField(
-                            controller: _codeCtrl,
-                            keyboardType: TextInputType.number,
-                            decoration: const InputDecoration(
-                              labelText: '验证码',
-                              hintText: '请输入验证码',
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: Spacing.md),
-                        SizedBox(
-                          width: 120,
-                          height: 48,
-                          child: OutlinedButton(
-                            onPressed: _isSendingCode ? null : _sendVerificationCode,
-                            child: _countdown > 0
-                                ? Text('${_countdown}s')
-                                : const Text('获取验证码'),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: Spacing.lg),
-                    if (auth.error != null)
-                      Text(auth.error!, style: const TextStyle(color: Color(0xFFEF4444))),
-                    const SizedBox(height: Spacing.md),
-                    // 主按钮
-                    SizedBox(
-                      width: double.infinity,
-                      child: FilledButton(
-                        onPressed: auth.loading ? null : _resetPassword,
-                        child: auth.loading
-                            ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2))
-                            : const Text('重置密码'),
-                      ),
-                    ),
-                    const SizedBox(height: Spacing.md),
-                    // 返回登录按钮
-                    SizedBox(
-                      width: double.infinity,
-                      child: OutlinedButton(
-                        onPressed: () => context.go('/auth/login'),
-                        child: RichText(
-                          text: TextSpan(
-                            text: '记得密码？',
-                            style: theme.textTheme.bodyMedium,
-                            children: [
-                              TextSpan(
-                                text: ' 返回登录',
-                                style: theme.textTheme.bodyMedium?.copyWith(color: theme.colorScheme.primary),
-                              )
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: Spacing.xl),
-                  ],
+    final l10n = context.l10n;
+    final error = _localError ?? auth.error;
+    return AuthScaffold(
+      showBack: true,
+      onBack: () => context.go('/auth/login'),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          AuthBrandHeader(
+            title: l10n.forgotTitle,
+            subtitle: l10n.forgotSubtitle,
+          ),
+          const SizedBox(height: 24),
+          TextField(
+            controller: _emailCtrl,
+            keyboardType: TextInputType.emailAddress,
+            textInputAction: TextInputAction.next,
+            onChanged: (_) => _setLocalError(null),
+            decoration: AuthChrome.fieldDecoration(
+              context: context,
+              label: l10n.registerEmail,
+              hint: l10n.forgotEmailHint,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _codeCtrl,
+                  keyboardType: TextInputType.number,
+                  textInputAction: TextInputAction.next,
+                  onChanged: (_) => _setLocalError(null),
+                  decoration: AuthChrome.fieldDecoration(
+                    context: context,
+                    label: l10n.registerCode,
+                    hint: l10n.registerCodeHint,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              AuthCodeButton(
+                countdown: authCodeCountdown,
+                busy: authCodeSending,
+                onPressed: _sendCode,
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _pwdCtrl,
+            obscureText: _obscure,
+            textInputAction: TextInputAction.done,
+            onSubmitted: (_) => _reset(),
+            onChanged: (_) => _setLocalError(null),
+            decoration: AuthChrome.fieldDecoration(
+              context: context,
+              label: l10n.forgotNewPassword,
+              hint: l10n.forgotNewPasswordHint,
+              suffix: IconButton(
+                onPressed: () => setState(() => _obscure = !_obscure),
+                icon: Icon(
+                  _obscure ? Icons.visibility_off_rounded : Icons.visibility_rounded,
+                  color: ShellSurface.ink.withValues(alpha: 0.45),
                 ),
               ),
             ),
           ),
-        ),
+          const SizedBox(height: 16),
+          if (error != null) ...[
+            AuthErrorBanner(message: error),
+            const SizedBox(height: 14),
+          ],
+          AuthPrimaryButton(
+            label: l10n.forgotSubmit,
+            loading: auth.loading,
+            onPressed: _reset,
+          ),
+          const SizedBox(height: 12),
+          AuthSecondaryLink(
+            prefix: l10n.forgotRemember,
+            action: l10n.forgotBackLogin,
+            onTap: () => context.go('/auth/login'),
+          ),
+        ],
       ),
     );
   }

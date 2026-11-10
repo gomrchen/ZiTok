@@ -26,30 +26,15 @@ func NewWsService(manager *Manager) *WsService {
 
 // Start 启动WebSocket服务
 func (s *WsService) Start(ctx context.Context) {
-	// 启动WebSocket管理器
 	go s.manager.Start(ctx)
-	// 启动心跳检测
-	go s.manager.StartHeartbeat(ctx, pingPeriod)
+	// 心跳由各连接 WritePump 负责，避免与业务写并发
 }
 
-// RegisterClient 注册WebSocket客户端
+// RegisterClient 注册WebSocket客户端（只走 Manager，避免重复建 Client 覆盖连接）
 func (s *WsService) RegisterClient(userID int64, conn *websocket.Conn) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-
-	// 创建新的客户端
-	client := &Client{
-		UserID: userID,
-		Rooms:  make(map[int64]bool),
-		mu:     sync.Mutex{},
-		Conn:   conn,
-	}
-	s.manager.RegisterClient(userID, client.Conn)
-
-	// 同时发送到注册通道，以便其他功能使用
-	go func() {
-		s.manager.register <- client
-	}()
+	s.manager.RegisterClient(userID, conn)
 	return nil
 }
 

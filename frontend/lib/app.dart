@@ -6,6 +6,7 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'config/env.dart';
+import 'l10n/app_localizations.dart';
 import 'routes/app_router.dart';
 import 'providers/theme_provider.dart';
 import 'services/api_client.dart';
@@ -302,10 +303,14 @@ class ZitokApp extends StatelessWidget {
           final authProvider = context.read<AuthProvider>();
           final router = _routerCache ??= AppRouter.buildRouter(authProvider);
           final theme = context.watch<ThemeProvider>().theme;
+          final locale = context.watch<SettingsProvider>().locale;
 
           return MaterialApp.router(
-            title: 'ZiTok 短剧',
+            onGenerateTitle: (ctx) => AppLocalizations.of(ctx).appTitle,
             theme: theme,
+            locale: locale,
+            supportedLocales: AppLocalizations.supportedLocales,
+            localizationsDelegates: AppLocalizations.localizationsDelegates,
             routerConfig: router,
           );
         },

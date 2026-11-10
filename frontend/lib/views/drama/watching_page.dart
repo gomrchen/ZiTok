@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 
+import '../../l10n/l10n_ext.dart';
 import '../../providers/drama_provider.dart';
 import '../home/shell_surface.dart';
 
@@ -24,14 +25,15 @@ class _WatchingPageState extends State<WatchingPage> {
   @override
   Widget build(BuildContext context) {
     final dp = context.watch<DramaProvider>();
+    final l10n = context.l10n;
     return AnnotatedRegion(
-      value: ShellSurface.systemUi,
+      value: ShellSurface.systemUiOf(context),
       child: Scaffold(
-        backgroundColor: ShellSurface.canvas,
-        appBar: ShellSurface.appBar(title: '追剧'),
+        backgroundColor: ShellSurface.canvasOf(context),
+        appBar: ShellSurface.appBar(title: l10n.watchingTitle, context: context),
         body: RefreshIndicator(
           color: ShellSurface.coral,
-          backgroundColor: ShellSurface.card,
+          backgroundColor: ShellSurface.cardOf(context),
           onRefresh: () => dp.refreshWatching(),
           child: ListView(
             padding: const EdgeInsets.fromLTRB(
@@ -41,10 +43,10 @@ class _WatchingPageState extends State<WatchingPage> {
               20,
             ),
             children: [
-              Text('继续观看', style: ShellSurface.sectionTitle),
+              Text(l10n.profileContinue, style: ShellSurface.sectionTitleOf(context)),
               const SizedBox(height: 12),
               if (dp.continueList.isEmpty)
-                const _EmptyHint(text: '暂无进度，去剧场挑一部开追')
+                _EmptyHint(text: l10n.watchingEmptyContinue)
               else
                 ...dp.continueList.map((c) {
                   final drama = c.drama;
@@ -52,18 +54,18 @@ class _WatchingPageState extends State<WatchingPage> {
                     padding: const EdgeInsets.only(bottom: 10),
                     child: _WatchRow(
                       coverUrl: drama?.coverUrl ?? '',
-                      title: drama?.title ?? '未知剧',
-                      subtitle: '看到第${c.episodeNo}集',
+                      title: drama?.title ?? l10n.watchingUnknownDrama,
+                      subtitle: l10n.profileEpisodeSeen(c.episodeNo),
                       accentSubtitle: true,
                       onTap: drama == null ? null : () => context.push('/drama/${drama.id}'),
                     ),
                   );
                 }),
               const SizedBox(height: ShellSurface.sectionGap),
-              Text('我的收藏', style: ShellSurface.sectionTitle),
+              Text(l10n.profileFavorites, style: ShellSurface.sectionTitleOf(context)),
               const SizedBox(height: 12),
               if (dp.favorites.isEmpty)
-                const _EmptyHint(text: '还没有追剧，点进播放页即可收藏')
+                _EmptyHint(text: l10n.watchingEmptyFav)
               else
                 ...dp.favorites.map(
                   (d) => Padding(
@@ -71,7 +73,8 @@ class _WatchingPageState extends State<WatchingPage> {
                     child: _WatchRow(
                       coverUrl: d.coverUrl,
                       title: d.title,
-                      subtitle: '${d.totalEpisodes}集${d.category.isEmpty ? '' : ' · ${d.category}'}',
+                      subtitle:
+                          '${l10n.watchingEpisodes(d.totalEpisodes)}${d.category.isEmpty ? '' : ' · ${d.category}'}',
                       onTap: () => context.push('/drama/${d.id}'),
                     ),
                   ),
@@ -94,14 +97,14 @@ class _EmptyHint extends StatelessWidget {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
       decoration: BoxDecoration(
-        color: ShellSurface.card,
+        color: ShellSurface.cardOf(context),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: ShellSurface.line),
+        border: Border.all(color: ShellSurface.lineOf(context)),
       ),
       child: Text(
         text,
         textAlign: TextAlign.center,
-        style: ShellSurface.caption.copyWith(fontSize: 13),
+        style: ShellSurface.captionOf(context).copyWith(fontSize: 13),
       ),
     );
   }
@@ -132,9 +135,9 @@ class _WatchRow extends StatelessWidget {
         child: Ink(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: ShellSurface.card,
+            color: ShellSurface.cardOf(context),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: ShellSurface.line),
+            border: Border.all(color: ShellSurface.lineOf(context)),
           ),
           child: Row(
             children: [
@@ -145,7 +148,11 @@ class _WatchRow extends StatelessWidget {
                   height: 78,
                   child: coverUrl.isNotEmpty
                       ? Image.network(coverUrl, fit: BoxFit.cover)
-                      : const ColoredBox(color: Color(0xFFD9D4CC)),
+                      : ColoredBox(
+                          color: ShellSurface.isDark(context)
+                              ? const Color(0xFF1F2937)
+                              : const Color(0xFFD9D4CC),
+                        ),
                 ),
               ),
               const SizedBox(width: 12),
@@ -153,23 +160,31 @@ class _WatchRow extends StatelessWidget {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text(title, maxLines: 1, overflow: TextOverflow.ellipsis, style: ShellSurface.bodyStrong),
+                    Text(
+                      title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: ShellSurface.bodyStrongOf(context),
+                    ),
                     const SizedBox(height: 6),
                     Text(
                       subtitle,
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: accentSubtitle
-                          ? ShellSurface.caption.copyWith(
+                          ? ShellSurface.captionOf(context).copyWith(
                               color: ShellSurface.coral.withValues(alpha: 0.9),
                               fontWeight: FontWeight.w700,
                             )
-                          : ShellSurface.caption,
+                          : ShellSurface.captionOf(context),
                     ),
                   ],
                 ),
               ),
-              Icon(Icons.chevron_right_rounded, color: ShellSurface.ink.withValues(alpha: 0.28)),
+              Icon(
+                Icons.chevron_right_rounded,
+                color: ShellSurface.inkOf(context).withValues(alpha: 0.28),
+              ),
             ],
           ),
         ),

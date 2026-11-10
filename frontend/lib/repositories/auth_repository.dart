@@ -1,3 +1,4 @@
+import 'package:hive_flutter/hive_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auth_service.dart';
 import '../services/user_session.dart';
@@ -166,12 +167,18 @@ class AuthRepository {
   /// 登出，清除本地认证信息
   Future<void> logout() async {
     try {
+      // 后端暂无强制吊销接口时，失败也继续清本地（幂等）
       await authService.logout();
     } catch (_) {
-      // 即使后端接口调用失败，也继续清除本地数据
+      // ignore: 本地退出必须成功
     } finally {
-      // 通过 UserSession 统一清除所有用户信息和令牌
       await userSession.clear(prefs);
+      await prefs.remove('auth_user_id');
+      try {
+        if (Hive.isBoxOpen('user_box')) {
+          await Hive.box('user_box').clear();
+        }
+      } catch (_) {}
     }
   }
 
@@ -200,6 +207,29 @@ class AuthException implements Exception {
 
   AuthException({required this.message, required this.code});
 
+  /// 把网关包装的技术文案收敛成可读提示
+  static String friendlyMessage(String raw) {
+    final s = raw.trim();
+    if (s.contains('密码错误') || s.contains('password')) return '用户名或密码错误';
+    if (s.contains('user not exist') || s.contains('用户不存在')) return '用户不存在';
+    if (s.contains('验证码') || s.contains('code')) {
+      if (s.contains('过期') || s.contains('expire')) return '验证码已过期，请重新获取';
+      if (s.contains('错误') || s.contains('invalid')) return '验证码错误';
+    }
+    if (s.contains('已存在') || s.contains('already')) return '用户名或邮箱已被注册';
+    if (s.contains('internal server error') || s.contains('remote or network')) {
+      // 尽量从尾部抽取业务中文
+      final m = RegExp(r'[\u4e00-\u9fff]{2,}').allMatches(s).map((e) => e.group(0)!).toList();
+      if (m.isNotEmpty) return m.last;
+      return '服务暂时不可用，请稍后重试';
+    }
+    if (s.startsWith('AuthException')) {
+      final m = RegExp(r'message=(.+)\)$').firstMatch(s);
+      if (m != null) return friendlyMessage(m.group(1)!);
+    }
+    return s.isEmpty ? '操作失败，请稍后重试' : s;
+  }
+
   @override
-  String toString() => 'AuthException(code=$code, message=$message)';
+  String toString() => friendlyMessage(message);
 }

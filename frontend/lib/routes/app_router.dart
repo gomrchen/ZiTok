@@ -130,17 +130,24 @@ class AppRouter {
           '/chat',
           '/profile',
           '/user',
+          '/settings',
+          '/watching',
+          '/theater',
+          '/search',
         ];
         final wantsProtected = protectedPrefixes.any(
           (p) => state.matchedLocation.startsWith(p),
         );
 
+        // 已退出：禁止停留在业务页
         if (!canAccess && wantsProtected && !loggingIn) {
           return '/auth/login';
         }
-        if (canAccess && loggingIn) {
+        // 登录中页：已登录则回首页
+        if (auth.isAuthenticated && loggingIn) {
           return '/home';
         }
+        // 欢迎页：仅真正已登录才跳过（不能用 canAttemptAutoLogin，避免退出后被顶回）
         if (auth.isAuthenticated && state.matchedLocation == '/welcome') {
           return '/home';
         }

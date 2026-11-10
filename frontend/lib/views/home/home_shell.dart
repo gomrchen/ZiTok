@@ -9,6 +9,7 @@ import '../drama/player_overlay.dart';
 import '../drama/theater_page.dart';
 import '../messages/messages_page.dart';
 import '../profile/profile_page.dart';
+import '../../l10n/l10n_ext.dart';
 import '../../services/video/video_preload_manager.dart';
 import '../../services/video_playback_manager.dart';
 import '../../app.dart';
@@ -56,9 +57,9 @@ class _HomeShellState extends State<HomeShell> {
   void _handleAuthenticationFailed() {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('登录已失效，请重新登录'),
-        duration: Duration(seconds: 3),
+      SnackBar(
+        content: Text(context.l10n.sessionExpired),
+        duration: const Duration(seconds: 3),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -92,7 +93,8 @@ class _HomeShellState extends State<HomeShell> {
       child: Scaffold(
         extendBody: true,
         extendBodyBehindAppBar: true,
-        backgroundColor: immersive ? Colors.black : ShellSurface.canvas,
+        backgroundColor:
+            immersive ? Colors.black : ShellSurface.canvasOf(context),
         body: Stack(
           fit: StackFit.expand,
           children: [
@@ -149,20 +151,20 @@ class _CapsuleDock extends StatelessWidget {
     required this.onChanged,
   });
 
-  static const _labels = ['首页', '剧场', '消息', '我的'];
-
   @override
   Widget build(BuildContext context) {
+    final l10n = context.l10n;
+    final labels = [l10n.tabHome, l10n.tabTheater, l10n.tabMessages, l10n.tabProfile];
     final glass = immersive
         ? Colors.black.withValues(alpha: 0.42)
-        : ShellSurface.card.withValues(alpha: 0.92);
+        : ShellSurface.cardOf(context).withValues(alpha: 0.92);
     final border = immersive
         ? Colors.white.withValues(alpha: 0.12)
-        : ShellSurface.line;
+        : ShellSurface.lineOf(context);
 
     return Semantics(
       container: true,
-      label: '主导航',
+      label: l10n.navMain,
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
         child: BackdropFilter(
@@ -192,18 +194,18 @@ class _CapsuleDock extends StatelessWidget {
                       begin: Alignment.topCenter,
                       end: Alignment.bottomCenter,
                       colors: [
-                        ShellSurface.card.withValues(alpha: 0.98),
-                        ShellSurface.canvas.withValues(alpha: 0.92),
+                        ShellSurface.cardOf(context).withValues(alpha: 0.98),
+                        ShellSurface.canvasOf(context).withValues(alpha: 0.92),
                       ],
                     ),
             ),
             child: SizedBox(
               height: 54,
               child: Row(
-                children: List.generate(_labels.length, (i) {
+                children: List.generate(labels.length, (i) {
                   return Expanded(
                     child: _DockTab(
-                      label: _labels[i],
+                      label: labels[i],
                       kind: _DockGlyphKind.values[i],
                       selected: i == index,
                       immersive: immersive,
@@ -284,7 +286,7 @@ class _DockTabState extends State<_DockTab> with SingleTickerProviderStateMixin 
   Widget build(BuildContext context) {
     final idle = widget.immersive
         ? Colors.white.withValues(alpha: 0.58)
-        : const Color(0xFF6A7380);
+        : ShellSurface.mutedOf(context);
     final active = widget.immersive ? const Color(0xFFFF8A6B) : kPlayerPrimary;
     final color = widget.selected ? active : idle;
 

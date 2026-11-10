@@ -71,9 +71,14 @@ class AuthService {
     );
   }
 
-  /// 登出
+  /// 登出（后端若未实现则由仓库层吞掉错误，本地仍清会话）
   Future<Response<dynamic>> logout() {
-    return client.dio.post('/user/logout');
+    return client.dio.post(
+      '/user/logout',
+      options: Options(
+        validateStatus: (code) => code != null && code < 500,
+      ),
+    );
   }
 
   /// 刷新令牌

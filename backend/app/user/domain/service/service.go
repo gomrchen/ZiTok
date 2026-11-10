@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"github.com/go-redis/redis/v8"
@@ -132,12 +133,19 @@ func (s *UserService) UploadBackground(ctx context.Context, uid int64, backgroun
 
 
 func isValidImageType(contentType string) bool {
+	ct := strings.TrimSpace(strings.ToLower(contentType))
+	// 空类型由网关按扩展名兜底；仍兼容历史客户端
+	if ct == "" || ct == "application/octet-stream" {
+		return true
+	}
 	validTypes := map[string]bool{
 		"image/jpeg": true,
 		"image/png":  true,
-        "image/jpg":  true,
+		"image/jpg":  true,
+		"image/gif":  true,
+		"image/webp": true,
 	}
-	return validTypes[contentType]
+	return validTypes[ct]
 }
 
 func getFileExt(contentType string) string {

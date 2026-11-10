@@ -21,7 +21,12 @@ package errno
 import (
 	"errors"
 	"fmt"
+	"regexp"
+	"strconv"
+	"strings"
 )
+
+var bizErrPattern = regexp.MustCompile(`biz error:\s*\[(\d+)\]\s*(.+)`)
 
 type ErrNo struct {
 	ErrorCode int64
@@ -66,10 +71,41 @@ func ConvertErr(err error) ErrNo {
 	}
 	errno := ErrNo{}
 	if errors.As(err, &errno) {
+		// Kitex 常把业务 ErrNo 包进 InternalServiceError.WithError
+		if unwrapped := unwrapBizErrNo(errno); unwrapped != nil {
+			return *unwrapped
+		}
 		return errno
+	}
+
+	if unwrapped := parseBizErrMsg(err.Error()); unwrapped != nil {
+		return *unwrapped
 	}
 
 	s := InternalServiceError
 	s.ErrorMsg = err.Error()
 	return s
+}
+
+func unwrapBizErrNo(e ErrNo) *ErrNo {
+	if e.ErrorCode != InternalServiceErrorCode {
+		return nil
+	}
+	return parseBizErrMsg(e.ErrorMsg)
+}
+
+func parseBizErrMsg(msg string) *ErrNo {
+	m := bizErrPattern.FindStringSubmatch(msg)
+	if len(m) != 3 {
+		return nil
+	}
+	code, err := strconv.ParseInt(m[1], 10, 64)
+	if err != nil {
+		return nil
+	}
+	text := strings.TrimSpace(m[2])
+	if text == "" {
+		return nil
+	}
+	return &ErrNo{ErrorCode: code, ErrorMsg: text}
 }

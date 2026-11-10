@@ -35,10 +35,11 @@ type Message struct {
 
 // Client 表示一个WebSocket客户端连接
 type Client struct {
-	UserID int64           // 用户ID
-	Conn   *websocket.Conn // WebSocket连接
-	Rooms  map[int64]bool  // 加入的聊天室
-	mu     sync.Mutex      // 保护 Rooms 的互斥锁
+	UserID  int64           // 用户ID
+	Conn    *websocket.Conn // WebSocket连接
+	Rooms   map[int64]bool  // 加入的聊天室
+	mu      sync.Mutex      // 保护 Rooms
+	writeMu sync.Mutex      // 串行化 Conn 写，避免 concurrent write
 }
 
 // Manager 管理WebSocket连接
@@ -46,7 +47,6 @@ type Manager struct {
 	clients    map[int64]*Client          // 用户ID -> 客户端连接
 	roomMap    map[int64]map[*Client]bool // 聊天室ID -> 客户端集合
 	broadcast  chan []byte                // 广播消息通道
-	register   chan *Client               // 注册客户端通道
 	unregister chan *Client               // 注销客户端通道
 	mutex      sync.RWMutex               // 保护 clients 和 roomMap 的互斥锁
 }
@@ -57,7 +57,6 @@ func NewManager() *Manager {
 		clients:    make(map[int64]*Client),
 		roomMap:    make(map[int64]map[*Client]bool),
 		broadcast:  make(chan []byte),
-		register:   make(chan *Client),
 		unregister: make(chan *Client),
 	}
 }
@@ -86,7 +85,7 @@ func (m *Manager) RegisterClient(userID int64, conn *websocket.Conn) {
 		Timestamp: time.Now().Unix(),
 	}
 	data, _ := json.Marshal(welcomeMsg)
-	if err := conn.WriteMessage(websocket.TextMessage, data); err != nil {
+	if err := client.SendMessage(websocket.TextMessage, data); err != nil {
 		log.Printf("error sending welcome message: %v", err)
 	}
 }
@@ -95,11 +94,6 @@ func (m *Manager) RegisterClient(userID int64, conn *websocket.Conn) {
 func (m *Manager) Start(ctx context.Context) {
 	for {
 		select {
-		case client := <-m.register:
-			m.mutex.Lock()
-			m.clients[client.UserID] = client
-			m.mutex.Unlock()
-
 		case client := <-m.unregister:
 			m.mutex.Lock()
 			if _, ok := m.clients[client.UserID]; ok {
@@ -119,8 +113,7 @@ func (m *Manager) Start(ctx context.Context) {
 		case message := <-m.broadcast:
 			m.mutex.RLock()
 			for _, client := range m.clients {
-				// 直接发送消息
-				if err := client.Conn.WriteMessage(websocket.TextMessage, message); err != nil {
+				if err := client.SendMessage(websocket.TextMessage, message); err != nil {
 					m.unregister <- client
 					log.Printf("error broadcasting message: %v", err)
 				}
@@ -149,12 +142,7 @@ func (m *Manager) SendToUser(userID int64, message []byte) error {
 		return nil // 用户不在线，忽略消息
 	}
 
-	return client.Conn.WriteMessage(websocket.TextMessage, message)
-}
-
-// BroadcastMessage 广播消息给所有连接的客户端
-func (m *Manager) BroadcastMessage(message []byte) {
-	m.broadcast <- message
+	return client.SendMessage(websocket.TextMessage, message)
 }
 
 // GetOnlineUsers 获取在线用户ID列表
@@ -175,29 +163,6 @@ func (m *Manager) IsUserOnline(userID int64) bool {
 	defer m.mutex.RUnlock()
 	_, exists := m.clients[userID]
 	return exists
-}
-
-// StartHeartbeat 启动心跳检测
-func (m *Manager) StartHeartbeat(ctx context.Context, interval time.Duration) {
-	ticker := time.NewTicker(interval)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ticker.C:
-			m.mutex.RLock()
-			for _, client := range m.clients {
-				go func(client *Client) {
-					if err := client.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
-						m.unregister <- client
-					}
-				}(client)
-			}
-			m.mutex.RUnlock()
-		case <-ctx.Done():
-			return
-		}
-	}
 }
 
 // JoinRoom 加入聊天室
@@ -255,7 +220,7 @@ func (m *Manager) SendToRoom(selfUserID int64, roomID int64, message *Message) {
 
 	for client := range room {
 		if client.UserID != selfUserID {
-			if err := client.Conn.WriteMessage(websocket.TextMessage, data); err != nil {
+			if err := client.SendMessage(websocket.TextMessage, data); err != nil {
 				log.Printf("error sending message to room member: %v", err)
 				continue
 			}

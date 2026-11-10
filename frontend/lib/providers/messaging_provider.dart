@@ -35,21 +35,25 @@ class MessagingProvider extends ChangeNotifier {
   void _onUserSessionChanged() {
     final currentUserId = userSession.userId;
 
-    // 检测用户 ID 是否变化
+    // 检测用户 ID 是否变化（含退出登录 → null）
     if (currentUserId != _lastUserId) {
       _lastUserId = currentUserId;
 
-      // 清空当前数据
+      // 先断旧连接，避免退出后仍带着旧 token 收发
+      _socketService.disconnect();
+      _userCache.clear();
+      _fetchingUserIds.clear();
       _following = [];
       _followers = [];
       _chatRooms = [];
       _messages.clear();
       notifyListeners();
 
-      // 如果有新用户，重新加载数据
+      // 如果有新用户，重新加载并建连
       final uid = currentUid;
       if (uid != null) {
         loadRelationData(uid: uid);
+        connectGlobal();
       }
     }
   }

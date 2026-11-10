@@ -2,12 +2,18 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 
+import '../repositories/auth_repository.dart';
+
 /// 统一的错误处理工具类
 ///
 /// 将各种异常转换为用户友好的错误消息
 class ErrorHandler {
   /// 将异常转换为用户友好的错误消息
   static String getErrorMessage(dynamic error, {String? defaultMessage}) {
+    if (error is AuthException) {
+      return AuthException.friendlyMessage(error.message);
+    }
+
     // DioException 处理
     if (error is DioException) {
       return _handleDioError(error);

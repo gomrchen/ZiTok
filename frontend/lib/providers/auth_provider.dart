@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import '../repositories/auth_repository.dart';
 import '../models/user_models.dart';
 import '../services/user_session.dart';
+import '../utils/error_handler.dart';
 
 /// 认证 Provider：维护登录态与用户数据
 class AuthProvider extends ChangeNotifier {
@@ -18,19 +19,31 @@ class AuthProvider extends ChangeNotifier {
   });
 
   bool get isAuthenticated => userSession.isLoggedIn;
+
   /// 是否可以尝试自动登录（有userId和refreshToken）
-  ///
-  /// 用于路由守卫判断是否允许进入主界面
   bool get canAttemptAutoLogin => userSession.canAttemptAutoLogin;
   bool get isRegistered => _registeredUser != null;
   bool get loading => _loading;
   String? get error => _error;
 
-  /// 当前用户信息
   User? get user => userSession.user;
-
-  /// 当前用户 ID（推荐通过 UserSession 获取）
   String? get userId => userSession.userId;
+
+  void setLocalError(String? message) {
+    _error = message;
+    notifyListeners();
+  }
+
+  void clearError() {
+    if (_error == null) return;
+    _error = null;
+    notifyListeners();
+  }
+
+  String _friendly(dynamic e) {
+    if (e is AuthException) return AuthException.friendlyMessage(e.message);
+    return ErrorHandler.getErrorMessage(e, defaultMessage: '操作失败，请稍后重试');
+  }
 
   Future<void> login(String username, String password) async {
     _loading = true;
@@ -41,10 +54,9 @@ class AuthProvider extends ChangeNotifier {
         username: username,
         password: password,
       );
-      // 用户信息已在 authRepository.login 中通过 UserSession 设置
       userSession.updateUser(user);
     } catch (e) {
-      _error = e.toString();
+      _error = _friendly(e);
     } finally {
       _loading = false;
       notifyListeners();
@@ -68,7 +80,7 @@ class AuthProvider extends ChangeNotifier {
         verificationCode: verificationCode,
       );
     } catch (e) {
-      _error = e.toString();
+      _error = _friendly(e);
     } finally {
       _loading = false;
       notifyListeners();
@@ -76,7 +88,10 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> changePassword(
-      String email, String code, String newPassword) async {
+    String email,
+    String code,
+    String newPassword,
+  ) async {
     _loading = true;
     _error = null;
     notifyListeners();
@@ -87,7 +102,7 @@ class AuthProvider extends ChangeNotifier {
         newPassword: newPassword,
       );
     } catch (e) {
-      _error = e.toString();
+      _error = _friendly(e);
       rethrow;
     } finally {
       _loading = false;
@@ -102,7 +117,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       await authRepository.sendVerificationCode(email: email);
     } catch (e) {
-      _error = e.toString();
+      _error = _friendly(e);
       rethrow;
     } finally {
       _loading = false;
@@ -116,7 +131,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       await authRepository.logout();
     } catch (e) {
-      _error = e.toString();
+      _error = _friendly(e);
     } finally {
       _loading = false;
       notifyListeners();

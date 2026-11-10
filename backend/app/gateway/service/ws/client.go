@@ -35,19 +35,17 @@ func (c *Client) WritePump() {
 	}()
 
 	for range ticker.C {
-		if err := c.Conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
-			log.Printf("error setting write deadline: %v", err)
-			return
-		}
-		if err := c.Conn.WriteMessage(websocket.PingMessage, nil); err != nil {
+		if err := c.SendMessage(websocket.PingMessage, nil); err != nil {
 			log.Printf("error writing ping message: %v", err)
 			return
 		}
 	}
 }
 
-// SendMessage 发送消息给客户端
+// SendMessage 串行化写连接，避免 concurrent write panic
 func (c *Client) SendMessage(messageType int, data []byte) error {
+	c.writeMu.Lock()
+	defer c.writeMu.Unlock()
 	if err := c.Conn.SetWriteDeadline(time.Now().Add(writeWait)); err != nil {
 		log.Printf("error setting write deadline: %v", err)
 		return err

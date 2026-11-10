@@ -2,20 +2,28 @@ import 'package:flutter/material.dart';
 
 import '../home/shell_surface.dart';
 
-/// 设置体系共用视觉件：与 ShellSurface 纸色画布对齐
+/// 设置体系共用视觉件：跟随 Theme（含夜晚模式）
 class SettingsChrome {
   static Widget page({
     required String title,
     required Widget body,
     List<Widget>? actions,
   }) {
-    return AnnotatedRegion(
-      value: ShellSurface.systemUi,
-      child: Scaffold(
-        backgroundColor: ShellSurface.canvas,
-        appBar: ShellSurface.appBar(title: title, actions: actions),
-        body: body,
-      ),
+    return Builder(
+      builder: (context) {
+        return AnnotatedRegion(
+          value: ShellSurface.systemUiOf(context),
+          child: Scaffold(
+            backgroundColor: ShellSurface.canvasOf(context),
+            appBar: ShellSurface.appBar(
+              title: title,
+              context: context,
+              actions: actions,
+            ),
+            body: body,
+          ),
+        );
+      },
     );
   }
 
@@ -24,54 +32,63 @@ class SettingsChrome {
     String? subtitle,
     required List<Widget> children,
   }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(title, style: ShellSurface.sectionTitle.copyWith(fontSize: 15)),
-              if (subtitle != null) ...[
-                const SizedBox(height: 4),
-                Text(subtitle, style: ShellSurface.caption),
-              ],
-            ],
-          ),
-        ),
-        DecoratedBox(
-          decoration: BoxDecoration(
-            color: ShellSurface.card,
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(color: ShellSurface.line),
-            boxShadow: [
-              BoxShadow(
-                color: ShellSurface.ink.withValues(alpha: 0.04),
-                blurRadius: 16,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(18),
-            child: Column(
-              children: [
-                for (var i = 0; i < children.length; i++) ...[
-                  if (i > 0)
-                    Divider(
-                      height: 1,
-                      thickness: 1,
-                      indent: 62,
-                      color: ShellSurface.line,
-                    ),
-                  children[i],
+    return Builder(
+      builder: (context) {
+        final card = ShellSurface.cardOf(context);
+        final line = ShellSurface.lineOf(context);
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(4, 0, 4, 10),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: ShellSurface.sectionTitleOf(context).copyWith(fontSize: 15),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 4),
+                    Text(subtitle, style: ShellSurface.captionOf(context)),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
-        ),
-      ],
+            DecoratedBox(
+              decoration: BoxDecoration(
+                color: card,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: line),
+                boxShadow: [
+                  BoxShadow(
+                    color: ShellSurface.inkOf(context).withValues(alpha: 0.04),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(18),
+                child: Column(
+                  children: [
+                    for (var i = 0; i < children.length; i++) ...[
+                      if (i > 0)
+                        Divider(
+                          height: 1,
+                          thickness: 1,
+                          indent: 62,
+                          color: line,
+                        ),
+                      children[i],
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 
@@ -101,43 +118,47 @@ class SettingsChrome {
     Color? titleColor,
     bool showChevron = true,
   }) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
-          child: Row(
-            children: [
-              iconBubble(icon: icon, tint: tint, iconColor: iconColor),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: ShellSurface.bodyStrong.copyWith(
-                        color: titleColor ?? ShellSurface.ink,
-                        fontSize: 15,
-                      ),
+    return Builder(
+      builder: (context) {
+        return Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(14, 13, 12, 13),
+              child: Row(
+                children: [
+                  iconBubble(icon: icon, tint: tint, iconColor: iconColor),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          title,
+                          style: ShellSurface.bodyStrongOf(context).copyWith(
+                            color: titleColor ?? ShellSurface.inkOf(context),
+                            fontSize: 15,
+                          ),
+                        ),
+                        if (subtitle != null) ...[
+                          const SizedBox(height: 3),
+                          Text(subtitle, style: ShellSurface.captionOf(context)),
+                        ],
+                      ],
                     ),
-                    if (subtitle != null) ...[
-                      const SizedBox(height: 3),
-                      Text(subtitle, style: ShellSurface.caption),
-                    ],
-                  ],
-                ),
+                  ),
+                  if (showChevron)
+                    Icon(
+                      Icons.chevron_right_rounded,
+                      color: ShellSurface.inkOf(context).withValues(alpha: 0.28),
+                    ),
+                ],
               ),
-              if (showChevron)
-                Icon(
-                  Icons.chevron_right_rounded,
-                  color: ShellSurface.ink.withValues(alpha: 0.28),
-                ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -150,56 +171,65 @@ class SettingsChrome {
     required bool value,
     required ValueChanged<bool> onChanged,
   }) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
-      child: Row(
-        children: [
-          iconBubble(icon: icon, tint: tint, iconColor: iconColor),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title, style: ShellSurface.bodyStrong.copyWith(fontSize: 15)),
-                if (subtitle != null) ...[
-                  const SizedBox(height: 3),
-                  Text(subtitle, style: ShellSurface.caption),
-                ],
-              ],
-            ),
+    return Builder(
+      builder: (context) {
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(14, 10, 8, 10),
+          child: Row(
+            children: [
+              iconBubble(icon: icon, tint: tint, iconColor: iconColor),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      title,
+                      style: ShellSurface.bodyStrongOf(context).copyWith(fontSize: 15),
+                    ),
+                    if (subtitle != null) ...[
+                      const SizedBox(height: 3),
+                      Text(subtitle, style: ShellSurface.captionOf(context)),
+                    ],
+                  ],
+                ),
+              ),
+              Switch.adaptive(
+                value: value,
+                activeThumbColor: Colors.white,
+                activeTrackColor: ShellSurface.accent,
+                onChanged: onChanged,
+              ),
+            ],
           ),
-          Switch.adaptive(
-            value: value,
-            activeThumbColor: Colors.white,
-            activeTrackColor: ShellSurface.accent,
-            onChanged: onChanged,
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   static InputDecoration fieldDecoration({
+    required BuildContext context,
     required String label,
     String? hint,
     Widget? suffix,
   }) {
+    final ink = ShellSurface.inkOf(context);
     return InputDecoration(
       labelText: label,
       hintText: hint,
       suffixIcon: suffix,
       filled: true,
-      fillColor: ShellSurface.card,
-      labelStyle: TextStyle(color: ShellSurface.ink.withValues(alpha: 0.55)),
-      hintStyle: TextStyle(color: ShellSurface.ink.withValues(alpha: 0.35)),
+      fillColor: ShellSurface.cardOf(context),
+      labelStyle: TextStyle(color: ink.withValues(alpha: 0.55)),
+      hintStyle: TextStyle(color: ink.withValues(alpha: 0.35)),
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: ShellSurface.line),
+        borderSide: BorderSide(color: ShellSurface.lineOf(context)),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: const BorderSide(color: ShellSurface.line),
+        borderSide: BorderSide(color: ShellSurface.lineOf(context)),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
@@ -216,11 +246,32 @@ class SettingsChrome {
         textStyle: const TextStyle(fontWeight: FontWeight.w800, fontSize: 15),
       );
 
-  static ButtonStyle get ghostButton => OutlinedButton.styleFrom(
-        foregroundColor: ShellSurface.ink,
+  static ButtonStyle ghostButtonOf(BuildContext context) => OutlinedButton.styleFrom(
+        foregroundColor: ShellSurface.inkOf(context),
         minimumSize: const Size.fromHeight(50),
-        side: const BorderSide(color: ShellSurface.line),
+        side: BorderSide(color: ShellSurface.lineOf(context)),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
       );
+
+  /// 设置体系弹窗：跟随夜晚模式，标题/正文可读
+  static AlertDialog dialog({
+    required BuildContext context,
+    required String title,
+    Widget? content,
+    List<Widget>? actions,
+  }) {
+    final ink = ShellSurface.inkOf(context);
+    return AlertDialog(
+      backgroundColor: ShellSurface.cardOf(context),
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      title: Text(
+        title,
+        style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 17),
+      ),
+      content: content,
+      actions: actions,
+    );
+  }
 }
