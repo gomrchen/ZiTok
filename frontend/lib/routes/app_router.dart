@@ -21,6 +21,7 @@ import '../views/profile/visitor_profile_page.dart';
 import '../views/drama/drama_detail_page.dart';
 import '../views/drama/wallet_page.dart';
 import '../views/drama/theater_page.dart';
+import '../views/drama/watching_page.dart';
 
 class AppRouter {
   static GoRouter buildRouter(AuthProvider auth) {
@@ -70,6 +71,7 @@ class AppRouter {
         ),
         GoRoute(path: '/wallet', builder: _builder((_) => const WalletPage())),
         GoRoute(path: '/theater', builder: _builder((_) => const TheaterPage())),
+        GoRoute(path: '/watching', builder: _builder((_) => const WatchingPage())),
         // 旧 /video /note /create 路由统一回首页，避免深链崩溃
         GoRoute(path: '/video/:id', redirect: (_, __) => '/home'),
         GoRoute(path: '/video/list', redirect: (_, __) => '/theater'),

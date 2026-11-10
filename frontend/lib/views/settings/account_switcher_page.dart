@@ -5,7 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/user_session.dart';
 import '../../utils/error_handler.dart';
-import '../../theme/theme_tokens.dart';
+import '../home/shell_surface.dart';
+import 'settings_chrome.dart';
 import 'dart:convert';
 import 'dart:developer';
 
@@ -119,17 +120,19 @@ class _AccountSwitcherPageState extends State<AccountSwitcherPage> {
     final result = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('删除账号'),
-        content: const Text('确定要删除这个账号吗？'),
+        backgroundColor: ShellSurface.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('删除账号', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: Text('确定要删除这个账号吗？', style: ShellSurface.caption.copyWith(fontSize: 14)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
+            child: Text('取消', style: TextStyle(color: ShellSurface.ink.withValues(alpha: 0.55))),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('删除'),
+            style: TextButton.styleFrom(foregroundColor: ShellSurface.coral),
+            child: const Text('删除', style: TextStyle(fontWeight: FontWeight.w800)),
           ),
         ],
       ),
@@ -145,61 +148,96 @@ class _AccountSwitcherPageState extends State<AccountSwitcherPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('切换账号')),
+    return SettingsChrome.page(
+      title: '切换账号',
+      actions: [
+        IconButton(
+          onPressed: _addAccount,
+          tooltip: '添加账号',
+          icon: const Icon(Icons.add_rounded),
+        ),
+      ],
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: CircularProgressIndicator(color: ShellSurface.coral))
           : _accounts.isEmpty
-          ? Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text('暂无保存的账号'),
-                  const SizedBox(height: Spacing.md),
-                  ElevatedButton(
-                    onPressed: _addAccount,
-                    child: const Text('添加账号'),
-                  ),
-                ],
-              ),
-            )
-          : ListView.builder(
-              padding: const EdgeInsets.all(Spacing.md),
-              itemCount: _accounts.length,
-              itemBuilder: (context, index) {
-                final account = _accounts[index];
-                return Card(
-                  margin: const EdgeInsets.only(bottom: Spacing.md),
-                  child: ListTile(
-                    title: Text(account.username),
-                    subtitle: Text('密码: ${_maskPassword(account.password)}'),
-                    // 切换账号功能已移至右侧按钮
-                    trailing: Row(
+              ? Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(ShellSurface.pagePad),
+                    child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        IconButton(
-                          icon: const Icon(Icons.switch_account_outlined),
-                          onPressed: () => _switchToAccount(context, account),
-                          color: Colors.blue,
-                          tooltip: '切换到此账号',
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.delete_outline),
-                          onPressed: () => _deleteAccount(account.id),
-                          color: Colors.red,
-                          tooltip: '删除账号',
+                        Icon(Icons.switch_account_rounded, size: 42, color: ShellSurface.ink.withValues(alpha: 0.28)),
+                        const SizedBox(height: 12),
+                        Text('暂无保存的账号', style: ShellSurface.bodyStrong),
+                        const SizedBox(height: 6),
+                        Text('添加后可一键切换登录', style: ShellSurface.caption),
+                        const SizedBox(height: 18),
+                        FilledButton(
+                          onPressed: _addAccount,
+                          style: SettingsChrome.primaryButton.copyWith(
+                            minimumSize: const WidgetStatePropertyAll(Size(160, 46)),
+                          ),
+                          child: const Text('添加账号'),
                         ),
                       ],
                     ),
                   ),
-                );
-              },
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _addAccount,
-        tooltip: '添加账号',
-        child: const Icon(Icons.add),
-      ),
+                )
+              : ListView.separated(
+                  padding: const EdgeInsets.fromLTRB(
+                    ShellSurface.pagePad,
+                    8,
+                    ShellSurface.pagePad,
+                    28,
+                  ),
+                  itemCount: _accounts.length,
+                  separatorBuilder: (_, __) => const SizedBox(height: 10),
+                  itemBuilder: (context, index) {
+                    final account = _accounts[index];
+                    return Container(
+                      padding: const EdgeInsets.fromLTRB(14, 12, 8, 12),
+                      decoration: BoxDecoration(
+                        color: ShellSurface.card,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: ShellSurface.line),
+                      ),
+                      child: Row(
+                        children: [
+                          Container(
+                            width: 44,
+                            height: 44,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              color: const Color(0xFFE8F0FF),
+                            ),
+                            child: const Icon(Icons.person_rounded, color: Color(0xFF3B6FD9)),
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(account.username, style: ShellSurface.bodyStrong.copyWith(fontSize: 15)),
+                                const SizedBox(height: 3),
+                                Text('密码 ${_maskPassword(account.password)}', style: ShellSurface.caption),
+                              ],
+                            ),
+                          ),
+                          IconButton(
+                            tooltip: '切换到此账号',
+                            onPressed: () => _switchToAccount(context, account),
+                            icon: const Icon(Icons.login_rounded, color: ShellSurface.accent),
+                          ),
+                          IconButton(
+                            tooltip: '删除账号',
+                            onPressed: () => _deleteAccount(account.id),
+                            icon: const Icon(Icons.delete_outline_rounded, color: ShellSurface.coral),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
     );
   }
 
@@ -227,11 +265,16 @@ class _AccountSwitcherPageState extends State<AccountSwitcherPage> {
       builder: (dialogContext) => const PopScope(
         canPop: false,
         child: AlertDialog(
+          backgroundColor: ShellSurface.card,
           content: Row(
             children: [
-              CircularProgressIndicator(),
-              SizedBox(width: Spacing.md),
-              Text('正在切换账号...'),
+              SizedBox(
+                width: 22,
+                height: 22,
+                child: CircularProgressIndicator(strokeWidth: 2.4, color: ShellSurface.coral),
+              ),
+              SizedBox(width: 14),
+              Text('正在切换账号...', style: TextStyle(fontWeight: FontWeight.w700)),
             ],
           ),
         ),
@@ -314,20 +357,22 @@ class _AddAccountDialogState extends State<_AddAccountDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('添加账号'),
+      backgroundColor: ShellSurface.card,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      title: const Text('添加账号', style: TextStyle(fontWeight: FontWeight.w800)),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           TextField(
             controller: _usernameController,
-            decoration: const InputDecoration(labelText: '用户名'),
+            decoration: SettingsChrome.fieldDecoration(label: '用户名'),
             autofocus: true,
             textInputAction: TextInputAction.next,
           ),
-          const SizedBox(height: Spacing.md),
+          const SizedBox(height: 12),
           TextField(
             controller: _passwordController,
-            decoration: const InputDecoration(labelText: '密码'),
+            decoration: SettingsChrome.fieldDecoration(label: '密码'),
             obscureText: true,
             textInputAction: TextInputAction.done,
             onSubmitted: (_) => _submit(),
@@ -337,11 +382,12 @@ class _AddAccountDialogState extends State<_AddAccountDialog> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context, null),
-          child: const Text('取消'),
+          child: Text('取消', style: TextStyle(color: ShellSurface.ink.withValues(alpha: 0.55))),
         ),
         TextButton(
           onPressed: _submit,
-          child: const Text('确定'),
+          style: TextButton.styleFrom(foregroundColor: ShellSurface.coral),
+          child: const Text('确定', style: TextStyle(fontWeight: FontWeight.w800)),
         ),
       ],
     );

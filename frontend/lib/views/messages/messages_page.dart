@@ -8,6 +8,7 @@ import '../chat/chat_page.dart';
 import '../chat/friend_search_page.dart';
 import '../chat/global_search_page.dart'; // 全网搜索（添加好友）
 import '../chat/create_group_page.dart'; // 【新增】新建群聊页面
+import '../home/shell_surface.dart';
 
 /// 消息列表筛选类型
 enum MessageFilter {
@@ -89,32 +90,34 @@ class _MessagesPageState extends State<MessagesPage> {
     // 根据筛选器获取对应的会话列表
     final List<Conversation> filteredConversations = _getFilteredConversations(mp);
 
-    return Scaffold(
-      appBar: AppBar(
-        leading: IconButton(
-          icon: const Icon(Icons.filter_list),
-          tooltip: '筛选',
-          onPressed: () => _showFilterMenu(context, mp),
+    return AnnotatedRegion(
+      value: ShellSurface.systemUi,
+      child: Scaffold(
+        backgroundColor: ShellSurface.canvas,
+        appBar: ShellSurface.appBar(
+          title: _getFilterTitle(),
+          actions: [
+            IconButton(
+              tooltip: '筛选',
+              icon: const Icon(Icons.filter_list_rounded),
+              onPressed: () => _showFilterMenu(context, mp),
+            ),
+            IconButton(
+              tooltip: '搜索',
+              icon: const Icon(Icons.search_rounded),
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const FriendSearchPage()),
+              ),
+            ),
+            IconButton(
+              tooltip: '添加',
+              icon: const Icon(Icons.add_circle_outline_rounded),
+              onPressed: () => _showAddMenu(context),
+            ),
+          ],
         ),
-        centerTitle: true,
-        title: Text(_getFilterTitle()),
-        actions: [
-          // 🔍 搜索按钮：跳转到【本地搜索】（搜已关注好友/聊天记录）
-          IconButton(
-            tooltip: '搜索',
-            icon: const Icon(Icons.search),
-            onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FriendSearchPage())),
-          ),
-
-          // ➕ 添加按钮：弹出菜单
-          IconButton(
-            tooltip: '添加',
-            icon: const Icon(Icons.add_circle_outline),
-            onPressed: () => _showAddMenu(context),
-          ),
-        ],
+        body: _buildBody(mp, filteredConversations),
       ),
-      body: _buildBody(mp, filteredConversations),
     );
   }
 
@@ -171,13 +174,11 @@ class _MessagesPageState extends State<MessagesPage> {
 
   /// 显示筛选菜单
   void _showFilterMenu(BuildContext context, MessagingProvider mp) {
-    final cs = Theme.of(context).colorScheme;
-
     showModalBottomSheet(
       context: context,
-      backgroundColor: cs.surface,
+      backgroundColor: ShellSurface.card,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
       builder: (ctx) {
         return SafeArea(
@@ -186,17 +187,14 @@ class _MessagesPageState extends State<MessagesPage> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 标题
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
                     '筛选消息',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w600,
-                        ),
+                    style: ShellSurface.sectionTitle,
                   ),
                 ),
-                const Divider(),
+                const Divider(height: 1, color: ShellSurface.line),
                 _buildFilterOption(
                   context: ctx,
                   filter: MessageFilter.all,

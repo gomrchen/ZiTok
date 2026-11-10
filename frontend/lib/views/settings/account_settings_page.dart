@@ -1,61 +1,119 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import '../../theme/theme_tokens.dart';
+
 import '../../providers/auth_provider.dart';
+import '../home/shell_surface.dart';
+import 'settings_chrome.dart';
 
 class AccountSettingsPage extends StatelessWidget {
   const AccountSettingsPage({super.key});
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('账户设置')),
+    return SettingsChrome.page(
+      title: '账户设置',
       body: ListView(
-        padding: const EdgeInsets.all(Spacing.md),
+        padding: const EdgeInsets.fromLTRB(
+          ShellSurface.pagePad,
+          12,
+          ShellSurface.pagePad,
+          28,
+        ),
         children: [
-          const SizedBox(height: Spacing.md),
-          _Section(
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(18),
+              color: ShellSurface.card,
+              border: Border.all(color: ShellSurface.line),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 54,
+                  height: 54,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: const LinearGradient(
+                      colors: [ShellSurface.accent, Color(0xFF0F9B8A)],
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: ShellSurface.accent.withValues(alpha: 0.28),
+                        blurRadius: 12,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: const Center(
+                    child: Text('Z', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w900, fontSize: 22)),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('当前账号', style: ShellSurface.caption),
+                      const SizedBox(height: 4),
+                      Text('ZiTok 演示账号', style: ShellSurface.bodyStrong.copyWith(fontSize: 16)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: ShellSurface.sectionGap),
+          SettingsChrome.section(
             title: '账户管理',
+            subtitle: '切换或退出当前登录态',
             children: [
-              ListTile(
-                leading: const Icon(Icons.switch_account),
-                title: const Text('切换账号'),
-                trailing: const Icon(Icons.chevron_right),
+              SettingsChrome.navTile(
+                icon: Icons.switch_account_rounded,
+                tint: const Color(0xFFE8F0FF),
+                iconColor: const Color(0xFF3B6FD9),
+                title: '切换账号',
+                subtitle: '在已保存账号间快速切换',
                 onTap: () => context.push('/settings/account-switcher'),
               ),
-              ListTile(
-                leading: const Icon(Icons.logout),
-                title: const Text('退出当前账号'),
-                textColor: Colors.red,
+              SettingsChrome.navTile(
+                icon: Icons.logout_rounded,
+                tint: const Color(0xFFFFE0D8),
+                iconColor: ShellSurface.coral,
+                title: '退出当前账号',
+                subtitle: '清除本机登录态',
+                titleColor: ShellSurface.coral,
+                showChevron: false,
                 onTap: () => _confirmLogout(context),
               ),
             ],
           ),
-
         ],
       ),
     );
   }
 
   void _confirmLogout(BuildContext context) {
-    showDialog(
+    showDialog<void>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('退出登录'),
-        content: const Text('确定要退出当前账号吗？'),
+      builder: (ctx) => AlertDialog(
+        backgroundColor: ShellSurface.card,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+        title: const Text('退出登录', style: TextStyle(fontWeight: FontWeight.w800)),
+        content: Text('确定要退出当前账号吗？', style: ShellSurface.caption.copyWith(fontSize: 14)),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('取消', style: TextStyle(color: ShellSurface.ink.withValues(alpha: 0.55))),
           ),
           TextButton(
             onPressed: () {
-              Navigator.pop(context);
+              Navigator.pop(ctx);
               _logout(context);
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('确定'),
+            style: TextButton.styleFrom(foregroundColor: ShellSurface.coral),
+            child: const Text('确定', style: TextStyle(fontWeight: FontWeight.w800)),
           ),
         ],
       ),
@@ -64,59 +122,21 @@ class AccountSettingsPage extends StatelessWidget {
 
   void _logout(BuildContext context) {
     final authProvider = context.read<AuthProvider>();
-    showDialog(
+    showDialog<void>(
       context: context,
       barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
+      builder: (_) => const Center(child: CircularProgressIndicator(color: ShellSurface.coral)),
     );
 
-    // 执行登出操作
-    authProvider
-        .logout()
-        .then((_) {
-          if (!context.mounted) return;
-          // 清除所有路由栈并跳转到欢迎界面
-          context.go('/welcome');
-        })
-        .catchError((error) {
-          if (!context.mounted) return;
-          Navigator.pop(context); // 关闭加载对话框
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(SnackBar(content: Text('登出失败: $error')));
-        });
-  }
-}
-
-class _Section extends StatelessWidget {
-  final String title;
-  final List<Widget> children;
-  const _Section({required this.title, required this.children});
-  @override
-  Widget build(BuildContext context) {
-    return Semantics(
-      label: '$title 区块',
-      child: Card(
-        elevation: 0,
-        clipBehavior: Clip.hardEdge,
-        child: Column(
-          children: [
-            Container(
-              alignment: Alignment.centerLeft,
-              padding: const EdgeInsets.symmetric(
-                horizontal: Spacing.md,
-                vertical: Spacing.sm,
-              ),
-              child: Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium,
-              ),
-            ),
-            const Divider(height: 1),
-            ...children,
-          ],
-        ),
-      ),
-    );
+    authProvider.logout().then((_) {
+      if (!context.mounted) return;
+      context.go('/welcome');
+    }).catchError((error) {
+      if (!context.mounted) return;
+      Navigator.pop(context);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('登出失败: $error'), behavior: SnackBarBehavior.floating),
+      );
+    });
   }
 }

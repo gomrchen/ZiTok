@@ -9,6 +9,7 @@ import '../../models/drama_models.dart';
 import '../../providers/drama_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../utils/url_utils.dart';
+import '../home/shell_surface.dart';
 
 /// 短剧个人中心 — 夜戏光影：墨色氛围头图 + 金币条 + 色块入口 + 横滑海报
 class ProfilePage extends StatefulWidget {
@@ -19,10 +20,10 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStateMixin {
-  static const _ink = Color(0xFF12151C);
+  static const _ink = ShellSurface.ink;
   static const _inkSoft = Color(0xFF1C212B);
-  static const _paper = Color(0xFFF4F1EC);
-  static const _coral = Color(0xFFFF6B4A);
+  static const _paper = ShellSurface.canvas;
+  static const _coral = ShellSurface.coral;
 
   late final AnimationController _enter;
 
@@ -138,7 +139,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                     favorites: favs.length,
                     onEdit: () => context.push('/profile/edit'),
                     onWallet: () => context.push('/wallet'),
-                    onWatching: () => context.go('/home?tab=2'),
+                    onWatching: () => context.push('/watching'),
                   ),
                 ),
               ),
@@ -150,8 +151,8 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                     child: _QuickGrid(
                       continueCount: continues.length,
                       onWallet: () => context.push('/wallet'),
-                      onWatching: () => context.go('/home?tab=2'),
-                      onMessages: () => context.push('/messages'),
+                      onWatching: () => context.push('/watching'),
+                      onMessages: () => context.go('/home?tab=2'),
                       onSettings: () => context.push('/settings'),
                     ),
                   ),
@@ -163,7 +164,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                     opacity: _fade(0.36, 0.8),
                     child: _ContinueRail(
                       items: continues.take(8).toList(),
-                      onAll: () => context.go('/home?tab=2'),
+                      onAll: () => context.push('/watching'),
                       onTap: (c) {
                         if (c.drama != null) context.push('/drama/${c.drama!.id}');
                       },
@@ -189,7 +190,7 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                         const Spacer(),
                         if (favs.isNotEmpty)
                           GestureDetector(
-                            onTap: () => context.go('/home?tab=2'),
+                            onTap: () => context.push('/watching'),
                             behavior: HitTestBehavior.opaque,
                             child: const Padding(
                               padding: EdgeInsets.symmetric(vertical: 4),
@@ -301,7 +302,7 @@ class _HeroBlock extends StatelessWidget {
                     Colors.black.withValues(alpha: 0.28),
                     Colors.black.withValues(alpha: 0.42),
                     const Color(0xFF0E1117).withValues(alpha: 0.78),
-                    const Color(0xFFF4F1EC),
+                    ShellSurface.canvas,
                   ],
                   stops: const [0.0, 0.38, 0.78, 1.0],
                 ),
