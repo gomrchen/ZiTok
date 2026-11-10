@@ -10,8 +10,10 @@ struct CommentListResponse {
 }
 
 // 点赞请求
+// 短剧语义：video_id 字段复用为 episode_id（目标集）
 struct LikeRequest {
-    1: required i64 video_id         // 视频ID
+    1: required i64 video_id         // episode_id（历史字段名 video_id）
+    2: optional i64 episode_id       // 显式 episode_id，优先于 video_id
 }
 
 // 点赞响应
@@ -21,9 +23,10 @@ struct LikeResponse {
 
 // 获取点赞列表请求
 struct GetLikesRequest {
-    1: required i64 video_id         // 视频ID
+    1: required i64 video_id         // episode_id（历史字段名）
     2: required i32 page             // 页码
     3: required i32 size             // 每页大小
+    4: optional i64 episode_id       // 显式 episode_id
 }
 
 // 获取点赞列表响应
@@ -35,9 +38,10 @@ struct GetLikesResponse {
 
 // 发表评论请求
 struct CommentRequest {
-    1: required i64 video_id         // 视频ID
+    1: required i64 video_id         // episode_id（历史字段名）
     2: required string content       // 评论内容
     3: optional i64 parent_id        // 父评论ID
+    4: optional i64 episode_id       // 显式 episode_id，优先于 video_id
 }
 
 // 发表评论响应
@@ -48,10 +52,11 @@ struct CommentResponse {
 
 // 获取评论列表请求
 struct GetCommentsRequest {
-    1: required i64 video_id         // 视频ID
+    1: required i64 video_id         // episode_id（历史字段名）
     2: required i32 page             // 页码
     3: required i32 size             // 每页大小
     4: optional i64 comment_id       // 评论ID（可选，用于筛选特定评论）
+    5: optional i64 episode_id       // 显式 episode_id
 }
 
 // 获取评论列表响应

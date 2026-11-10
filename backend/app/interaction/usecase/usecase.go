@@ -12,7 +12,7 @@ type InteractionUseCase interface {
 	Like(ctx context.Context, userID int64, videoID int64) (bool, error)
 	GetLikes(ctx context.Context, videoID int64, page int32, size int32) ([]*model.Like, error)
 	Comment(ctx context.Context, userID int64, videoID int64, content string, parentID int64) (bool, error)
-	GetComments(ctx context.Context, videoID int64, page int32, size int32, commentID *int64) ([]*model.Comment, error)
+	GetComments(ctx context.Context, videoID int64, page int32, size int32, commentID *int64) ([]*model.Comment, int64, error)
 	DeleteComment(ctx context.Context, userID int64, commentID int64) (bool, error)
 	LikeComment(ctx context.Context, userID int64, commentID int64) (bool, error)
 }

@@ -28,6 +28,8 @@ import 'services/comment_service.dart';
 import 'providers/comment_provider.dart';
 import 'repositories/relation_repository.dart';
 import 'services/relation_service.dart';
+import 'services/drama_service.dart';
+import 'providers/drama_provider.dart';
 
 class AppBootstrap {
   static late SharedPreferences prefs;
@@ -38,7 +40,6 @@ class AppBootstrap {
     await Hive.initFlutter();
     await Hive.openBox('user_box');
     await Hive.openBox('feed_cache_box');
-    await Hive.openBox('notes_box');
     await Hive.openBox('messages_box');
 
     prefs = await SharedPreferences.getInstance();
@@ -289,6 +290,12 @@ class ZitokApp extends StatelessWidget {
             ),
           ),
         ),
+        ChangeNotifierProvider<DramaProvider>(
+          create: (_) => DramaProvider(
+            dramaService: DramaService(AppBootstrap.apiClient.dio),
+            commerceService: CommerceService(AppBootstrap.apiClient.dio),
+          ),
+        ),
       ],
       child: Builder(
         builder: (context) {
@@ -297,7 +304,7 @@ class ZitokApp extends StatelessWidget {
           final theme = context.watch<ThemeProvider>().theme;
 
           return MaterialApp.router(
-            title: '知音App',
+            title: 'ZiTok 短剧',
             theme: theme,
             routerConfig: router,
           );

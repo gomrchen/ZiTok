@@ -7,6 +7,8 @@ import (
 	_ "net/http/pprof"
 
 	"github.com/cloudwego/hertz/pkg/app/server"
+	"github.com/yxrxy/videoHub/app/gateway/commerce"
+	"github.com/yxrxy/videoHub/app/gateway/drama"
 	"github.com/yxrxy/videoHub/app/gateway/mw"
 	"github.com/yxrxy/videoHub/app/gateway/router"
 	"github.com/yxrxy/videoHub/app/gateway/rpc"
@@ -49,8 +51,22 @@ func main() {
 
 	router.RegisterWebSocket(h)
 
-	router.GeneratedRegister(h)      // 先注册 API 路由
-  	router.RegisterStaticRoutes(h)
+	router.GeneratedRegister(h)
+	router.RegisterDramaRoutes(h)
+	router.RegisterCommerceRoutes(h)
+	router.RegisterAdminRoutes(h)
+	router.RegisterEpisodeInteractRoutes(h)
+	router.RegisterNotesGone(h)
+	router.RegisterStaticRoutes(h)
+
+	go func() {
+		if err := drama.EnsureSeed(); err != nil {
+			log.Printf("[gateway] drama seed: %v", err)
+		}
+		if err := commerce.EnsureAdminSeed(); err != nil {
+			log.Printf("[gateway] admin seed: %v", err)
+		}
+	}()
 
 	h.Spin()
 }

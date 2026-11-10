@@ -1,23 +1,16 @@
-import 'dart:math' as math;
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
-import 'package:hive/hive.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import '../../app.dart';
-import '../../models/video.dart';
-import '../../models/notes_models.dart';
-import '../../providers/auth_provider.dart';
-import '../../providers/video_provider.dart';
-import '../../services/user_service.dart';
-import '../../services/notes_service.dart';
-import '../../repositories/notes_repository.dart';
-import '../../theme/theme_tokens.dart';
+
+import '../../models/drama_models.dart';
+import '../../providers/drama_provider.dart';
 import '../../providers/profile_provider.dart';
-import '../../providers/theme_provider.dart';
-import '../../models/user_models.dart';
 import '../../utils/url_utils.dart';
 
+/// 短剧个人中心 — 夜戏光影：墨色氛围头图 + 金币条 + 色块入口 + 横滑海报
 class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
 
@@ -25,213 +18,80 @@ class ProfilePage extends StatefulWidget {
   State<ProfilePage> createState() => _ProfilePageState();
 }
 
-class _ProfilePageState extends State<ProfilePage> {
-  bool _initialLoadComplete = false;
-  int _videosCount = 0; // 添加视频计数状态
-  bool _loadingVideosCount = false; // 添加视频数量加载状态
-  bool _isRefreshing = false; // 下拉刷新状态
+class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStateMixin {
+  static const _ink = Color(0xFF12151C);
+  static const _inkSoft = Color(0xFF1C212B);
+  static const _paper = Color(0xFFF4F1EC);
+  static const _coral = Color(0xFFFF6B4A);
 
-  // GlobalKey 用于访问子 Tab 的刷新方法
-  final GlobalKey<_FavoritesListState> _favoritesKey = GlobalKey();
-  final GlobalKey<_NotesTabState> _notesKey = GlobalKey();
-  final GlobalKey<_VideosTabState> _videosKey = GlobalKey();
+  late final AnimationController _enter;
 
   @override
   void initState() {
     super.initState();
-
+    _enter = AnimationController(vsync: this, duration: const Duration(milliseconds: 720))..forward();
     WidgetsBinding.instance.addPostFrameCallback((_) async {
-      try {
-        await context.read<ProfileProvider>().loadCurrentUser();
-
-        // 用户数据加载完成后，立即加载视频数量
-        _loadVideosCount();
-
-        setState(() {
-          _initialLoadComplete = true;
-        });
-      } catch (e) {
-        // Error loading user data
-      }
-    });
-  }
-
-  // 独立加载视频数量
-  void _loadVideosCount() async {
-    if (mounted) {
-      setState(() {
-        _loadingVideosCount = true;
-      });
-    }
-
-    try {
-      // 获取用户ID
-      final String? userId = await _getUserId();
-
-      if (userId == null || userId.isEmpty) {
-        return;
-      }
-
-      // 使用UserService获取视频列表并统计数量
-      final userService = UserService(AppBootstrap.apiClient.dio);
-      final videos = await userService.getVideos(
-        userId: userId,
-        page: 1,
-        size: 999, // 只获取1条来统计总数
-      );
-
-      if (mounted) {
-        setState(() {
-          _videosCount = videos.length;
-        });
-      }
-
-    } catch (e) {
-      // Error loading videos count
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loadingVideosCount = false;
-        });
-      }
-    }
-  }
-
-  // 获取用户ID的独立方法
-  Future<String?> _getUserId() async {
-    // 方法1: 从 ProfileProvider 获取（主要方法）
-    final profileProvider = context.read<ProfileProvider>();
-    final profileUser = profileProvider.user;
-
-    if (profileUser != null && profileUser.id.isNotEmpty) {
-      return profileUser.id;
-    }
-
-    // 方法2: 从 AuthProvider 获取（备用方法）
-    try {
-      final authProvider = context.read<AuthProvider>();
-      final authUser = authProvider.user;
-      if (authUser != null && authUser.id.isNotEmpty) {
-        return authUser.id;
-      }
-    } catch (e) {
-      // Error getting user ID from AuthProvider
-    }
-
-    // 方法3: 从本地存储获取（最后备选）
-    return await _getUserIdFromStorage();
-  }
-
-  Future<String?> _getUserIdFromStorage() async {
-    try {
-      // 首先尝试从 Hive 获取
-      final box = await Hive.openBox('user_box');
-      final String? hiveUserId = box.get('id') as String?;
-
-      if (hiveUserId != null && hiveUserId.isNotEmpty) {
-        return hiveUserId;
-      }
-
-      // 然后尝试从 SharedPreferences 获取（统一使用 user_id）
-      final prefs = await SharedPreferences.getInstance();
-      final String? prefsUserId = prefs.getString('user_id');
-
-      if (prefsUserId != null && prefsUserId.isNotEmpty) {
-        return prefsUserId;
-      }
-
-      return null;
-    } catch (e) {
-      return null;
-    }
-  }
-
-  // 添加视频数量更新方法
-  void _updateVideosCount(int count) {
-    setState(() {
-      _videosCount = count;
-    });
-  }
-
-  /// 下拉刷新：重新加载所有个人相关数据
-  Future<void> _refreshAll() async {
-    if (_isRefreshing) return;
-
-    setState(() {
-      _isRefreshing = true;
-    });
-
-    try {
-      // 1. 刷新用户信息（会自动触发统计数据加载）
-      await context.read<ProfileProvider>().loadCurrentUser();
-
-      // 2. 刷新视频数量
-      _loadVideosCount();
-
-      // 3. 刷新收藏列表
       if (!mounted) return;
-      await context.read<VideoProvider>().refreshFavorites();
+      final profile = context.read<ProfileProvider>();
+      final drama = context.read<DramaProvider>();
+      await profile.loadCurrentUser();
+      if (!mounted) return;
+      await drama.refreshWallet();
+      if (!mounted) return;
+      await drama.refreshWatching();
+    });
+  }
 
-      // 4. 刷新当前 Tab 的数据（通过 GlobalKey 访问）
-      _favoritesKey.currentState?._refreshData();
-      _notesKey.currentState?._refreshData();
-      _videosKey.currentState?._refreshData();
+  @override
+  void dispose() {
+    _enter.dispose();
+    super.dispose();
+  }
 
-    } catch (e) {
-      // 刷新失败时显示提示
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('刷新失败: $e')),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isRefreshing = false;
-        });
-      }
-    }
+  Future<void> _refresh() async {
+    final profile = context.read<ProfileProvider>();
+    final drama = context.read<DramaProvider>();
+    await profile.loadCurrentUser();
+    if (!mounted) return;
+    await drama.refreshWallet();
+    if (!mounted) return;
+    await drama.refreshWatching();
+  }
+
+  Animation<double> _fade(double start, double end) {
+    return CurvedAnimation(
+      parent: _enter,
+      curve: Interval(start, end, curve: Curves.easeOutCubic),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final profile = context.watch<ProfileProvider>();
+    final drama = context.watch<DramaProvider>();
     final user = profile.user;
+    // viewPadding：即使父 Scaffold extendBody 改写了 padding，也能顶到刘海
+    final top = MediaQuery.viewPaddingOf(context).top;
+    final bottom = MediaQuery.viewPaddingOf(context).bottom;
 
-    // 如果初始加载未完成且不在加载状态，显示加载指示器
-    if (!_initialLoadComplete && !profile.loading) {
+    if (profile.loading && user == null) {
       return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
+        backgroundColor: _paper,
+        body: Center(child: CircularProgressIndicator(color: _coral)),
       );
     }
-
-    // 显示加载状态
-    if (profile.loading) {
-      return const Scaffold(
-        body: Center(
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    // 显示错误信息
-    if (profile.error != null) {
+    if (profile.error != null && user == null) {
       return Scaffold(
+        backgroundColor: _paper,
         body: Center(
           child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+            mainAxisSize: MainAxisSize.min,
             children: [
-              Text('加载失败: ${profile.error}'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                  context.read<ProfileProvider>().loadFromCache();
-                  setState(() {
-                    _initialLoadComplete = false;
-                  });
-                },
+              Text('${profile.error}', style: const TextStyle(color: _inkSoft)),
+              const SizedBox(height: 12),
+              FilledButton(
+                style: FilledButton.styleFrom(backgroundColor: _coral),
+                onPressed: _refresh,
                 child: const Text('重试'),
               ),
             ],
@@ -240,1698 +100,936 @@ class _ProfilePageState extends State<ProfilePage> {
       );
     }
 
-    return Scaffold(
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final maxW = math.min(520.0, constraints.maxWidth);
-          return Center(
-            child: ConstrainedBox(
-              constraints: BoxConstraints.tightFor(width: maxW),
-              child: DefaultTabController(
-                length: 3,
-                child: RefreshIndicator(
-                  onRefresh: _refreshAll,
-                  notificationPredicate: (notification) {
-                    // 允许来自任何深度的滚动通知触发刷新
-                    return notification.depth == 0 || notification.depth == 1;
-                  },
-                  child: NestedScrollView(
-                    headerSliverBuilder: (context, innerBoxIsScrolled) => [
-                      SliverToBoxAdapter(child: _ProfileHeader(
-                          userName: user?.username ?? '用户',
-                          bio: user?.bio ?? '',
-                          avatarUrl: user?.avatarUrl,
-                          backgroundUrl: user?.profileBackgroundImageUrl,
-                          gender: user?.gender,
-                          birthday: user?.birthday,
-                          onEdit: () => context.push('/profile/edit'))),
-                            SliverToBoxAdapter(
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-                                child: _StatsRow(
-                                  videosCount: _videosCount,
-                                  loadingVideosCount: _loadingVideosCount,
-                                ), // 传递视频数量和加载状态
-                              ),
-                            ),
-                            SliverPersistentHeader(
-                              pinned: true,
-                              delegate: _StickyTabBarDelegate(
-                                child: Builder(
-                                  builder: (context) {
-                                    final cs = Theme.of(context).colorScheme;
-                                    return Container(
-                                      color: Theme.of(context).scaffoldBackgroundColor,
-                                      child: TabBar(
-                                        labelColor: cs.primary,
-                                        unselectedLabelColor: cs.onSurfaceVariant,
-                                        labelStyle: Theme.of(context).textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w600),
-                                        indicator: UnderlineTabIndicator(
-                                          borderSide: BorderSide(color: cs.primary, width: 2),
-                                        ),
-                                        tabs: const [
-                                          Tab(text: '我的收藏'),
-                                          Tab(text: '我的笔记'),
-                                          Tab(text: '我的视频'),
-                                        ],
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                            ),
-                          ],
-                          body: TabBarView(
-                            children: [
-                              _FavoritesList(key: _favoritesKey),
-                              _NotesTab(key: _notesKey),
-                              _VideosTab(key: _videosKey, onVideosLoaded: _updateVideosCount),
-                            ],
-                          ),
-                        ),
-                      ),
+    final name = user?.username ?? '用户';
+    final avatar = user?.avatarUrl;
+    final bio = (user?.bio ?? '').trim();
+    final balance = drama.wallet?.balance ?? 0;
+    final favs = drama.favorites;
+
+    final continues = drama.continueList;
+
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+        systemNavigationBarColor: Colors.transparent,
+      ),
+      child: Scaffold(
+        backgroundColor: _paper,
+        extendBodyBehindAppBar: true,
+        body: RefreshIndicator(
+          color: _coral,
+          backgroundColor: Colors.white,
+          displacement: top + 12,
+          onRefresh: _refresh,
+          child: CustomScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            slivers: [
+              // 头图 + 金币条同一层：顶到刘海，不再用纸色溶入盖住金币
+              SliverToBoxAdapter(
+                child: FadeTransition(
+                  opacity: _fade(0.0, 0.5),
+                  child: _HeroBlock(
+                    topInset: top,
+                    name: name,
+                    bio: bio.isEmpty ? '写下你的追剧宣言' : bio,
+                    avatarUrl: avatar,
+                    balance: balance,
+                    watching: continues.length,
+                    favorites: favs.length,
+                    onEdit: () => context.push('/profile/edit'),
+                    onWallet: () => context.push('/wallet'),
+                    onWatching: () => context.go('/home?tab=2'),
+                  ),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                  child: FadeTransition(
+                    opacity: _fade(0.22, 0.65),
+                    child: _QuickGrid(
+                      continueCount: continues.length,
+                      onWallet: () => context.push('/wallet'),
+                      onWatching: () => context.go('/home?tab=2'),
+                      onMessages: () => context.push('/messages'),
+                      onSettings: () => context.push('/settings'),
                     ),
                   ),
-                );
-              },
-          ),
-        );
-  }
-}
-
-class _ProfileHeader extends StatelessWidget {
-  final String userName;
-  final String bio;
-  final String? avatarUrl;
-  final String? backgroundUrl;
-  final Gender? gender;
-  final String? birthday;
-  final VoidCallback onEdit;
-
-  const _ProfileHeader({
-    required this.userName,
-    required this.bio,
-    required this.avatarUrl,
-    this.backgroundUrl,
-    this.gender,
-    this.birthday,
-    required this.onEdit
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final themeProvider = context.watch<ThemeProvider>();
-    final isDark = themeProvider.themeName == 'dark';
-    const double headerHeight = 176;
-    const double avatarRadius = 36;
-
-    return Semantics(
-      label: '个人资料头部',
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Stack(
-            children: [
-              // 背景容器 - 包含透明度渐变和横向缩放
-              _buildBackground(headerHeight, backgroundUrl),
-
-              // 顶部功能栏（覆盖在背景上，透明背景）
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: SafeArea(
-                  bottom: false,
+                ),
+              ),
+              if (continues.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: FadeTransition(
+                    opacity: _fade(0.36, 0.8),
+                    child: _ContinueRail(
+                      items: continues.take(8).toList(),
+                      onAll: () => context.go('/home?tab=2'),
+                      onTap: (c) {
+                        if (c.drama != null) context.push('/drama/${c.drama!.id}');
+                      },
+                    ),
+                  ),
+                ),
+              SliverToBoxAdapter(
+                child: FadeTransition(
+                  opacity: _fade(0.4, 0.85),
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: Spacing.sm, vertical: Spacing.xs),
+                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
                     child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // 左侧：主题切换按钮
-                        Tooltip(
-                          message: isDark ? '切换到浅色模式' : '切换到深色模式',
-                          child: IconButton(
-                            onPressed: () => themeProvider.toggleDark(),
-                            icon: Icon(
-                              isDark ? Icons.light_mode_outlined : Icons.dark_mode_outlined,
-                              color: Colors.white,
-                            ),
+                        const Text(
+                          '我的收藏',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.w800,
+                            color: _ink,
+                            letterSpacing: 0.2,
                           ),
                         ),
-                        // 右侧：菜单入口按钮
-                        Tooltip(
-                          message: '设置',
-                          child: IconButton(
-                            onPressed: () => context.push('/settings'),
-                            icon: const Icon(
-                              Icons.menu,
-                              color: Colors.white,
+                        const Spacer(),
+                        if (favs.isNotEmpty)
+                          GestureDetector(
+                            onTap: () => context.go('/home?tab=2'),
+                            behavior: HitTestBehavior.opaque,
+                            child: const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 4),
+                              child: Row(
+                                children: [
+                                  Text(
+                                    '全部',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      fontWeight: FontWeight.w600,
+                                      color: _coral,
+                                    ),
+                                  ),
+                                  Icon(Icons.chevron_right_rounded, size: 18, color: _coral),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
                       ],
                     ),
                   ),
                 ),
               ),
+              if (favs.isEmpty)
+                SliverToBoxAdapter(
+                  child: FadeTransition(
+                    opacity: _fade(0.45, 0.9),
+                    child: const _EmptyFavorites(),
+                  ),
+                )
+              else
+                SliverToBoxAdapter(
+                  child: FadeTransition(
+                    opacity: _fade(0.45, 0.9),
+                    child: SizedBox(
+                      height: 236,
+                      child: ListView.separated(
+                        padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
+                        scrollDirection: Axis.horizontal,
+                        itemCount: favs.length.clamp(0, 12),
+                        separatorBuilder: (_, __) => const SizedBox(width: 12),
+                        itemBuilder: (_, i) => _PosterCard(
+                          drama: favs[i],
+                          onTap: () => context.push('/drama/${favs[i].id}'),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              SliverToBoxAdapter(child: SizedBox(height: 72 + bottom)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-              // 内容层
-              SizedBox(
-                height: headerHeight,
-                width: double.infinity,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: Spacing.md),
-                  child: Align(
-                    alignment: Alignment.bottomLeft,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
+/// 头图与金币条一体：背景从 y=0 铺满刘海，金币叠在暗色区上，不再被纸色雾盖住
+class _HeroBlock extends StatelessWidget {
+  final double topInset;
+  final String name;
+  final String bio;
+  final String? avatarUrl;
+  final int balance;
+  final int watching;
+  final int favorites;
+  final VoidCallback onEdit;
+  final VoidCallback onWallet;
+  final VoidCallback onWatching;
+
+  const _HeroBlock({
+    required this.topInset,
+    required this.name,
+    required this.bio,
+    required this.avatarUrl,
+    required this.balance,
+    required this.watching,
+    required this.favorites,
+    required this.onEdit,
+    required this.onWallet,
+    required this.onWatching,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: const Color(0xFF0E1117),
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          // 真实夜戏街景底图，铺满含刘海
+          Positioned.fill(
+            child: Image.asset(
+              'assets/images/profile_hero_bg.jpg',
+              fit: BoxFit.cover,
+              alignment: const Alignment(0, -0.35),
+              filterQuality: FilterQuality.high,
+            ),
+          ),
+          // 可读性压暗 + 底部接到纸色
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.28),
+                    Colors.black.withValues(alpha: 0.42),
+                    const Color(0xFF0E1117).withValues(alpha: 0.78),
+                    const Color(0xFFF4F1EC),
+                  ],
+                  stops: const [0.0, 0.38, 0.78, 1.0],
+                ),
+              ),
+            ),
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Padding(
+                // 刘海下方再留一口气，避免贴 Dynamic Island
+                padding: EdgeInsets.fromLTRB(16, topInset + 22, 16, 0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
                       children: [
-                        // 头像部分
-                        _buildAvatar(cs, avatarRadius),
-                        const SizedBox(width: Spacing.md),
+                        _Avatar(name: name, avatarUrl: avatarUrl),
+                        const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
                             children: [
                               Text(
-                                userName.isEmpty ? '用户' : userName,
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 20
+                                'ZiTok',
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.72),
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w700,
+                                  letterSpacing: 1.8,
+                                  shadows: const [
+                                    Shadow(color: Color(0x88000000), blurRadius: 8),
+                                  ],
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 4),
                               Text(
-                                '@${userName.isEmpty ? 'unknown' : userName}',
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.white70,
-                                    fontSize: 12
+                                name,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 26,
+                                  fontWeight: FontWeight.w800,
+                                  height: 1.08,
+                                  letterSpacing: 0.2,
+                                  shadows: [
+                                    Shadow(color: Color(0x99000000), blurRadius: 10),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                bio,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: Colors.white.withValues(alpha: 0.82),
+                                  fontSize: 13,
+                                  height: 1.35,
+                                  shadows: const [
+                                    Shadow(color: Color(0x88000000), blurRadius: 6),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(width: Spacing.sm),
-                        TextButton(
-                          style: TextButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: const Color(0xFF2BD2C4),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                            overlayColor: const Color(0x1F2BD2C4),
+                        const SizedBox(width: 8),
+                        ClipOval(
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            child: Material(
+                              color: Colors.white.withValues(alpha: 0.16),
+                              child: InkWell(
+                                onTap: onEdit,
+                                child: const SizedBox(
+                                  width: 42,
+                                  height: 42,
+                                  child: Icon(Icons.edit_outlined, color: Colors.white, size: 18),
+                                ),
+                              ),
+                            ),
                           ),
-                          onPressed: onEdit,
-                          child: const Text('编辑主页'),
                         ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 22),
+                    _CoinStrip(
+                      balance: balance,
+                      watching: watching,
+                      favorites: favorites,
+                      onWallet: onWallet,
+                      onWatching: onWatching,
+                    ),
+                  ],
                 ),
               ),
+              const SizedBox(height: 28),
             ],
-          ),
-          // 简介部分保持不变
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    bio.isEmpty ? '完善个人介绍' : bio,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                  ),
-                  const SizedBox(height: 6),
-                  Row(
-                    children: [
-                      if (gender != null && gender != Gender.unknown)
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                          decoration: BoxDecoration(
-                              color: cs.surfaceContainerHighest.withValues(alpha: 0.6),
-                              borderRadius: Radii.sm
-                          ),
-                          child: Text(
-                              gender == Gender.male ? '男' : '女',
-                              style: Theme.of(context).textTheme.bodySmall
-                          ),
-                        ),
-                      if ((gender != null && gender != Gender.unknown) &&
-                          (birthday != null && birthday!.isNotEmpty))
-                        const SizedBox(width: Spacing.sm),
-                      if (birthday != null && birthday!.isNotEmpty)
-                        Text(
-                            '生日 $birthday',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: cs.onSurfaceVariant
-                            )
-                        ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
           ),
         ],
       ),
     );
   }
+}
 
-  // 重构背景构建方法 - 添加上到下透明度渐变和横向缩放
-// 在 profile_page.dart 中确保 _buildBackground 方法使用正确的 fit
-  Widget _buildBackground(double headerHeight, String? backgroundUrl) {
-    // 如果有有效的背景图URL，显示网络图片
-    if (backgroundUrl != null && backgroundUrl.isNotEmpty && backgroundUrl != 'null') {
-      return SizedBox(
-        height: headerHeight,
-        width: double.infinity,
-        child: Stack(
-          children: [
-            // 背景图片 - 横向填充
-            Image.network(
-              backgroundUrl,
-              fit: BoxFit.fitWidth, // 确保使用 fitWidth 进行水平填充
-              width: double.infinity,
-              height: headerHeight,
-              errorBuilder: (context, error, stackTrace) {
-                return _buildGradientBackground(headerHeight);
-              },
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return _buildGradientBackground(headerHeight);
-              },
-            ),
-            // 渐变遮罩保持不变...
-          ],
-        ),
-      );
-    }
+class _Avatar extends StatelessWidget {
+  final String name;
+  final String? avatarUrl;
 
-    return _buildGradientBackground(headerHeight);
-  }
+  const _Avatar({required this.name, required this.avatarUrl});
 
-  // 渐变背景构建方法
-  Widget _buildGradientBackground(double headerHeight) {
+  @override
+  Widget build(BuildContext context) {
+    final has = avatarUrl != null && avatarUrl!.isNotEmpty;
     return Container(
-      height: headerHeight,
-      width: double.infinity,
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Color(0xFF2BD2C4),
-            Color(0xFFEFF9F7),
-          ],
-        ),
+      width: 72,
+      height: 72,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(color: Colors.white.withValues(alpha: 0.55), width: 2.5),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.28),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: ClipOval(
+        child: has
+            ? Image.network(
+                UrlUtils.resolveStorageUrl(avatarUrl!, defaultDir: 'avatars'),
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) => _fallback(),
+              )
+            : _fallback(),
       ),
     );
   }
 
-  // 头像构建方法
-  Widget _buildAvatar(ColorScheme cs, double avatarRadius) {
-    if (avatarUrl == null || avatarUrl!.isEmpty || avatarUrl == 'null') {
-      return CircleAvatar(
-        radius: avatarRadius,
-        backgroundColor: const Color(0xFF2BD2C4),
-        child: Icon(
-            Icons.person,
-            color: cs.onPrimary,
-            size: 24
+  Widget _fallback() {
+    return ColoredBox(
+      color: const Color(0xFF2ED3BE),
+      child: Center(
+        child: Text(
+          name.isNotEmpty ? name[0].toUpperCase() : '?',
+          style: const TextStyle(
+            color: Colors.white,
+            fontSize: 28,
+            fontWeight: FontWeight.w800,
+          ),
         ),
-      );
-    }
-
-    return CircleAvatar(
-      radius: avatarRadius,
-      backgroundColor: const Color(0xFF2BD2C4),
-      backgroundImage: NetworkImage(avatarUrl!),
-      onBackgroundImageError: (exception, stackTrace) {
-        // Error loading avatar image
-      },
-      child: avatarUrl == null ? Icon(
-          Icons.person,
-          color: cs.onPrimary,
-          size: 24
-      ) : null,
+      ),
     );
   }
 }
 
-class _StatsRow extends StatefulWidget {
-  final int videosCount; // 接收视频数量
-  final bool loadingVideosCount; // 接收视频数量加载状态
+class _CoinStrip extends StatelessWidget {
+  final int balance;
+  final int watching;
+  final int favorites;
+  final VoidCallback onWallet;
+  final VoidCallback onWatching;
 
-  const _StatsRow({
-    required this.videosCount,
-    required this.loadingVideosCount,
+  const _CoinStrip({
+    required this.balance,
+    required this.watching,
+    required this.favorites,
+    required this.onWallet,
+    required this.onWatching,
   });
 
   @override
-  State<_StatsRow> createState() => _StatsRowState();
+  Widget build(BuildContext context) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(18),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onWallet,
+            child: Ink(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(18),
+                color: Colors.white.withValues(alpha: 0.10),
+                border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.16),
+                    Colors.white.withValues(alpha: 0.05),
+                  ],
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(14, 13, 10, 13),
+                child: Row(
+                  children: [
+                    Container(
+                      width: 40,
+                      height: 40,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFE8B84A), Color(0xFFFF6B4A)],
+                        ),
+                      ),
+                      child: const Icon(Icons.monetization_on_rounded, color: Colors.white, size: 21),
+                    ),
+                    const SizedBox(width: 11),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            '我的金币',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.7),
+                              fontSize: 11.5,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            '$balance',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 25,
+                              fontWeight: FontWeight.w800,
+                              height: 1.05,
+                              letterSpacing: 0.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Container(
+                      width: 1,
+                      height: 28,
+                      margin: const EdgeInsets.only(right: 4),
+                      color: Colors.white.withValues(alpha: 0.18),
+                    ),
+                    _MiniStat(label: '续看', value: '$watching', onTap: onWatching),
+                    _MiniStat(label: '收藏', value: '$favorites', onTap: onWatching),
+                    Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.45), size: 22),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-class _StatsRowState extends State<_StatsRow> {
-  String? _userId;
-  int _notesCount = 0;
-  bool _loadingNotesCount = false;
+class _MiniStat extends StatelessWidget {
+  final String label;
+  final String value;
+  final VoidCallback onTap;
 
-  @override
-  void initState() {
-    super.initState();
-    // 组件初始化时获取用户ID并加载统计数据
-    _getUserIdAndLoadStats();
-  }
-
-  void _getUserIdAndLoadStats() {
-    // 方法1: 从 ProfileProvider 获取（主要方法）
-    final profileProvider = context.read<ProfileProvider>();
-    final profileUser = profileProvider.user;
-
-    if (profileUser != null && profileUser.id.isNotEmpty) {
-      _userId = profileUser.id;
-      _loadStats();
-      _loadNotesCount();
-      return;
-    }
-
-    // 方法2: 从 AuthProvider 获取（备用方法）
-    try {
-      final authProvider = context.read<AuthProvider>();
-      final authUser = authProvider.user;
-      if (authUser != null && authUser.id.isNotEmpty) {
-        _userId = authUser.id;
-        _loadStats();
-        _loadNotesCount();
-        return;
-      }
-    } catch (e) {
-      // Error getting user ID from AuthProvider
-    }
-
-    // 方法3: 从本地存储获取（最后备选）
-    _getUserIdFromStorage();
-  }
-
-  void _getUserIdFromStorage() async {
-    try {
-      // 首先尝试从 Hive 获取
-      final box = await Hive.openBox('user_box');
-      final String? hiveUserId = box.get('id') as String?;
-
-      if (hiveUserId != null && hiveUserId.isNotEmpty) {
-        setState(() {
-          _userId = hiveUserId;
-        });
-        _loadStats();
-        _loadNotesCount();
-        return;
-      }
-
-      // 然后尝试从 SharedPreferences 获取（统一使用 user_id）
-      final prefs = await SharedPreferences.getInstance();
-      final String? prefsUserId = prefs.getString('user_id');
-
-      if (prefsUserId != null && prefsUserId.isNotEmpty) {
-        setState(() {
-          _userId = prefsUserId;
-        });
-        _loadStats();
-        _loadNotesCount();
-        return;
-      }
-
-    } catch (e) {
-      // Error getting user ID from storage
-    }
-  }
-
-  void _loadStats() {
-    if (_userId == null || _userId!.isEmpty) {
-      return;
-    }
-
-    final profileProvider = context.read<ProfileProvider>();
-    profileProvider.loadUserStats(userId: _userId!);
-  }
-
-  /// 加载笔记数量
-  Future<void> _loadNotesCount() async {
-    if (_userId == null || _userId!.isEmpty) return;
-
-    if (mounted) {
-      setState(() => _loadingNotesCount = true);
-    }
-
-    try {
-      final notesService = NotesService(AppBootstrap.apiClient.dio);
-      final notesRepo = NotesRepository(api: notesService);
-      final result = await notesRepo.getUserNotes(
-        userId: int.tryParse(_userId!) ?? 0,
-        page: 1,
-        pageSize: 1, // 只需获取总数
-      );
-
-      if (mounted) {
-        setState(() {
-          _notesCount = result.total;
-        });
-      }
-    } catch (e) {
-      // Error loading notes count
-    } finally {
-      if (mounted) {
-        setState(() => _loadingNotesCount = false);
-      }
-    }
-  }
+  const _MiniStat({required this.label, required this.value, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    final profile = context.watch<ProfileProvider>();
-    final cs = Theme.of(context).colorScheme;
-
-    Widget cell(String num, String label) => Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(num, style: Theme.of(context).textTheme.titleMedium?.copyWith(
-          fontWeight: FontWeight.w700,
-          fontSize: 18,
-          color: (profile.loadingStats || widget.loadingVideosCount) ? cs.onSurfaceVariant : cs.onSurface,
-        )),
-        const SizedBox(height: 4),
-        Text(label, style: Theme.of(context).textTheme.bodySmall?.copyWith(
-          color: cs.onSurfaceVariant,
-        )),
-      ],
-    );
-
-    // 显示视频数量（处理加载状态）
-    String getVideosCountText() {
-      if (widget.loadingVideosCount) {
-        return '...';
-      }
-      return widget.videosCount.toString();
-    }
-
-    // 显示笔记数量（处理加载状态）
-    String getNotesCountText() {
-      if (_loadingNotesCount) {
-        return '...';
-      }
-      return _notesCount.toString();
-    }
-
-    // 如果没有获取到用户ID，显示加载状态
-    if (_userId == null) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            cell(getVideosCountText(), '视频'), // 使用传入的视频数量
-            cell(getNotesCountText(), '笔记'),
-            cell('...', '粉丝'),
-            cell('...', '关注'),
-          ],
-        ),
-      );
-    }
-
-    // 显示加载状态
-    if (profile.loadingStats) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          children: [
-            cell(getVideosCountText(), '视频'), // 使用传入的视频数量
-            cell(getNotesCountText(), '笔记'),
-            cell('...', '粉丝'),
-            cell('...', '关注'),
-          ],
-        ),
-      );
-    }
-
-    // 显示错误状态
-    if (profile.statsError != null) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         child: Column(
           children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            Text(
+              value,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.5),
+                fontSize: 10,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuickGrid extends StatelessWidget {
+  final int continueCount;
+  final VoidCallback onWallet;
+  final VoidCallback onWatching;
+  final VoidCallback onMessages;
+  final VoidCallback onSettings;
+
+  const _QuickGrid({
+    required this.continueCount,
+    required this.onWallet,
+    required this.onWatching,
+    required this.onMessages,
+    required this.onSettings,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Padding(
+          padding: EdgeInsets.only(left: 2, bottom: 12),
+          child: Text(
+            '常用入口',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: Color(0xFF12151C),
+              letterSpacing: 0.2,
+            ),
+          ),
+        ),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickTile(
+                title: '钱包',
+                subtitle: '充值解锁',
+                icon: Icons.account_balance_wallet_rounded,
+                tint: const Color(0xFFFFE8C8),
+                iconColor: const Color(0xFFC47A12),
+                onTap: onWallet,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _QuickTile(
+                title: '追剧',
+                subtitle: continueCount > 0 ? '续看 $continueCount 部' : '去发现好剧',
+                icon: Icons.bookmark_rounded,
+                tint: const Color(0xFFFFE0D8),
+                iconColor: const Color(0xFFFF6B4A),
+                onTap: onWatching,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 10),
+        Row(
+          children: [
+            Expanded(
+              child: _QuickTile(
+                title: '消息',
+                subtitle: '互动通知',
+                icon: Icons.chat_bubble_rounded,
+                tint: const Color(0xFFD8F5F0),
+                iconColor: const Color(0xFF0F9B8A),
+                onTap: onMessages,
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: _QuickTile(
+                title: '设置',
+                subtitle: '账号与偏好',
+                icon: Icons.settings_rounded,
+                tint: const Color(0xFFE8E6E2),
+                iconColor: const Color(0xFF3D4450),
+                onTap: onSettings,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+class _QuickTile extends StatelessWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final Color tint;
+  final Color iconColor;
+  final VoidCallback onTap;
+
+  const _QuickTile({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.tint,
+    required this.iconColor,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white,
+      borderRadius: BorderRadius.circular(16),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: onTap,
+        child: Ink(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: const Color(0xFF12151C).withValues(alpha: 0.05)),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 13, 10, 13),
+            child: Row(
               children: [
-                cell(getVideosCountText(), '视频'), // 使用传入的视频数量
-                cell(getNotesCountText(), '笔记'),
-                cell('0', '粉丝'),
-                cell('0', '关注'),
+                Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: tint,
+                    borderRadius: BorderRadius.circular(11),
+                  ),
+                  child: Icon(icon, color: iconColor, size: 19),
+                ),
+                const SizedBox(width: 9),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        style: const TextStyle(
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF12151C),
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: const Color(0xFF12151C).withValues(alpha: 0.42),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ContinueRail extends StatelessWidget {
+  final List<ContinueItem> items;
+  final VoidCallback onAll;
+  final ValueChanged<ContinueItem> onTap;
+
+  const _ContinueRail({
+    required this.items,
+    required this.onAll,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
+          child: Row(
+            children: [
+              const Text(
+                '继续观看',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                  color: Color(0xFF12151C),
+                  letterSpacing: 0.2,
+                ),
+              ),
+              const Spacer(),
+              GestureDetector(
+                onTap: onAll,
+                behavior: HitTestBehavior.opaque,
+                child: const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 4, horizontal: 4),
+                  child: Row(
+                    children: [
+                      Text(
+                        '全部',
+                        style: TextStyle(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFFFF6B4A),
+                        ),
+                      ),
+                      Icon(Icons.chevron_right_rounded, size: 18, color: Color(0xFFFF6B4A)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 96,
+          child: ListView.separated(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            scrollDirection: Axis.horizontal,
+            itemCount: items.length,
+            separatorBuilder: (_, __) => const SizedBox(width: 10),
+            itemBuilder: (_, i) {
+              final c = items[i];
+              final d = c.drama;
+              final title = d?.title ?? '未知剧';
+              final cover = d?.coverUrl ?? '';
+              return GestureDetector(
+                onTap: () => onTap(c),
+                child: Container(
+                  width: 220,
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFF12151C).withValues(alpha: 0.05)),
+                  ),
+                  child: Row(
+                    children: [
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(9),
+                        child: SizedBox(
+                          width: 56,
+                          height: 80,
+                          child: cover.isNotEmpty
+                              ? Image.network(cover, fit: BoxFit.cover)
+                              : const ColoredBox(color: Color(0xFFD9D4CC)),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Text(
+                              title,
+                              maxLines: 2,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 13.5,
+                                fontWeight: FontWeight.w800,
+                                color: Color(0xFF12151C),
+                                height: 1.25,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '看到第${c.episodeNo}集',
+                              style: TextStyle(
+                                fontSize: 11.5,
+                                fontWeight: FontWeight.w600,
+                                color: const Color(0xFFFF6B4A).withValues(alpha: 0.9),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(
+                        Icons.play_circle_fill_rounded,
+                        color: const Color(0xFF12151C).withValues(alpha: 0.2),
+                        size: 28,
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+class _PosterCard extends StatelessWidget {
+  final Drama drama;
+  final VoidCallback onTap;
+
+  const _PosterCard({required this.drama, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: SizedBox(
+        width: 124,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            AspectRatio(
+              aspectRatio: 3 / 4.15,
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: Stack(
+                  fit: StackFit.expand,
+                  children: [
+                    if (drama.coverUrl.isNotEmpty)
+                      Image.network(
+                        drama.coverUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const ColoredBox(color: Color(0xFFD9D4CC)),
+                      )
+                    else
+                      const ColoredBox(color: Color(0xFFD9D4CC)),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      height: 52,
+                      child: DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.topCenter,
+                            end: Alignment.bottomCenter,
+                            colors: [
+                              Colors.transparent,
+                              Colors.black.withValues(alpha: 0.58),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 8,
+                      bottom: 8,
+                      child: Text(
+                        '${drama.totalEpisodes}集',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
             const SizedBox(height: 8),
             Text(
-              '统计数据加载失败',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Colors.red,
+              drama.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF12151C),
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              drama.category.isEmpty ? '短剧' : drama.category,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                color: const Color(0xFF12151C).withValues(alpha: 0.45),
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
         ),
-      );
-    }
+      ),
+    );
+  }
+}
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: Spacing.sm),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+class _EmptyFavorites extends StatelessWidget {
+  const _EmptyFavorites();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+      padding: const EdgeInsets.symmetric(vertical: 36, horizontal: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
         children: [
-          cell(getVideosCountText(), '视频'), // 使用传入的视频数量
-          cell(getNotesCountText(), '笔记'),
-          cell(profile.followersCount.toString(), '粉丝'),
-          cell(profile.followingsCount.toString(), '关注'),
+          Icon(Icons.movie_filter_outlined, size: 36, color: const Color(0xFF12151C).withValues(alpha: 0.28)),
+          const SizedBox(height: 10),
+          Text(
+            '还没有收藏',
+            style: TextStyle(
+              fontSize: 15,
+              fontWeight: FontWeight.w700,
+              color: const Color(0xFF12151C).withValues(alpha: 0.7),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '去剧场挑一部心动短剧吧',
+            style: TextStyle(
+              fontSize: 12,
+              color: const Color(0xFF12151C).withValues(alpha: 0.4),
+            ),
+          ),
         ],
       ),
     );
-  }
-}
-
-class _FavoritesList extends StatefulWidget {
-  const _FavoritesList({super.key});
-
-  @override
-  State<_FavoritesList> createState() => _FavoritesListState();
-}
-
-class _FavoritesListState extends State<_FavoritesList> {
-  String _sortBy = 'like'; // 'like' or 'comment'
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final vp = context.read<VideoProvider>();
-      if (vp.favorites.isEmpty) {
-        vp.refreshFavorites();
-      }
-    });
-  }
-
-  /// 供父组件调用的刷新方法
-  void _refreshData() {
-    context.read<VideoProvider>().refreshFavorites();
-  }
-
-  /// 根据排序方式对收藏列表排序
-  List<Video> _sortedFavorites(List<Video> favorites) {
-    final sorted = List<Video>.from(favorites);
-    if (_sortBy == 'like') {
-      sorted.sort((a, b) => (b.likes ?? 0).compareTo(a.likes ?? 0));
-    } else {
-      sorted.sort((a, b) => (b.commentCount ?? 0).compareTo(a.commentCount ?? 0));
-    }
-    return sorted;
-  }
-
-  Widget _buildThumbnail(Video video) {
-    final coverUrl = video.coverUrl;
-    if (coverUrl != null && coverUrl.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.network(
-          UrlUtils.resolveStorageUrl(coverUrl, defaultDir: 'covers'),
-          width: 80,
-          height: 60,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => _buildDefaultThumbnail(),
-        ),
-      );
-    }
-    return _buildDefaultThumbnail();
-  }
-
-  Widget _buildDefaultThumbnail() {
-    return Container(
-      width: 80,
-      height: 60,
-      decoration: BoxDecoration(
-        color: Colors.grey[300],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Icon(Icons.videocam, color: Colors.grey),
-    );
-  }
-
-  Future<void> _unfavorite(String videoId) async {
-    final vp = context.read<VideoProvider>();
-    final success = await vp.toggleFavorite(videoId);
-    if (success) {
-      // 刷新收藏列表
-      await vp.refreshFavorites();
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('取消收藏失败')),
-      );
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final vp = context.watch<VideoProvider>();
-    final cs = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-    final favorites = vp.favorites;
-    final sortedFavorites = _sortedFavorites(favorites);
-    final loading = vp.loadingFavorites;
-
-    if (loading && favorites.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(Spacing.lg),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    if (favorites.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(Spacing.lg),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.star_border,
-                color: cs.onSurfaceVariant,
-                size: 64,
-              ),
-              const SizedBox(height: Spacing.md),
-              Text(
-                '暂无收藏',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: Spacing.sm),
-              Text(
-                '您还没有收藏任何视频',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: Spacing.lg),
-              ElevatedButton(
-                onPressed: () => vp.refreshFavorites(),
-                child: const Text('刷新'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        // 排序栏
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.xs),
-          color: cs.surfaceContainerLow,
-          child: Row(
-            children: [
-              Icon(Icons.star_outline, size: 18, color: cs.primary),
-              const SizedBox(width: Spacing.xs),
-              Text('收藏视频 (${favorites.length})', style: theme.textTheme.labelLarge),
-              const Spacer(),
-              PopupMenuButton<String>(
-                initialValue: _sortBy,
-                onSelected: (value) => setState(() => _sortBy = value),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.sort, size: 16, color: cs.onSurfaceVariant),
-                    const SizedBox(width: 4),
-                    Text(
-                      _sortBy == 'like' ? '按点赞数' : '按评论数',
-                      style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                    ),
-                    Icon(Icons.arrow_drop_down, size: 16, color: cs.onSurfaceVariant),
-                  ],
-                ),
-                itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'like', child: Text('按点赞数排序')),
-                  const PopupMenuItem(value: 'comment', child: Text('按评论数排序')),
-                ],
-              ),
-            ],
-          ),
-        ),
-        // 列表
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: () => vp.refreshFavorites(),
-            child: ListView.separated(
-              padding: const EdgeInsets.all(Spacing.md),
-              itemCount: sortedFavorites.length + (vp.favoritesHasMore ? 1 : 0),
-              separatorBuilder: (_, __) => const SizedBox(height: Spacing.sm),
-              itemBuilder: (context, i) {
-                // 加载更多指示器
-                if (i >= sortedFavorites.length) {
-                  if (!loading) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      vp.loadMoreFavorites();
-                    });
-                  }
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(Spacing.md),
-                      child: CircularProgressIndicator(),
-                    ),
-                  );
-                }
-
-                final video = sortedFavorites[i];
-                return ListTile(
-                  leading: _buildThumbnail(video),
-                  title: Text(
-                    video.title ?? '未命名视频',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  subtitle: Row(
-                    children: [
-                      Icon(Icons.thumb_up_outlined, size: 14, color: cs.onSurfaceVariant),
-                      const SizedBox(width: 4),
-                      Text('${video.likes ?? 0}', style: Theme.of(context).textTheme.bodySmall),
-                      const SizedBox(width: 12),
-                      Icon(Icons.chat_bubble_outline, size: 14, color: cs.onSurfaceVariant),
-                      const SizedBox(width: 4),
-                      Text('${video.commentCount ?? 0}', style: Theme.of(context).textTheme.bodySmall),
-                    ],
-                  ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.star, color: Color(0xFFFFD700)),
-                    tooltip: '取消收藏',
-                    onPressed: () => _unfavorite(video.id),
-                  ),
-                  onTap: () {
-                    context.push('/video/${video.id}', extra: video);
-                  },
-                );
-              },
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _NotesTab extends StatefulWidget {
-  const _NotesTab({super.key});
-
-  @override
-  State<_NotesTab> createState() => _NotesTabState();
-}
-
-class _NotesTabState extends State<_NotesTab> {
-  List<NoteItem> _notes = [];
-  bool _loading = false;
-  String? _error;
-  String? _userId;
-  int _page = 1;
-  bool _hasMore = true;
-  static const int _pageSize = 20;
-  String _sortBy = 'like'; // 'like' or 'favorite'
-
-  /// 根据排序方式对笔记列表排序
-  List<NoteItem> get _sortedNotes {
-    final sorted = List<NoteItem>.from(_notes);
-    if (_sortBy == 'like') {
-      sorted.sort((a, b) => b.likeCount.compareTo(a.likeCount));
-    } else {
-      sorted.sort((a, b) => b.favoriteCount.compareTo(a.favoriteCount));
-    }
-    return sorted;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    _getUserIdAndLoadNotes();
-  }
-
-  /// 供父组件调用的刷新方法
-  void _refreshData() {
-    _loadNotes(refresh: true);
-  }
-
-  void _getUserIdAndLoadNotes() {
-    final profileProvider = context.read<ProfileProvider>();
-    final profileUser = profileProvider.user;
-
-    if (profileUser != null && profileUser.id.isNotEmpty) {
-      _userId = profileUser.id;
-      _loadNotes();
-      return;
-    }
-
-    try {
-      final authProvider = context.read<AuthProvider>();
-      final authUser = authProvider.user;
-      if (authUser != null && authUser.id.isNotEmpty) {
-        _userId = authUser.id;
-        _loadNotes();
-        return;
-      }
-    } catch (e) {
-      // Error getting user ID from AuthProvider
-    }
-
-    _getUserIdFromStorage();
-  }
-
-  void _getUserIdFromStorage() async {
-    try {
-      final box = await Hive.openBox('user_box');
-      final String? hiveUserId = box.get('id') as String?;
-
-      if (hiveUserId != null && hiveUserId.isNotEmpty) {
-        setState(() => _userId = hiveUserId);
-        _loadNotes();
-        return;
-      }
-
-      final prefs = await SharedPreferences.getInstance();
-      final String? prefsUserId = prefs.getString('user_id');
-
-      if (prefsUserId != null && prefsUserId.isNotEmpty) {
-        setState(() => _userId = prefsUserId);
-        _loadNotes();
-        return;
-      }
-
-      setState(() {
-        _error = '无法获取用户ID，请重新登录';
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = '获取用户信息失败: $e';
-        _loading = false;
-      });
-    }
-  }
-
-  Future<void> _loadNotes({bool refresh = false}) async {
-    if (_userId == null || _userId!.isEmpty) {
-      setState(() {
-        _error = '用户ID为空，无法加载笔记';
-        _loading = false;
-      });
-      return;
-    }
-
-    if (refresh) {
-      _page = 1;
-      _hasMore = true;
-    }
-
-    if (!_hasMore && !refresh) return;
-
-    if (mounted) {
-      setState(() {
-        _loading = true;
-        if (refresh) _error = null;
-      });
-    }
-
-    try {
-      final notesService = NotesService(AppBootstrap.apiClient.dio);
-      final notesRepo = NotesRepository(api: notesService);
-      final result = await notesRepo.getUserNotes(
-        userId: int.tryParse(_userId!) ?? 0,
-        page: _page,
-        pageSize: _pageSize,
-      );
-
-      if (mounted) {
-        setState(() {
-          if (refresh) {
-            _notes = result.notes;
-          } else {
-            _notes.addAll(result.notes);
-          }
-          _hasMore = result.notes.length >= _pageSize;
-          _page++;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _error = e.toString());
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _loading = false);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-    final sortedNotes = _sortedNotes;
-
-    if (_userId == null && !_loading && _error == null) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(Spacing.lg),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    if (_loading && _notes.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(Spacing.lg),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(Spacing.lg),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.error_outline, color: cs.error, size: 48),
-              const SizedBox(height: Spacing.md),
-              Text('加载失败', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: cs.error)),
-              const SizedBox(height: Spacing.sm),
-              Text(_error!, style: Theme.of(context).textTheme.bodySmall, textAlign: TextAlign.center),
-              const SizedBox(height: Spacing.lg),
-              ElevatedButton(onPressed: _getUserIdAndLoadNotes, child: const Text('重新加载')),
-            ],
-          ),
-        ),
-      );
-    }
-
-    if (_notes.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(Spacing.lg),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.note_outlined, color: cs.onSurfaceVariant, size: 64),
-              const SizedBox(height: Spacing.md),
-              Text('暂无笔记', style: Theme.of(context).textTheme.titleMedium?.copyWith(color: cs.onSurfaceVariant)),
-              const SizedBox(height: Spacing.sm),
-              Text('您还没有发布任何笔记', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-              const SizedBox(height: Spacing.lg),
-              ElevatedButton(onPressed: () => _loadNotes(refresh: true), child: const Text('刷新')),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return Column(
-      children: [
-        // 排序栏
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.xs),
-          color: cs.surfaceContainerLow,
-          child: Row(
-            children: [
-              Icon(Icons.article_outlined, size: 18, color: cs.primary),
-              const SizedBox(width: Spacing.xs),
-              Text('我的笔记 (${_notes.length})', style: theme.textTheme.labelLarge),
-              const Spacer(),
-              PopupMenuButton<String>(
-                initialValue: _sortBy,
-                onSelected: (value) => setState(() => _sortBy = value),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.sort, size: 16, color: cs.onSurfaceVariant),
-                    const SizedBox(width: 4),
-                    Text(
-                      _sortBy == 'like' ? '按点赞数' : '按收藏数',
-                      style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                    ),
-                    Icon(Icons.arrow_drop_down, size: 16, color: cs.onSurfaceVariant),
-                  ],
-                ),
-                itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'like', child: Text('按点赞数排序')),
-                  const PopupMenuItem(value: 'favorite', child: Text('按收藏数排序')),
-                ],
-              ),
-            ],
-          ),
-        ),
-        // 列表
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: () async => _loadNotes(refresh: true),
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (notification) {
-                if (notification is ScrollEndNotification) {
-                  if (_hasMore && !_loading &&
-                      notification.metrics.pixels >= notification.metrics.maxScrollExtent - 100) {
-                    _loadNotes();
-                  }
-                }
-                return false;
-              },
-              child: ListView.builder(
-                padding: const EdgeInsets.all(Spacing.md),
-                itemCount: sortedNotes.length + (_hasMore ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index >= sortedNotes.length) {
-                    return const Padding(
-                      padding: EdgeInsets.all(Spacing.md),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-                  final note = sortedNotes[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: Spacing.sm),
-                    child: _NoteListItem(
-                      note: note,
-                      onTap: () async {
-                        await context.push('/profile/note/${note.id}/manage', extra: {
-                          'note': note,
-                        });
-                        _loadNotes(refresh: true);
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _NoteListItem extends StatelessWidget {
-  final NoteItem note;
-  final VoidCallback onTap;
-
-  const _NoteListItem({required this.note, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-
-    return Card(
-      elevation: 0,
-      color: cs.surfaceContainerLow,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(Spacing.md),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: cs.primaryContainer,
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Icon(Icons.article_outlined, color: cs.onPrimaryContainer, size: 24),
-              ),
-              const SizedBox(width: Spacing.md),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      note.title.isNotEmpty ? note.title : '无标题笔记',
-                      style: theme.textTheme.bodyMedium?.copyWith(fontWeight: FontWeight.w500),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.thumb_up_outlined, size: 14, color: cs.onSurfaceVariant),
-                        const SizedBox(width: 4),
-                        Text('${note.likeCount}', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                        const SizedBox(width: 12),
-                        Icon(Icons.star_outline, size: 14, color: cs.onSurfaceVariant),
-                        const SizedBox(width: 4),
-                        Text('${note.favoriteCount}', style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _VideosTab extends StatefulWidget {
-  final Function(int)? onVideosLoaded;
-
-  const _VideosTab({super.key, this.onVideosLoaded});
-
-  @override
-  State<_VideosTab> createState() => _VideosTabState();
-}
-
-class _VideosTabState extends State<_VideosTab> with WidgetsBindingObserver {
-  List<Video> _videos = [];
-  bool _loading = false;
-  String? _error;
-  String? _userId;
-  bool _needsRefresh = false;
-  int _page = 1;
-  bool _hasMore = true;
-  static const int _pageSize = 20;
-  String _sortBy = 'like'; // 'like' or 'comment'
-
-  /// 根据排序方式对视频列表排序
-  List<Video> get _sortedVideos {
-    final sorted = List<Video>.from(_videos);
-    if (_sortBy == 'like') {
-      sorted.sort((a, b) => (b.likes ?? 0).compareTo(a.likes ?? 0));
-    } else {
-      sorted.sort((a, b) => (b.commentCount ?? 0).compareTo(a.commentCount ?? 0));
-    }
-    return sorted;
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    WidgetsBinding.instance.addObserver(this);
-    _getUserIdAndLoadVideos();
-  }
-
-  /// 供父组件调用的刷新方法
-  void _refreshData() {
-    _loadVideos(refresh: true);
-  }
-
-  @override
-  void dispose() {
-    WidgetsBinding.instance.removeObserver(this);
-    super.dispose();
-  }
-
-  @override
-  void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.resumed) {
-      if (_needsRefresh) {
-        _loadVideos();
-        _needsRefresh = false;
-      }
-    }
-  }
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // Note: addScopedWillPopCallback is deprecated in newer Flutter versions
-    // Consider using PopScope widget instead if needed
-    // Commenting out deprecated code for now
-    /*
-    ModalRoute? route = ModalRoute.of(context);
-    if (route != null) {
-      route.addScopedWillPopCallback(() {
-        _needsRefresh = true;
-        return SynchronousFuture(true);
-      });
-    }
-    */
-  }
-
-  void _getUserIdAndLoadVideos() {
-    // 方法1: 从 ProfileProvider 获取（主要方法）
-    final profileProvider = context.read<ProfileProvider>();
-    final profileUser = profileProvider.user;
-
-    if (profileUser != null && profileUser.id.isNotEmpty) {
-      _userId = profileUser.id;
-      _loadVideos();
-      return;
-    }
-
-    // 方法2: 从 AuthProvider 获取（备用方法）
-    try {
-      final authProvider = context.read<AuthProvider>();
-      final authUser = authProvider.user;
-      if (authUser != null && authUser.id.isNotEmpty) {
-        _userId = authUser.id;
-        _loadVideos();
-        return;
-      }
-    } catch (e) {
-      // Error getting user ID from AuthProvider
-    }
-
-    // 方法3: 从本地存储获取（最后备选）
-    _getUserIdFromStorage();
-  }
-
-  void _getUserIdFromStorage() async {
-    try {
-      // 首先尝试从 Hive 获取
-      final box = await Hive.openBox('user_box');
-      final String? hiveUserId = box.get('id') as String?;
-
-      if (hiveUserId != null && hiveUserId.isNotEmpty) {
-        setState(() {
-          _userId = hiveUserId;
-        });
-        _loadVideos();
-        return;
-      }
-
-      // 然后尝试从 SharedPreferences 获取（统一使用 user_id）
-      final prefs = await SharedPreferences.getInstance();
-      final String? prefsUserId = prefs.getString('user_id');
-
-      if (prefsUserId != null && prefsUserId.isNotEmpty) {
-        setState(() {
-          _userId = prefsUserId;
-        });
-        _loadVideos();
-        return;
-      }
-
-      setState(() {
-        _error = '无法获取用户ID，请重新登录';
-        _loading = false;
-      });
-    } catch (e) {
-      setState(() {
-        _error = '获取用户信息失败: $e';
-        _loading = false;
-      });
-    }
-  }
-
-  Future<void> _loadVideos({bool refresh = false}) async {
-    if (_userId == null || _userId!.isEmpty) {
-      setState(() {
-        _error = '用户ID为空，无法加载视频';
-        _loading = false;
-      });
-      return;
-    }
-
-    if (refresh) {
-      _page = 1;
-      _hasMore = true;
-    }
-
-    if (!_hasMore && !refresh) return;
-
-    if (mounted) {
-      setState(() {
-        _loading = true;
-        if (refresh) _error = null;
-      });
-    }
-
-    try {
-      final userService = UserService(AppBootstrap.apiClient.dio);
-      final videos = await userService.getVideos(
-        userId: _userId!,
-        page: _page,
-        size: _pageSize,
-      );
-
-      if (mounted) {
-        setState(() {
-          if (refresh) {
-            _videos = videos;
-          } else {
-            _videos.addAll(videos);
-          }
-          _hasMore = videos.length >= _pageSize;
-          _page++;
-        });
-      }
-
-      // 新增：通知父组件视频数量更新
-      if (widget.onVideosLoaded != null) {
-        widget.onVideosLoaded!(_videos.length);
-      }
-
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = e.toString();
-        });
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _loading = false;
-        });
-      }
-    }
-  }
-
-  void _refreshVideos() {
-    _loadVideos(refresh: true);
-  }
-
-  // 构建视频封面组件
-  Widget _buildVideoThumbnail(Video video) {
-    String? resolvedCoverUrl;
-
-    if (video.coverUrl != null && video.coverUrl!.isNotEmpty) {
-      resolvedCoverUrl = UrlUtils.resolveStorageUrl(video.coverUrl!, defaultDir: 'covers');
-    }
-
-    if (resolvedCoverUrl != null && resolvedCoverUrl.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(8),
-        child: Image.network(
-          resolvedCoverUrl,
-          width: 60,
-          height: 60,
-          fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) {
-            return _buildDefaultThumbnail();
-          },
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return _buildDefaultThumbnail();
-          },
-        ),
-      );
-    }
-    return _buildDefaultThumbnail();
-  }
-
-  Widget _buildDefaultThumbnail() {
-    return Container(
-      width: 60,
-      height: 60,
-      decoration: BoxDecoration(
-        color: Colors.grey[300],
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Icon(Icons.videocam, color: Colors.grey),
-    );
-  }
-
-  // 构建视频统计信息 - 使用统一的icon样式
-  Widget _buildVideoStats(Video video) {
-    final cs = Theme.of(context).colorScheme;
-    return Row(
-      children: [
-        Icon(Icons.thumb_up_outlined, size: 14, color: cs.onSurfaceVariant),
-        const SizedBox(width: 4),
-        Text('${video.likes ?? 0}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-        const SizedBox(width: 12),
-        Icon(Icons.chat_bubble_outline, size: 14, color: cs.onSurfaceVariant),
-        const SizedBox(width: 4),
-        Text('${video.commentCount ?? 0}', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant)),
-      ],
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    final theme = Theme.of(context);
-    final sortedVideos = _sortedVideos;
-
-    // 如果还没有获取到用户ID，显示加载状态
-    if (_userId == null && !_loading && _error == null) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(Spacing.lg),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    // 显示加载状态
-    if (_loading && _videos.isEmpty) {
-      return const Center(
-        child: Padding(
-          padding: EdgeInsets.all(Spacing.lg),
-          child: CircularProgressIndicator(),
-        ),
-      );
-    }
-
-    // 显示错误状态
-    if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(Spacing.lg),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.error_outline,
-                color: cs.error,
-                size: 48,
-              ),
-              const SizedBox(height: Spacing.md),
-              Text(
-                '加载失败',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: cs.error,
-                ),
-              ),
-              const SizedBox(height: Spacing.sm),
-              Text(
-                _error!,
-                style: Theme.of(context).textTheme.bodySmall,
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: Spacing.lg),
-              ElevatedButton(
-                onPressed: _getUserIdAndLoadVideos,
-                child: const Text('重新加载'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // 显示空状态
-    if (_videos.isEmpty) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(Spacing.lg),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(
-                Icons.video_library_outlined,
-                color: cs.onSurfaceVariant,
-                size: 64,
-              ),
-              const SizedBox(height: Spacing.md),
-              Text(
-                '暂无视频',
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: Spacing.sm),
-              Text(
-                '您还没有发布任何视频',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: cs.onSurfaceVariant,
-                ),
-              ),
-              const SizedBox(height: Spacing.lg),
-              ElevatedButton(
-                onPressed: _refreshVideos,
-                child: const Text('刷新'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // 显示视频列表 - 添加刷新指示器和分页
-    return Column(
-      children: [
-        // 排序栏
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.xs),
-          color: cs.surfaceContainerLow,
-          child: Row(
-            children: [
-              Icon(Icons.video_library_outlined, size: 18, color: cs.primary),
-              const SizedBox(width: Spacing.xs),
-              Text('我的视频 (${_videos.length})', style: theme.textTheme.labelLarge),
-              const Spacer(),
-              PopupMenuButton<String>(
-                initialValue: _sortBy,
-                onSelected: (value) => setState(() => _sortBy = value),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.sort, size: 16, color: cs.onSurfaceVariant),
-                    const SizedBox(width: 4),
-                    Text(
-                      _sortBy == 'like' ? '按点赞数' : '按评论数',
-                      style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
-                    ),
-                    Icon(Icons.arrow_drop_down, size: 16, color: cs.onSurfaceVariant),
-                  ],
-                ),
-                itemBuilder: (context) => [
-                  const PopupMenuItem(value: 'like', child: Text('按点赞数排序')),
-                  const PopupMenuItem(value: 'comment', child: Text('按评论数排序')),
-                ],
-              ),
-            ],
-          ),
-        ),
-        // 列表
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: () async {
-              await _loadVideos(refresh: true);
-            },
-            child: NotificationListener<ScrollNotification>(
-              onNotification: (notification) {
-                if (notification is ScrollEndNotification) {
-                  if (_hasMore && !_loading &&
-                      notification.metrics.pixels >= notification.metrics.maxScrollExtent - 100) {
-                    _loadVideos();
-                  }
-                }
-                return false;
-              },
-              child: ListView.builder(
-                padding: const EdgeInsets.all(Spacing.md),
-                itemCount: sortedVideos.length + (_hasMore ? 1 : 0),
-                itemBuilder: (context, index) {
-                  if (index >= sortedVideos.length) {
-                    return const Padding(
-                      padding: EdgeInsets.all(Spacing.md),
-                      child: Center(child: CircularProgressIndicator()),
-                    );
-                  }
-                  final video = sortedVideos[index];
-                  return Padding(
-                    padding: const EdgeInsets.only(bottom: Spacing.md),
-                    child: ListTile(
-                      leading: _buildVideoThumbnail(video),
-                      title: Text(
-                        video.title ?? '未命名视频',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                          fontWeight: FontWeight.w500,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          if (video.intro != null && video.intro!.isNotEmpty) ...[
-                            Text(
-                              video.intro!,
-                              style: Theme.of(context).textTheme.bodySmall,
-                              maxLines: 2,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                          ],
-                          _buildVideoStats(video),
-                        ],
-                      ),
-                      trailing: IconButton(
-                        icon: Icon(Icons.chevron_right, color: cs.onSurfaceVariant),
-                        onPressed: () async {
-                          await context.push('/profile/video/${video.id}/manage', extra: {
-                            'title': video.title ?? '未命名视频',
-                            'description': video.intro ?? '',
-                            'likes': video.likes ?? 0,
-                            'views': video.views ?? 0,
-                            'coverUrl': UrlUtils.resolveStorageUrl(video.coverUrl ?? '', defaultDir: 'covers'),
-                            'videoUrl': video.videoUrl,
-                            'tags': video.tags,
-                          });
-
-                          // 返回后刷新视频列表
-                          _refreshVideos();
-                        },
-                      ),
-                      onTap: () async {
-                        await context.push('/profile/video/${video.id}/manage', extra: {
-                          'title': video.title ?? '未命名视频',
-                          'description': video.intro ?? '',
-                          'likes': video.likes ?? 0,
-                          'views': video.views ?? 0,
-                          'coverUrl': UrlUtils.resolveStorageUrl(video.coverUrl ?? '', defaultDir: 'covers'),
-                          'videoUrl': video.videoUrl,
-                          'tags': video.tags,
-                        });
-
-                        // 返回后刷新视频列表
-                        _refreshVideos();
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// TabBar 固定在顶部的代理类
-class _StickyTabBarDelegate extends SliverPersistentHeaderDelegate {
-  final Widget child;
-
-  _StickyTabBarDelegate({required this.child});
-
-  @override
-  double get minExtent => 48.0;
-
-  @override
-  double get maxExtent => 48.0;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return child;
-  }
-
-  @override
-  bool shouldRebuild(covariant _StickyTabBarDelegate oldDelegate) {
-    return child != oldDelegate.child;
   }
 }

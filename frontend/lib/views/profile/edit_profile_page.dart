@@ -485,7 +485,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
   }
 
   String _birthdayText() {
-    if (_birthday == null) return '生日当天会收到知音的祝福';
+    if (_birthday == null) return '生日当天会收到ZiTok 短剧的祝福';
     return '${_birthday!.year}-${_birthday!.month.toString().padLeft(2, '0')}-${_birthday!.day.toString().padLeft(2, '0')}';
   }
 

@@ -64,7 +64,7 @@ func (s *InteractionService) Comment(ctx context.Context, userID int64, videoID 
 		return false, err
 	}
 	if !exist {
-		return false, errors.New("video not found")
+		return false, errors.New("target not found")
 	}
 	// 创建评论
 	if err := s.db.CreateComment(ctx, userID, videoID, content, pID); err != nil {
@@ -73,12 +73,12 @@ func (s *InteractionService) Comment(ctx context.Context, userID int64, videoID 
 	return true, nil
 }
 
-func (s *InteractionService) GetComments(ctx context.Context, videoID int64, page int32, size int32, commentID *int64) ([]*model.Comment, error) {
+func (s *InteractionService) GetComments(ctx context.Context, videoID int64, page int32, size int32, commentID *int64) ([]*model.Comment, int64, error) {
 	offset := (page - 1) * size
 
-	comments, _, err := s.db.GetCommentList(ctx, videoID, int(offset), int(size), commentID)
+	comments, total, err := s.db.GetCommentList(ctx, videoID, int(offset), int(size), commentID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	result := make([]*model.Comment, len(comments))
@@ -93,7 +93,7 @@ func (s *InteractionService) GetComments(ctx context.Context, videoID int64, pag
 		}
 	}
 
-	return result, nil
+	return result, total, nil
 }
 
 func (s *InteractionService) LikeComment(ctx context.Context, userID int64, commentID int64) (bool, error) {

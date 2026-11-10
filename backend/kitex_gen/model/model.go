@@ -534,6 +534,7 @@ type Comment struct {
 	CreatedAt *int64 `thrift:"createdAt,6,optional" frugal:"6,optional,i64" json:"createdAt,omitempty"`
 	UpdatedAt *int64 `thrift:"updatedAt,7,optional" frugal:"7,optional,i64" json:"updatedAt,omitempty"`
 	ParentId  *int64 `thrift:"parentId,8,optional" frugal:"8,optional,i64" json:"parentId,omitempty"`
+	EpisodeId *int64 `thrift:"episodeId,9,optional" frugal:"9,optional,i64" json:"episodeId,omitempty"`
 }
 
 func NewComment() *Comment {
@@ -594,6 +595,15 @@ func (p *Comment) GetParentId() (v int64) {
 	}
 	return *p.ParentId
 }
+
+var Comment_EpisodeId_DEFAULT int64
+
+func (p *Comment) GetEpisodeId() (v int64) {
+	if !p.IsSetEpisodeId() {
+		return Comment_EpisodeId_DEFAULT
+	}
+	return *p.EpisodeId
+}
 func (p *Comment) SetId(val int64) {
 	p.Id = val
 }
@@ -618,6 +628,9 @@ func (p *Comment) SetUpdatedAt(val *int64) {
 func (p *Comment) SetParentId(val *int64) {
 	p.ParentId = val
 }
+func (p *Comment) SetEpisodeId(val *int64) {
+	p.EpisodeId = val
+}
 
 func (p *Comment) IsSetUser() bool {
 	return p.User != nil
@@ -633,6 +646,10 @@ func (p *Comment) IsSetUpdatedAt() bool {
 
 func (p *Comment) IsSetParentId() bool {
 	return p.ParentId != nil
+}
+
+func (p *Comment) IsSetEpisodeId() bool {
+	return p.EpisodeId != nil
 }
 
 func (p *Comment) String() string {
@@ -651,6 +668,7 @@ var fieldIDToName_Comment = map[int16]string{
 	6: "createdAt",
 	7: "updatedAt",
 	8: "parentId",
+	9: "episodeId",
 }
 
 type LikeInfo struct {

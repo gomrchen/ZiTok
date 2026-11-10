@@ -145,9 +145,9 @@ class _RegisterPageState extends State<RegisterPage> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const SizedBox(height: Spacing.xl),
-                    Text('知音', style: theme.textTheme.titleLarge),
+                    Text('ZiTok 短剧', style: theme.textTheme.titleLarge),
                     const SizedBox(height: Spacing.sm),
-                    Text('支持笔记功能的视频社区', style: theme.textTheme.bodySmall),
+                    Text('竖屏连播 · 热门短剧', style: theme.textTheme.bodySmall),
                     const SizedBox(height: Spacing.lg),
                     TextField(
                       controller: _usernameCtrl,

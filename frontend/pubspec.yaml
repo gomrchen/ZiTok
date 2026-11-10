@@ -1,5 +1,5 @@
 name: zitok
-description: "一个知识向短视频社交平台."
+description: "ZiTok 短剧 — 竖屏连播短剧 App."
 publish_to: 'none'
 version: 1.0.0
 
@@ -72,3 +72,6 @@ flutter_launcher_icons:
 
 flutter:
   uses-material-design: true
+  assets:
+    - assets/images/profile_hero_bg.jpg
+    - assets/icon/app_icon.png

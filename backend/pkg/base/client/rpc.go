@@ -25,8 +25,9 @@ import (
 	"github.com/kitex-contrib/obs-opentelemetry/tracing"
 	etcd "github.com/kitex-contrib/registry-etcd"
 	"github.com/yxrxy/videoHub/config"
+	"github.com/yxrxy/videoHub/kitex_gen/commerce/commerceservice"
+	"github.com/yxrxy/videoHub/kitex_gen/drama/dramaservice"
 	"github.com/yxrxy/videoHub/kitex_gen/interaction/interactionservice"
-	"github.com/yxrxy/videoHub/kitex_gen/notes/notesservice"
 	"github.com/yxrxy/videoHub/kitex_gen/social/socialservice"
 	"github.com/yxrxy/videoHub/kitex_gen/user/userservice"
 	"github.com/yxrxy/videoHub/kitex_gen/video/videoservice"
@@ -39,7 +40,8 @@ const (
 	VideoServiceName              = "VideoService"
 	InteractionServiceName        = "InteractionService"
 	SocialServiceName             = "SocialService"
-	NoteServiceName               = "NoteService"
+	DramaServiceName              = "DramaService"
+	CommerceServiceName           = "CommerceService"
 )
 
 // 通用的RPC客户端初始化函数
@@ -81,6 +83,10 @@ func InitSocialRPC() (*socialservice.Client, error) {
 	return initRPCClient(SocialServiceName, socialservice.NewClient)
 }
 
-func InitNoteRPC() (*notesservice.Client, error) {
-	return initRPCClient(NoteServiceName, notesservice.NewClient)
+func InitDramaRPC() (*dramaservice.Client, error) {
+	return initRPCClient(DramaServiceName, dramaservice.NewClient)
+}
+
+func InitCommerceRPC() (*commerceservice.Client, error) {
+	return initRPCClient(CommerceServiceName, commerceservice.NewClient)
 }

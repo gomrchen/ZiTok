@@ -75,12 +75,36 @@ class SettingsPage extends StatelessWidget {
                 onChanged: (_) => tp.toggleDark(),
               ),
               ListTile(
+                leading: const Icon(Icons.child_care_outlined),
+                title: const Text('青少年模式'),
+                subtitle: const Text('合规占位：可限制付费与社交'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('青少年模式'),
+                    content: const Text('一期占位：开启后将限制付费解锁与私信（待完善）。'),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('知道了')),
+                    ],
+                  ),
+                ),
+              ),
+              ListTile(
+                leading: const Icon(Icons.flag_outlined),
+                title: const Text('举报与反馈'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('已记录反馈入口（一期占位）')),
+                ),
+              ),
+              ListTile(
                 leading: const Icon(Icons.info_outline),
                 title: const Text('关于'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => showAboutDialog(
                   context: context,
-                  applicationName: '知音App',
+                  applicationName: 'ZiTok 短剧',
                   applicationVersion: '0.1.0',
                 ),
               ),

@@ -6,7 +6,7 @@ ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT"
 
 SESSION="${VIDEOHUB_TMUX_SESSION:-videohub}"
-SERVICES=(user video interaction social note gateway)
+SERVICES=(user video interaction social drama commerce gateway)
 export ETCD_ADDR="${ETCD_ADDR:-127.0.0.1:2379}"
 
 mkdir -p logs

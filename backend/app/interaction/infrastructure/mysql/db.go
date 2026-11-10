@@ -2,6 +2,8 @@ package mysql
 
 import (
 	"context"
+	"errors"
+	"time"
 
 	"github.com/yxrxy/videoHub/app/interaction/domain/model"
 	model2 "github.com/yxrxy/videoHub/app/video/domain/model"
@@ -34,20 +36,44 @@ func (i *Interaction) GetLikeList(ctx context.Context, videoID int64, offset, li
 	return result, err
 }
 
-// CreateLike 创建点赞
+// CreateLike 创建点赞（含软删恢复）
 func (i *Interaction) CreateLike(ctx context.Context, userID, videoID int64) error {
-	if err := i.db.WithContext(ctx).Create(&Like{
-		UserID:  userID,
-		VideoID: videoID,
-	}).Error; err != nil {
+	var existing Like
+	err := i.db.WithContext(ctx).
+		Where("user_id = ? AND video_id = ?", userID, videoID).
+		First(&existing).Error
+	if err == nil {
+		if existing.DeletedAt == nil {
+			return nil
+		}
+		if err := i.db.WithContext(ctx).Model(&Like{}).
+			Where("user_id = ? AND video_id = ?", userID, videoID).
+			Update("deleted_at", nil).Error; err != nil {
+			return err
+		}
+	} else if errors.Is(err, gorm.ErrRecordNotFound) {
+		if err := i.db.WithContext(ctx).Create(&Like{
+			UserID:  userID,
+			VideoID: videoID,
+		}).Error; err != nil {
+			return err
+		}
+	} else {
 		return err
 	}
-	result := i.db.WithContext(ctx).Model(&Video{}).
+	// 兼容短剧：优先更新 video，没有则更新 episode
+	res := i.db.WithContext(ctx).Model(&Video{}).
 		Where("id = ?", videoID).
 		UpdateColumn("like_count", gorm.Expr("like_count + ?", 1))
-
-	if result.Error != nil {
-		return result.Error
+	if res.Error != nil {
+		return res.Error
+	}
+	if res.RowsAffected == 0 {
+		if err := i.db.WithContext(ctx).Table("episode").
+			Where("id = ? AND deleted_at IS NULL", videoID).
+			UpdateColumn("like_count", gorm.Expr("like_count + ?", 1)).Error; err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -56,7 +82,7 @@ func (i *Interaction) CreateLike(ctx context.Context, userID, videoID int64) err
 func (i *Interaction) GetLike(ctx context.Context, userID, videoID int64) (*model.Like, error) {
 	var like Like
 	err := i.db.WithContext(ctx).
-		Where("video_id = ? AND deleted_at IS NULL", videoID).
+		Where("user_id = ? AND video_id = ? AND deleted_at IS NULL", userID, videoID).
 		First(&like).Error
 	if err != nil {
 		return nil, err
@@ -69,10 +95,25 @@ func (i *Interaction) GetLike(ctx context.Context, userID, videoID int64) (*mode
 
 // DeleteLike 删除点赞
 func (i *Interaction) DeleteLike(ctx context.Context, like *model.Like) error {
-	return i.db.WithContext(ctx).Delete(&Like{
-		UserID:  like.UserID,
-		VideoID: like.VideoID,
-	}).Error
+	now := time.Now().Unix()
+	res := i.db.WithContext(ctx).Model(&Like{}).
+		Where("user_id = ? AND video_id = ? AND deleted_at IS NULL", like.UserID, like.VideoID).
+		Update("deleted_at", now)
+	if res.Error != nil {
+		return res.Error
+	}
+	dec := i.db.WithContext(ctx).Model(&Video{}).
+		Where("id = ?", like.VideoID).
+		UpdateColumn("like_count", gorm.Expr("CASE WHEN like_count > 0 THEN like_count - 1 ELSE 0 END"))
+	if dec.Error != nil {
+		return dec.Error
+	}
+	if dec.RowsAffected == 0 {
+		return i.db.WithContext(ctx).Table("episode").
+			Where("id = ? AND deleted_at IS NULL", like.VideoID).
+			UpdateColumn("like_count", gorm.Expr("CASE WHEN like_count > 0 THEN like_count - 1 ELSE 0 END")).Error
+	}
+	return nil
 }
 
 // CreateComment 创建评论
@@ -104,11 +145,21 @@ func (i *Interaction) GetComment(ctx context.Context, commentID int64) (*model.C
 	}, nil
 }
 
-// IsVideoExist 检查视频是否存在
+// IsVideoExist 检查评论目标是否存在：兼容旧 video.id，以及短剧 episode.id。
 func (i *Interaction) IsVideoExist(ctx context.Context, videoID int64) (bool, error) {
 	var count int64
 	err := i.db.WithContext(ctx).Model(&model2.Video{}).
 		Where("id = ?", videoID).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	if count > 0 {
+		return true, nil
+	}
+	// 短剧评论复用 video_id 字段写入 episode.id
+	err = i.db.WithContext(ctx).Table("episode").
+		Where("id = ? AND deleted_at IS NULL", videoID).
 		Count(&count).Error
 	if err != nil {
 		return false, err

@@ -20,21 +20,26 @@ void _configurePerformance() {
   PaintingBinding.instance.imageCache.maximumSizeBytes =
       NetworkConfig.imageCacheMaxSizeMB * 1024 * 1024;
 
-  // 生产模式下的额外优化
-  if (AppConfig.isProduction) {
-    // 禁用调试横幅已由 MaterialApp 默认处理
-    // 设置首选屏幕方向
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+  SystemChrome.setPreferredOrientations([
+    DeviceOrientation.portraitUp,
+    DeviceOrientation.portraitDown,
+  ]);
 
-    // 设置系统UI覆盖样式
-    SystemChrome.setSystemUIOverlayStyle(
-      const SystemUiOverlayStyle(
-        statusBarColor: Colors.transparent,
-        statusBarIconBrightness: Brightness.dark,
-      ),
-    );
+  // 边缘到边：状态栏/导航栏透明，视频可铺满
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.light,
+      systemNavigationBarContrastEnforced: false,
+    ),
+  );
+
+  // 生产模式额外标记（缓存策略等已在上方配置）
+  if (AppConfig.isProduction) {
+    // no-op：保留分支便于后续加生产专用开关
   }
 }

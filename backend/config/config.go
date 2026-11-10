@@ -102,6 +102,16 @@ type NoteConfig struct {
 	RPCAddr string `mapstructure:"rpc_addr"`
 }
 
+type DramaConfig struct {
+	Name    string
+	RPCAddr string `mapstructure:"rpc_addr"`
+}
+
+type CommerceConfig struct {
+	Name    string
+	RPCAddr string `mapstructure:"rpc_addr"`
+}
+
 type ElasticsearchConfig struct {
 	Addr string `mapstructure:"addr"`
 }
@@ -174,6 +184,8 @@ var (
 	ApiKey            *ApiKeyConfig
 	Gorse             *GorseConfig
 	Note              *NoteConfig
+	Drama             *DramaConfig
+	Commerce          *CommerceConfig
 	runtimeViper      = viper.New()
 )
 
@@ -204,6 +216,8 @@ type Config struct {
 	ApiKey            ApiKeyConfig `mapstructure:"api_key"`
 	Gorse             GorseConfig  `mapstructure:"gorse"`
 	Note              NoteConfig
+	Drama             DramaConfig    `mapstructure:"drama"`
+	Commerce          CommerceConfig `mapstructure:"commerce"`
 }
 
 // Init 初始化配置，支持从etcd远程获取配置
@@ -272,6 +286,20 @@ func configMapping() {
 	ApiKey = &conf.ApiKey
 	Gorse = &conf.Gorse
 	Note = &conf.Note
+	Drama = &conf.Drama
+	Commerce = &conf.Commerce
+	if Drama.RPCAddr == "" {
+		Drama.RPCAddr = ":8898"
+	}
+	if Drama.Name == "" {
+		Drama.Name = "DramaService"
+	}
+	if Commerce.RPCAddr == "" {
+		Commerce.RPCAddr = ":8899"
+	}
+	if Commerce.Name == "" {
+		Commerce.Name = "CommerceService"
+	}
 }
 
 // GetDSN 获取MySQL连接字符串

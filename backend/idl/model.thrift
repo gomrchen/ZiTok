@@ -45,15 +45,17 @@ struct Video {
 }
 
 // 评论模型
+// 短剧语义：videoId 字段存储 episode_id
 struct Comment {
     1: required i64 id,              // 评论ID
     2: required i64 userId,          // 用户ID
-    3: required i64 videoId,         // 视频ID
+    3: required i64 videoId,         // episode_id（历史字段名 videoId）
     4: required string content,      // 评论内容
     5: optional User user,           // 用户信息
     6: optional i64 createdAt,       // 创建时间
     7: optional i64 updatedAt,       // 更新时间
     8: optional i64 parentId,        // 父评论ID
+    9: optional i64 episodeId,       // 显式 episode_id（与 videoId 同值）
 }
 
 struct LikeInfo {

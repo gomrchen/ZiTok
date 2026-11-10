@@ -1775,6 +1775,20 @@ func (p *Comment) FastRead(buf []byte) (int, error) {
 					goto SkipFieldError
 				}
 			}
+		case 9:
+			if fieldTypeId == thrift.I64 {
+				l, err = p.FastReadField9(buf[offset:])
+				offset += l
+				if err != nil {
+					goto ReadFieldError
+				}
+			} else {
+				l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
+				offset += l
+				if err != nil {
+					goto SkipFieldError
+				}
+			}
 		default:
 			l, err = thrift.Binary.Skip(buf[offset:], fieldTypeId)
 			offset += l
@@ -1924,6 +1938,20 @@ func (p *Comment) FastReadField8(buf []byte) (int, error) {
 	return offset, nil
 }
 
+func (p *Comment) FastReadField9(buf []byte) (int, error) {
+	offset := 0
+
+	var _field *int64
+	if v, l, err := thrift.Binary.ReadI64(buf[offset:]); err != nil {
+		return offset, err
+	} else {
+		offset += l
+		_field = &v
+	}
+	p.EpisodeId = _field
+	return offset, nil
+}
+
 func (p *Comment) FastWrite(buf []byte) int {
 	return p.FastWriteNocopy(buf, nil)
 }
@@ -1937,6 +1965,7 @@ func (p *Comment) FastWriteNocopy(buf []byte, w thrift.NocopyWriter) int {
 		offset += p.fastWriteField6(buf[offset:], w)
 		offset += p.fastWriteField7(buf[offset:], w)
 		offset += p.fastWriteField8(buf[offset:], w)
+		offset += p.fastWriteField9(buf[offset:], w)
 		offset += p.fastWriteField4(buf[offset:], w)
 		offset += p.fastWriteField5(buf[offset:], w)
 	}
@@ -1955,6 +1984,7 @@ func (p *Comment) BLength() int {
 		l += p.field6Length()
 		l += p.field7Length()
 		l += p.field8Length()
+		l += p.field9Length()
 	}
 	l += thrift.Binary.FieldStopLength()
 	return l
@@ -2024,6 +2054,15 @@ func (p *Comment) fastWriteField8(buf []byte, w thrift.NocopyWriter) int {
 	return offset
 }
 
+func (p *Comment) fastWriteField9(buf []byte, w thrift.NocopyWriter) int {
+	offset := 0
+	if p.IsSetEpisodeId() {
+		offset += thrift.Binary.WriteFieldBegin(buf[offset:], thrift.I64, 9)
+		offset += thrift.Binary.WriteI64(buf[offset:], *p.EpisodeId)
+	}
+	return offset
+}
+
 func (p *Comment) field1Length() int {
 	l := 0
 	l += thrift.Binary.FieldBeginLength()
@@ -2082,6 +2121,15 @@ func (p *Comment) field7Length() int {
 func (p *Comment) field8Length() int {
 	l := 0
 	if p.IsSetParentId() {
+		l += thrift.Binary.FieldBeginLength()
+		l += thrift.Binary.I64Length()
+	}
+	return l
+}
+
+func (p *Comment) field9Length() int {
+	l := 0
+	if p.IsSetEpisodeId() {
 		l += thrift.Binary.FieldBeginLength()
 		l += thrift.Binary.I64Length()
 	}

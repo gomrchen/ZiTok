@@ -1,0 +1,16 @@
+.login-wrap {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(160deg, #f6f3ee 0%, #e8efe9 45%, #dfe8f2 100%);
+}
+
+.brand {
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  border-bottom: 1px solid #f0f0f0;
+}

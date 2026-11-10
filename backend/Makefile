@@ -23,7 +23,7 @@ IDL_PATH = $(DIR)/idl
 OUTPUT_PATH = $(DIR)/output
 
 # 服务名
-SERVICES := gateway user social interaction video note
+SERVICES := gateway user social interaction video drama commerce
 service = $(word 1, $@)
 
 all:

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../theme/theme_tokens.dart';
-import '../views/create/create_page.dart';
 
 /// 底部普通导航项
 class NavItem extends StatelessWidget {
@@ -9,6 +8,8 @@ class NavItem extends StatelessWidget {
   final IconData selectedIcon;
   final bool selected;
   final VoidCallback onTap;
+  /// 首页沉浸底栏：未选中用浅色，保证黑底可读
+  final bool onDark;
   const NavItem({
     super.key,
     required this.label,
@@ -16,11 +17,14 @@ class NavItem extends StatelessWidget {
     required this.selectedIcon,
     required this.selected,
     required this.onTap,
+    this.onDark = false,
   });
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final color = selected ? cs.primary : cs.onSurfaceVariant;
+    final color = selected
+        ? cs.primary
+        : (onDark ? Colors.white70 : cs.onSurfaceVariant);
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -85,29 +89,6 @@ class MessagesItem extends StatelessWidget {
               ),
           ],
         ),
-      ),
-    );
-  }
-}
-
-/// 底部中间“+”按钮
-class PlusInlineButton extends StatelessWidget {
-  const PlusInlineButton({super.key});
-  @override
-  Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-    return InkWell(
-      onTap: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const CreatePage())),
-      borderRadius: BorderRadius.circular(10),
-      child: Container(
-        width: 36,
-        height: 36,
-        decoration: BoxDecoration(
-          color: cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(color: cs.outlineVariant),
-        ),
-        child: Icon(Icons.add, color: cs.onSurfaceVariant),
       ),
     );
   }

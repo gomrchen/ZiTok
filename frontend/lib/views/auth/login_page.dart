@@ -12,8 +12,8 @@ class LoginPage extends StatefulWidget {
 }
 
 class _LoginPageState extends State<LoginPage> {
-  final _usernameCtrl = TextEditingController();
-  final _pwdCtrl = TextEditingController();
+  final _usernameCtrl = TextEditingController(text: 'zitok');
+  final _pwdCtrl = TextEditingController(text: 'demo1234');
 
   @override
   void dispose() {
@@ -39,9 +39,11 @@ class _LoginPageState extends State<LoginPage> {
                   children: [
                     const SizedBox(height: Spacing.xl),
                     // 标题与副标题
-                    Text('知音', style: theme.textTheme.titleLarge),
+                    Text('ZiTok 短剧', style: theme.textTheme.titleLarge),
                     const SizedBox(height: Spacing.sm),
-                    Text('支持笔记功能的视频社区', style: theme.textTheme.bodySmall),
+                    Text('竖屏连播 · 热门短剧', style: theme.textTheme.bodySmall),
+                    const SizedBox(height: Spacing.xs),
+                    Text('演示：zitok / demo1234', style: theme.textTheme.bodySmall?.copyWith(color: Colors.grey)),
                     const SizedBox(height: Spacing.lg),
                     // 表单
                     TextField(

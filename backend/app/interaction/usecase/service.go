@@ -24,7 +24,7 @@ func (s *useCase) Comment(ctx context.Context, userID int64, videoID int64, cont
 }
 
 // GetComments 获取评论列表
-func (s *useCase) GetComments(ctx context.Context, videoID int64, page int32, size int32, commentID *int64) ([]*model.Comment, error) {
+func (s *useCase) GetComments(ctx context.Context, videoID int64, page int32, size int32, commentID *int64) ([]*model.Comment, int64, error) {
 	return s.svc.GetComments(ctx, videoID, page, size, commentID)
 }
 

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 SESSION="${VIDEOHUB_TMUX_SESSION:-videohub}"
-SERVICES=(user video interaction social note gateway)
+SERVICES=(user video interaction social drama commerce gateway)
 
 for s in "${SERVICES[@]}"; do
   pkill -f "output/${s}/videohub-${s}" 2>/dev/null || true

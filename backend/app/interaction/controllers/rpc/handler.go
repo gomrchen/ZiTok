@@ -67,10 +67,11 @@ func (h *InteractionHandler) Comment(ctx context.Context, req *interaction.Comme
 func (h *InteractionHandler) GetComments(ctx context.Context, req *interaction.GetCommentsRequest) (r *interaction.GetCommentsResponse, err error) {
 	r = new(interaction.GetCommentsResponse)
 
-	comments, err := h.useCase.GetComments(ctx, req.VideoId, req.Page, req.Size, req.CommentId)
+	comments, total, err := h.useCase.GetComments(ctx, req.VideoId, req.Page, req.Size, req.CommentId)
 	if err != nil {
 		return
 	}
+	r.Total = total
 	r.CommentList = make([]*rpcmodel.Comment, len(comments))
 	for i, comment := range comments {
 		r.CommentList[i] = &rpcmodel.Comment{
@@ -81,6 +82,7 @@ func (h *InteractionHandler) GetComments(ctx context.Context, req *interaction.G
 			ParentId: comment.ParentID,
 		}
 	}
+	r.Base = base.BuildBaseResp(nil)
 	return
 }
 

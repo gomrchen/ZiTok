@@ -113,8 +113,11 @@ func (s *VideoService) ReportFeedback(ctx context.Context, userID int64, videoID
 }
 
 func (s *VideoService) processVideo(ctx context.Context, videoID int64, videoPath string) error {
-	// 1. 确保封面目录存在
-	coverDir := "/home/ZiTok/src/storage/covers"
+	// 1. 确保封面目录存在（使用配置，避免硬编码路径）
+	coverDir := config.Upload.Video.CoverDir
+	if coverDir == "" {
+		coverDir = "src/storage/covers"
+	}
 	if err := os.MkdirAll(coverDir, constants.DirPermission); err != nil {
 		return fmt.Errorf("创建封面目录失败: %w", err)
 	}
