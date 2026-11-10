@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
+import '../../../l10n/l10n_ext.dart';
 import '../../../theme/theme_tokens.dart';
 import '../../../app.dart';
 import '../../../services/video_service.dart';
+import '../../home/shell_surface.dart';
 import 'work_detail_sheet.dart';
 
 class VideoSheet extends StatefulWidget {
@@ -142,9 +144,42 @@ class _VideoSheetState extends State<VideoSheet> {
   }
 
   Future<void> _addTag() async {
+    final ctrl = TextEditingController();
+    final l10n = context.l10n;
     final t = await showDialog<String>(
       context: context,
-      builder: (ctx) => AlertDialog(title: const Text('添加标签'), content: TextField(autofocus: true), actions: [TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('取消')), FilledButton(onPressed: () => Navigator.pop(ctx, '新标签'), child: const Text('添加'))]),
+      builder: (ctx) {
+        final ink = ShellSurface.inkOf(ctx);
+        return ShellSurface.dialog(
+          context: ctx,
+          title: l10n.dialogAddTag,
+          content: TextField(
+            controller: ctrl,
+            autofocus: true,
+            style: TextStyle(color: ink, fontSize: 15),
+            decoration: InputDecoration(
+              filled: true,
+              fillColor: ShellSurface.canvasOf(ctx),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: ShellSurface.lineOf(ctx)),
+              ),
+            ),
+          ),
+          actions: [
+            ShellSurface.cancelAction(
+              ctx,
+              onPressed: () => Navigator.pop(ctx),
+              label: l10n.commonCancel,
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, ctrl.text.trim()),
+              style: FilledButton.styleFrom(backgroundColor: ShellSurface.coral),
+              child: Text(l10n.commonAdd),
+            ),
+          ],
+        );
+      },
     );
     if (t != null && t.isNotEmpty) setState(() => _tags.add(t));
   }
@@ -156,9 +191,26 @@ class _VideoSheetState extends State<VideoSheet> {
   }
 
   Future<void> _confirmDelete() async {
+    final l10n = context.l10n;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (dctx) => AlertDialog(title: const Text('确认删除'), content: const Text('删除后不可恢复'), actions: [TextButton(onPressed: () => Navigator.pop(dctx, false), child: const Text('取消')), FilledButton(onPressed: () => Navigator.pop(dctx, true), child: const Text('删除'))]),
+      builder: (dctx) => ShellSurface.dialog(
+        context: dctx,
+        title: l10n.dialogConfirmDelete,
+        content: Text(l10n.dialogDeleteIrreversible),
+        actions: [
+          ShellSurface.cancelAction(
+            dctx,
+            onPressed: () => Navigator.pop(dctx, false),
+            label: l10n.commonCancel,
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dctx, true),
+            style: FilledButton.styleFrom(backgroundColor: ShellSurface.coral),
+            child: Text(l10n.commonDelete),
+          ),
+        ],
+      ),
     );
     if (ok == true) {
       await VideoService(AppBootstrap.apiClient.dio).delete(videoId: widget.id);

@@ -128,4 +128,90 @@ class ShellSurface {
         fontWeight: FontWeight.w500,
         height: 1.2,
       );
+
+  /// 全局主题弹窗：跟随夜晚模式，标题/正文可读
+  static AlertDialog dialog({
+    required BuildContext context,
+    String? title,
+    Widget? titleWidget,
+    Widget? content,
+    List<Widget>? actions,
+  }) {
+    final inkColor = inkOf(context);
+    return AlertDialog(
+      backgroundColor: cardOf(context),
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      title: titleWidget ??
+          (title == null
+              ? null
+              : Text(
+                  title,
+                  style: TextStyle(
+                    color: inkColor,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 17,
+                  ),
+                )),
+      content: content == null
+          ? null
+          : DefaultTextStyle(
+              style: TextStyle(
+                color: mutedOf(context),
+                fontSize: 14,
+                height: 1.4,
+                fontWeight: FontWeight.w500,
+              ),
+              child: content,
+            ),
+      actions: actions,
+    );
+  }
+
+  static Color sheetColor(BuildContext context) => cardOf(context);
+
+  static TextButton cancelAction(
+    BuildContext context, {
+    required VoidCallback onPressed,
+    String label = '取消',
+  }) {
+    return TextButton(
+      onPressed: onPressed,
+      child: Text(
+        label,
+        style: TextStyle(color: inkOf(context).withValues(alpha: 0.55)),
+      ),
+    );
+  }
+
+  static TextButton confirmAction({
+    required VoidCallback onPressed,
+    required String label,
+    Color color = coral,
+    bool bold = true,
+  }) {
+    return TextButton(
+      onPressed: onPressed,
+      style: TextButton.styleFrom(foregroundColor: color),
+      child: Text(
+        label,
+        style: TextStyle(fontWeight: bold ? FontWeight.w800 : FontWeight.w600),
+      ),
+    );
+  }
+
+  /// 主题提示条：暗色页不再出现浅灰默认 SnackBar
+  static void showTip(
+    BuildContext context,
+    String message, {
+    Duration duration = const Duration(seconds: 2),
+  }) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: duration,
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
 }

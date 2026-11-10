@@ -494,7 +494,192 @@ class AppLocalizationsZh extends AppLocalizations {
   String get commonConfirm => '确定';
 
   @override
+  String get commonSave => '保存';
+
+  @override
+  String get commonDelete => '删除';
+
+  @override
+  String get commonAdd => '添加';
+
+  @override
   String get commonLoading => '加载中…';
+
+  @override
+  String get dialogClearSearchHistory => '清除搜索历史';
+
+  @override
+  String get dialogClearSearchHistoryBody => '确定要清除所有搜索历史吗？';
+
+  @override
+  String get dialogSearchHistoryCleared => '搜索历史已清除';
+
+  @override
+  String dialogFollowUser(String name) {
+    return '关注 $name';
+  }
+
+  @override
+  String get dialogFollowRemarkHint => '设置备注（选填）';
+
+  @override
+  String get dialogAddTag => '添加标签';
+
+  @override
+  String get dialogConfirmDelete => '确认删除';
+
+  @override
+  String get dialogDeleteIrreversible => '删除后不可恢复';
+
+  @override
+  String get dialogResetModeTitle => '重新选择模式';
+
+  @override
+  String get dialogResetModeBody => '重新选择发布模式将清空已填写的所有数据，确定要继续吗？';
+
+  @override
+  String get dialogResetModeConfirm => '确定清空';
+
+  @override
+  String get dialogExitTitle => '确认退出';
+
+  @override
+  String get dialogExitBody => '您有未保存的内容，退出后将丢失所有编辑数据，确定要退出吗？';
+
+  @override
+  String get dialogExitKeep => '继续编辑';
+
+  @override
+  String get dialogExitConfirm => '确认退出';
+
+  @override
+  String get dialogDiscardTitle => '放弃更改？';
+
+  @override
+  String get dialogDiscardBody => '您有未保存的更改，确定要放弃吗？';
+
+  @override
+  String get dialogDiscard => '放弃';
+
+  @override
+  String get dialogSelectGender => '选择性别';
+
+  @override
+  String get dialogGenderMale => '男';
+
+  @override
+  String get dialogGenderFemale => '女';
+
+  @override
+  String get dialogGenderHidden => '不显示';
+
+  @override
+  String get messagesFilterTitle => '筛选消息';
+
+  @override
+  String get messagesFilterAll => '全部消息';
+
+  @override
+  String get messagesFilterAllSub => '显示所有联系人和群聊';
+
+  @override
+  String get messagesFilterMutual => '互关好友';
+
+  @override
+  String get messagesFilterMutualSub => '双向关注的好友';
+
+  @override
+  String get messagesFilterFollowing => '我关注的';
+
+  @override
+  String get messagesFilterFollowingSub => '我关注的用户';
+
+  @override
+  String get messagesFilterFollowers => '我的粉丝';
+
+  @override
+  String get messagesFilterFollowersSub => '关注我的用户';
+
+  @override
+  String get messagesFilterGroups => '群聊';
+
+  @override
+  String get messagesFilterGroupsSub => '我加入的群组';
+
+  @override
+  String get messagesAddFriend => '添加好友';
+
+  @override
+  String get messagesNewGroup => '新建群聊';
+
+  @override
+  String get messagesRetry => '重试';
+
+  @override
+  String get globalSearchHint => '搜索全网用户…';
+
+  @override
+  String get globalSearchEmpty => '搜索用户 ID 或昵称';
+
+  @override
+  String get globalSearchNotFound => '未找到相关用户';
+
+  @override
+  String get globalSearchFailed => '搜索失败';
+
+  @override
+  String get globalSearchNetworkError => '网络错误';
+
+  @override
+  String get globalSearchUnknownUser => '未知用户';
+
+  @override
+  String get globalSearchFollow => '关注';
+
+  @override
+  String get globalSearchFollowed => '已关注';
+
+  @override
+  String get globalSearchFollowOk => '关注成功';
+
+  @override
+  String get createGroupTitle => '发起群聊';
+
+  @override
+  String get createGroupAction => '创建';
+
+  @override
+  String get createGroupName => '群聊名称';
+
+  @override
+  String get createGroupNameHint => '例如：周末开黑群';
+
+  @override
+  String createGroupSelectMembers(int count) {
+    return '选择成员 ($count)';
+  }
+
+  @override
+  String get createGroupNoFriends => '暂无互关好友可选';
+
+  @override
+  String get createGroupNeedName => '请输入群聊名称';
+
+  @override
+  String get createGroupNeedMember => '请至少选择一个成员';
+
+  @override
+  String get createGroupSuccess => '群聊创建成功';
+
+  @override
+  String createGroupFailed(String error) {
+    return '创建失败: $error';
+  }
+
+  @override
+  String userIdLabel(String id) {
+    return 'ID: $id';
+  }
 
   @override
   String get sessionExpired => '登录已失效，请重新登录';

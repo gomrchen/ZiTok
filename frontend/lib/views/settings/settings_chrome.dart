@@ -254,22 +254,16 @@ class SettingsChrome {
         textStyle: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14),
       );
 
-  /// 设置体系弹窗：跟随夜晚模式，标题/正文可读
+  /// 设置体系弹窗：委托全局 [ShellSurface.dialog]
   static AlertDialog dialog({
     required BuildContext context,
     required String title,
     Widget? content,
     List<Widget>? actions,
   }) {
-    final ink = ShellSurface.inkOf(context);
-    return AlertDialog(
-      backgroundColor: ShellSurface.cardOf(context),
-      surfaceTintColor: Colors.transparent,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-      title: Text(
-        title,
-        style: TextStyle(color: ink, fontWeight: FontWeight.w800, fontSize: 17),
-      ),
+    return ShellSurface.dialog(
+      context: context,
+      title: title,
       content: content,
       actions: actions,
     );

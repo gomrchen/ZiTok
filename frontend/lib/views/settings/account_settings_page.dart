@@ -110,32 +110,22 @@ class AccountSettingsPage extends StatelessWidget {
     final l10n = context.l10n;
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: ShellSurface.cardOf(context),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Text(l10n.settingsLogout, style: const TextStyle(fontWeight: FontWeight.w800)),
-        content: Text(
-          l10n.settingsLogoutConfirm,
-          style: ShellSurface.captionOf(context).copyWith(fontSize: 14),
-        ),
+      builder: (ctx) => ShellSurface.dialog(
+        context: ctx,
+        title: l10n.settingsLogout,
+        content: Text(l10n.settingsLogoutConfirm),
         actions: [
-          TextButton(
+          ShellSurface.cancelAction(
+            ctx,
             onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              l10n.commonCancel,
-              style: TextStyle(color: ShellSurface.inkOf(context).withValues(alpha: 0.55)),
-            ),
+            label: l10n.commonCancel,
           ),
-          TextButton(
+          ShellSurface.confirmAction(
             onPressed: () {
               Navigator.pop(ctx);
               _logout(context);
             },
-            style: TextButton.styleFrom(foregroundColor: ShellSurface.coral),
-            child: Text(
-              l10n.commonConfirm,
-              style: const TextStyle(fontWeight: FontWeight.w800),
-            ),
+            label: l10n.commonConfirm,
           ),
         ],
       ),

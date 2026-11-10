@@ -1052,11 +1052,365 @@ abstract class AppLocalizations {
   /// **'确定'**
   String get commonConfirm;
 
+  /// No description provided for @commonSave.
+  ///
+  /// In zh, this message translates to:
+  /// **'保存'**
+  String get commonSave;
+
+  /// No description provided for @commonDelete.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除'**
+  String get commonDelete;
+
+  /// No description provided for @commonAdd.
+  ///
+  /// In zh, this message translates to:
+  /// **'添加'**
+  String get commonAdd;
+
   /// No description provided for @commonLoading.
   ///
   /// In zh, this message translates to:
   /// **'加载中…'**
   String get commonLoading;
+
+  /// No description provided for @dialogClearSearchHistory.
+  ///
+  /// In zh, this message translates to:
+  /// **'清除搜索历史'**
+  String get dialogClearSearchHistory;
+
+  /// No description provided for @dialogClearSearchHistoryBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'确定要清除所有搜索历史吗？'**
+  String get dialogClearSearchHistoryBody;
+
+  /// No description provided for @dialogSearchHistoryCleared.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索历史已清除'**
+  String get dialogSearchHistoryCleared;
+
+  /// No description provided for @dialogFollowUser.
+  ///
+  /// In zh, this message translates to:
+  /// **'关注 {name}'**
+  String dialogFollowUser(String name);
+
+  /// No description provided for @dialogFollowRemarkHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'设置备注（选填）'**
+  String get dialogFollowRemarkHint;
+
+  /// No description provided for @dialogAddTag.
+  ///
+  /// In zh, this message translates to:
+  /// **'添加标签'**
+  String get dialogAddTag;
+
+  /// No description provided for @dialogConfirmDelete.
+  ///
+  /// In zh, this message translates to:
+  /// **'确认删除'**
+  String get dialogConfirmDelete;
+
+  /// No description provided for @dialogDeleteIrreversible.
+  ///
+  /// In zh, this message translates to:
+  /// **'删除后不可恢复'**
+  String get dialogDeleteIrreversible;
+
+  /// No description provided for @dialogResetModeTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新选择模式'**
+  String get dialogResetModeTitle;
+
+  /// No description provided for @dialogResetModeBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'重新选择发布模式将清空已填写的所有数据，确定要继续吗？'**
+  String get dialogResetModeBody;
+
+  /// No description provided for @dialogResetModeConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'确定清空'**
+  String get dialogResetModeConfirm;
+
+  /// No description provided for @dialogExitTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'确认退出'**
+  String get dialogExitTitle;
+
+  /// No description provided for @dialogExitBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'您有未保存的内容，退出后将丢失所有编辑数据，确定要退出吗？'**
+  String get dialogExitBody;
+
+  /// No description provided for @dialogExitKeep.
+  ///
+  /// In zh, this message translates to:
+  /// **'继续编辑'**
+  String get dialogExitKeep;
+
+  /// No description provided for @dialogExitConfirm.
+  ///
+  /// In zh, this message translates to:
+  /// **'确认退出'**
+  String get dialogExitConfirm;
+
+  /// No description provided for @dialogDiscardTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'放弃更改？'**
+  String get dialogDiscardTitle;
+
+  /// No description provided for @dialogDiscardBody.
+  ///
+  /// In zh, this message translates to:
+  /// **'您有未保存的更改，确定要放弃吗？'**
+  String get dialogDiscardBody;
+
+  /// No description provided for @dialogDiscard.
+  ///
+  /// In zh, this message translates to:
+  /// **'放弃'**
+  String get dialogDiscard;
+
+  /// No description provided for @dialogSelectGender.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择性别'**
+  String get dialogSelectGender;
+
+  /// No description provided for @dialogGenderMale.
+  ///
+  /// In zh, this message translates to:
+  /// **'男'**
+  String get dialogGenderMale;
+
+  /// No description provided for @dialogGenderFemale.
+  ///
+  /// In zh, this message translates to:
+  /// **'女'**
+  String get dialogGenderFemale;
+
+  /// No description provided for @dialogGenderHidden.
+  ///
+  /// In zh, this message translates to:
+  /// **'不显示'**
+  String get dialogGenderHidden;
+
+  /// No description provided for @messagesFilterTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'筛选消息'**
+  String get messagesFilterTitle;
+
+  /// No description provided for @messagesFilterAll.
+  ///
+  /// In zh, this message translates to:
+  /// **'全部消息'**
+  String get messagesFilterAll;
+
+  /// No description provided for @messagesFilterAllSub.
+  ///
+  /// In zh, this message translates to:
+  /// **'显示所有联系人和群聊'**
+  String get messagesFilterAllSub;
+
+  /// No description provided for @messagesFilterMutual.
+  ///
+  /// In zh, this message translates to:
+  /// **'互关好友'**
+  String get messagesFilterMutual;
+
+  /// No description provided for @messagesFilterMutualSub.
+  ///
+  /// In zh, this message translates to:
+  /// **'双向关注的好友'**
+  String get messagesFilterMutualSub;
+
+  /// No description provided for @messagesFilterFollowing.
+  ///
+  /// In zh, this message translates to:
+  /// **'我关注的'**
+  String get messagesFilterFollowing;
+
+  /// No description provided for @messagesFilterFollowingSub.
+  ///
+  /// In zh, this message translates to:
+  /// **'我关注的用户'**
+  String get messagesFilterFollowingSub;
+
+  /// No description provided for @messagesFilterFollowers.
+  ///
+  /// In zh, this message translates to:
+  /// **'我的粉丝'**
+  String get messagesFilterFollowers;
+
+  /// No description provided for @messagesFilterFollowersSub.
+  ///
+  /// In zh, this message translates to:
+  /// **'关注我的用户'**
+  String get messagesFilterFollowersSub;
+
+  /// No description provided for @messagesFilterGroups.
+  ///
+  /// In zh, this message translates to:
+  /// **'群聊'**
+  String get messagesFilterGroups;
+
+  /// No description provided for @messagesFilterGroupsSub.
+  ///
+  /// In zh, this message translates to:
+  /// **'我加入的群组'**
+  String get messagesFilterGroupsSub;
+
+  /// No description provided for @messagesAddFriend.
+  ///
+  /// In zh, this message translates to:
+  /// **'添加好友'**
+  String get messagesAddFriend;
+
+  /// No description provided for @messagesNewGroup.
+  ///
+  /// In zh, this message translates to:
+  /// **'新建群聊'**
+  String get messagesNewGroup;
+
+  /// No description provided for @messagesRetry.
+  ///
+  /// In zh, this message translates to:
+  /// **'重试'**
+  String get messagesRetry;
+
+  /// No description provided for @globalSearchHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索全网用户…'**
+  String get globalSearchHint;
+
+  /// No description provided for @globalSearchEmpty.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索用户 ID 或昵称'**
+  String get globalSearchEmpty;
+
+  /// No description provided for @globalSearchNotFound.
+  ///
+  /// In zh, this message translates to:
+  /// **'未找到相关用户'**
+  String get globalSearchNotFound;
+
+  /// No description provided for @globalSearchFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'搜索失败'**
+  String get globalSearchFailed;
+
+  /// No description provided for @globalSearchNetworkError.
+  ///
+  /// In zh, this message translates to:
+  /// **'网络错误'**
+  String get globalSearchNetworkError;
+
+  /// No description provided for @globalSearchUnknownUser.
+  ///
+  /// In zh, this message translates to:
+  /// **'未知用户'**
+  String get globalSearchUnknownUser;
+
+  /// No description provided for @globalSearchFollow.
+  ///
+  /// In zh, this message translates to:
+  /// **'关注'**
+  String get globalSearchFollow;
+
+  /// No description provided for @globalSearchFollowed.
+  ///
+  /// In zh, this message translates to:
+  /// **'已关注'**
+  String get globalSearchFollowed;
+
+  /// No description provided for @globalSearchFollowOk.
+  ///
+  /// In zh, this message translates to:
+  /// **'关注成功'**
+  String get globalSearchFollowOk;
+
+  /// No description provided for @createGroupTitle.
+  ///
+  /// In zh, this message translates to:
+  /// **'发起群聊'**
+  String get createGroupTitle;
+
+  /// No description provided for @createGroupAction.
+  ///
+  /// In zh, this message translates to:
+  /// **'创建'**
+  String get createGroupAction;
+
+  /// No description provided for @createGroupName.
+  ///
+  /// In zh, this message translates to:
+  /// **'群聊名称'**
+  String get createGroupName;
+
+  /// No description provided for @createGroupNameHint.
+  ///
+  /// In zh, this message translates to:
+  /// **'例如：周末开黑群'**
+  String get createGroupNameHint;
+
+  /// No description provided for @createGroupSelectMembers.
+  ///
+  /// In zh, this message translates to:
+  /// **'选择成员 ({count})'**
+  String createGroupSelectMembers(int count);
+
+  /// No description provided for @createGroupNoFriends.
+  ///
+  /// In zh, this message translates to:
+  /// **'暂无互关好友可选'**
+  String get createGroupNoFriends;
+
+  /// No description provided for @createGroupNeedName.
+  ///
+  /// In zh, this message translates to:
+  /// **'请输入群聊名称'**
+  String get createGroupNeedName;
+
+  /// No description provided for @createGroupNeedMember.
+  ///
+  /// In zh, this message translates to:
+  /// **'请至少选择一个成员'**
+  String get createGroupNeedMember;
+
+  /// No description provided for @createGroupSuccess.
+  ///
+  /// In zh, this message translates to:
+  /// **'群聊创建成功'**
+  String get createGroupSuccess;
+
+  /// No description provided for @createGroupFailed.
+  ///
+  /// In zh, this message translates to:
+  /// **'创建失败: {error}'**
+  String createGroupFailed(String error);
+
+  /// No description provided for @userIdLabel.
+  ///
+  /// In zh, this message translates to:
+  /// **'ID: {id}'**
+  String userIdLabel(String id);
 
   /// No description provided for @sessionExpired.
   ///

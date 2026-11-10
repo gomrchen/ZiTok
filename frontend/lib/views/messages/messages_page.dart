@@ -177,9 +177,10 @@ class _MessagesPageState extends State<MessagesPage> {
 
   /// 显示筛选菜单
   void _showFilterMenu(BuildContext context, MessagingProvider mp) {
+    final l10n = context.l10n;
     showModalBottomSheet(
       context: context,
-      backgroundColor: ShellSurface.card,
+      backgroundColor: ShellSurface.sheetColor(context),
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
       ),
@@ -193,49 +194,49 @@ class _MessagesPageState extends State<MessagesPage> {
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Text(
-                    '筛选消息',
-                    style: ShellSurface.sectionTitle,
+                    l10n.messagesFilterTitle,
+                    style: ShellSurface.sectionTitleOf(ctx),
                   ),
                 ),
-                const Divider(height: 1, color: ShellSurface.line),
+                Divider(height: 1, color: ShellSurface.lineOf(ctx)),
                 _buildFilterOption(
                   context: ctx,
                   filter: MessageFilter.all,
                   icon: Icons.all_inbox,
-                  title: '全部消息',
-                  subtitle: '显示所有联系人和群聊',
+                  title: l10n.messagesFilterAll,
+                  subtitle: l10n.messagesFilterAllSub,
                   count: mp.following.length + mp.followers.length + mp.chatRooms.length,
                 ),
                 _buildFilterOption(
                   context: ctx,
                   filter: MessageFilter.mutual,
                   icon: Icons.people,
-                  title: '互关好友',
-                  subtitle: '双向关注的好友',
+                  title: l10n.messagesFilterMutual,
+                  subtitle: l10n.messagesFilterMutualSub,
                   count: mp.mutualFriends.length,
                 ),
                 _buildFilterOption(
                   context: ctx,
                   filter: MessageFilter.following,
                   icon: Icons.person_add,
-                  title: '我关注的',
-                  subtitle: '我关注的用户',
+                  title: l10n.messagesFilterFollowing,
+                  subtitle: l10n.messagesFilterFollowingSub,
                   count: mp.following.length,
                 ),
                 _buildFilterOption(
                   context: ctx,
                   filter: MessageFilter.followers,
                   icon: Icons.person,
-                  title: '我的粉丝',
-                  subtitle: '关注我的用户',
+                  title: l10n.messagesFilterFollowers,
+                  subtitle: l10n.messagesFilterFollowersSub,
                   count: mp.followers.length,
                 ),
                 _buildFilterOption(
                   context: ctx,
                   filter: MessageFilter.groups,
                   icon: Icons.group,
-                  title: '群聊',
-                  subtitle: '我加入的群组',
+                  title: l10n.messagesFilterGroups,
+                  subtitle: l10n.messagesFilterGroupsSub,
                   count: mp.chatRooms.length,
                 ),
               ],
@@ -322,36 +323,37 @@ class _MessagesPageState extends State<MessagesPage> {
     final screenWidth = MediaQuery.of(context).size.width;
     final topOffset = MediaQuery.of(context).padding.top + kToolbarHeight;
 
+    final l10n = context.l10n;
+    final ink = ShellSurface.inkOf(context);
     final selected = await showMenu<String>(
       context: context,
       position: RelativeRect.fromLTRB(screenWidth, topOffset + 1, 0, 0),
       elevation: 3,
+      color: ShellSurface.cardOf(context),
       constraints: const BoxConstraints(minWidth: 120, maxWidth: 160),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
       items: [
-        // 选项 1: 添加好友
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: 'add_friend',
           height: 40,
-          padding: EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
             children: [
-              Icon(Icons.person_add_outlined, size: 20, color: Colors.black87),
-              SizedBox(width: 10),
-              Text('添加好友', style: TextStyle(fontSize: 14)),
+              Icon(Icons.person_add_outlined, size: 20, color: ink),
+              const SizedBox(width: 10),
+              Text(l10n.messagesAddFriend, style: TextStyle(fontSize: 14, color: ink)),
             ],
           ),
         ),
-        // 选项 2: 新建群聊
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: 'create_group',
           height: 40,
-          padding: EdgeInsets.symmetric(horizontal: 12),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: Row(
             children: [
-              Icon(Icons.chat_bubble_outline, size: 20, color: Colors.black87),
-              SizedBox(width: 10),
-              Text('新建群聊', style: TextStyle(fontSize: 14)),
+              Icon(Icons.chat_bubble_outline, size: 20, color: ink),
+              const SizedBox(width: 10),
+              Text(l10n.messagesNewGroup, style: TextStyle(fontSize: 14, color: ink)),
             ],
           ),
         ),
@@ -386,7 +388,7 @@ class _MessagesPageState extends State<MessagesPage> {
             const SizedBox(height: 16),
             ElevatedButton(
               onPressed: _loadData,
-              child: const Text('重试'),
+              child: Text(context.l10n.messagesRetry),
             ),
           ],
         ),

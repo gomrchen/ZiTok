@@ -502,7 +502,193 @@ class AppLocalizationsEn extends AppLocalizations {
   String get commonConfirm => 'OK';
 
   @override
+  String get commonSave => 'Save';
+
+  @override
+  String get commonDelete => 'Delete';
+
+  @override
+  String get commonAdd => 'Add';
+
+  @override
   String get commonLoading => 'Loading…';
+
+  @override
+  String get dialogClearSearchHistory => 'Clear search history';
+
+  @override
+  String get dialogClearSearchHistoryBody => 'Clear all search history?';
+
+  @override
+  String get dialogSearchHistoryCleared => 'Search history cleared';
+
+  @override
+  String dialogFollowUser(String name) {
+    return 'Follow $name';
+  }
+
+  @override
+  String get dialogFollowRemarkHint => 'Add a note (optional)';
+
+  @override
+  String get dialogAddTag => 'Add tag';
+
+  @override
+  String get dialogConfirmDelete => 'Delete?';
+
+  @override
+  String get dialogDeleteIrreversible => 'This cannot be undone';
+
+  @override
+  String get dialogResetModeTitle => 'Change publish mode';
+
+  @override
+  String get dialogResetModeBody =>
+      'Changing mode clears what you already filled in. Continue?';
+
+  @override
+  String get dialogResetModeConfirm => 'Clear and continue';
+
+  @override
+  String get dialogExitTitle => 'Leave without saving?';
+
+  @override
+  String get dialogExitBody => 'Unsaved edits will be lost. Leave now?';
+
+  @override
+  String get dialogExitKeep => 'Keep editing';
+
+  @override
+  String get dialogExitConfirm => 'Leave';
+
+  @override
+  String get dialogDiscardTitle => 'Discard changes?';
+
+  @override
+  String get dialogDiscardBody => 'You have unsaved changes. Discard them?';
+
+  @override
+  String get dialogDiscard => 'Discard';
+
+  @override
+  String get dialogSelectGender => 'Select gender';
+
+  @override
+  String get dialogGenderMale => 'Male';
+
+  @override
+  String get dialogGenderFemale => 'Female';
+
+  @override
+  String get dialogGenderHidden => 'Prefer not to say';
+
+  @override
+  String get messagesFilterTitle => 'Filter messages';
+
+  @override
+  String get messagesFilterAll => 'All messages';
+
+  @override
+  String get messagesFilterAllSub => 'People and groups';
+
+  @override
+  String get messagesFilterMutual => 'Mutual friends';
+
+  @override
+  String get messagesFilterMutualSub => 'Follow each other';
+
+  @override
+  String get messagesFilterFollowing => 'Following';
+
+  @override
+  String get messagesFilterFollowingSub => 'Accounts you follow';
+
+  @override
+  String get messagesFilterFollowers => 'Followers';
+
+  @override
+  String get messagesFilterFollowersSub => 'Accounts following you';
+
+  @override
+  String get messagesFilterGroups => 'Groups';
+
+  @override
+  String get messagesFilterGroupsSub => 'Groups you joined';
+
+  @override
+  String get messagesAddFriend => 'Add friend';
+
+  @override
+  String get messagesNewGroup => 'New group';
+
+  @override
+  String get messagesRetry => 'Retry';
+
+  @override
+  String get globalSearchHint => 'Search all users…';
+
+  @override
+  String get globalSearchEmpty => 'Search by user ID or nickname';
+
+  @override
+  String get globalSearchNotFound => 'No users found';
+
+  @override
+  String get globalSearchFailed => 'Search failed';
+
+  @override
+  String get globalSearchNetworkError => 'Network error';
+
+  @override
+  String get globalSearchUnknownUser => 'Unknown user';
+
+  @override
+  String get globalSearchFollow => 'Follow';
+
+  @override
+  String get globalSearchFollowed => 'Following';
+
+  @override
+  String get globalSearchFollowOk => 'Followed';
+
+  @override
+  String get createGroupTitle => 'New group';
+
+  @override
+  String get createGroupAction => 'Create';
+
+  @override
+  String get createGroupName => 'Group name';
+
+  @override
+  String get createGroupNameHint => 'e.g. Weekend squad';
+
+  @override
+  String createGroupSelectMembers(int count) {
+    return 'Select members ($count)';
+  }
+
+  @override
+  String get createGroupNoFriends => 'No mutual friends to pick';
+
+  @override
+  String get createGroupNeedName => 'Enter a group chat name';
+
+  @override
+  String get createGroupNeedMember => 'Pick at least one member';
+
+  @override
+  String get createGroupSuccess => 'Group created';
+
+  @override
+  String createGroupFailed(String error) {
+    return 'Could not create: $error';
+  }
+
+  @override
+  String userIdLabel(String id) {
+    return 'ID: $id';
+  }
 
   @override
   String get sessionExpired => 'Session expired. Please sign in again';

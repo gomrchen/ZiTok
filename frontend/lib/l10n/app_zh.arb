@@ -188,7 +188,90 @@
   "commonBack": "返回",
   "commonCancel": "取消",
   "commonConfirm": "确定",
+  "commonSave": "保存",
+  "commonDelete": "删除",
+  "commonAdd": "添加",
   "commonLoading": "加载中…",
+
+  "dialogClearSearchHistory": "清除搜索历史",
+  "dialogClearSearchHistoryBody": "确定要清除所有搜索历史吗？",
+  "dialogSearchHistoryCleared": "搜索历史已清除",
+  "dialogFollowUser": "关注 {name}",
+  "@dialogFollowUser": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "dialogFollowRemarkHint": "设置备注（选填）",
+  "dialogAddTag": "添加标签",
+  "dialogConfirmDelete": "确认删除",
+  "dialogDeleteIrreversible": "删除后不可恢复",
+  "dialogResetModeTitle": "重新选择模式",
+  "dialogResetModeBody": "重新选择发布模式将清空已填写的所有数据，确定要继续吗？",
+  "dialogResetModeConfirm": "确定清空",
+  "dialogExitTitle": "确认退出",
+  "dialogExitBody": "您有未保存的内容，退出后将丢失所有编辑数据，确定要退出吗？",
+  "dialogExitKeep": "继续编辑",
+  "dialogExitConfirm": "确认退出",
+  "dialogDiscardTitle": "放弃更改？",
+  "dialogDiscardBody": "您有未保存的更改，确定要放弃吗？",
+  "dialogDiscard": "放弃",
+  "dialogSelectGender": "选择性别",
+  "dialogGenderMale": "男",
+  "dialogGenderFemale": "女",
+  "dialogGenderHidden": "不显示",
+
+  "messagesFilterTitle": "筛选消息",
+  "messagesFilterAll": "全部消息",
+  "messagesFilterAllSub": "显示所有联系人和群聊",
+  "messagesFilterMutual": "互关好友",
+  "messagesFilterMutualSub": "双向关注的好友",
+  "messagesFilterFollowing": "我关注的",
+  "messagesFilterFollowingSub": "我关注的用户",
+  "messagesFilterFollowers": "我的粉丝",
+  "messagesFilterFollowersSub": "关注我的用户",
+  "messagesFilterGroups": "群聊",
+  "messagesFilterGroupsSub": "我加入的群组",
+  "messagesAddFriend": "添加好友",
+  "messagesNewGroup": "新建群聊",
+  "messagesRetry": "重试",
+
+  "globalSearchHint": "搜索全网用户…",
+  "globalSearchEmpty": "搜索用户 ID 或昵称",
+  "globalSearchNotFound": "未找到相关用户",
+  "globalSearchFailed": "搜索失败",
+  "globalSearchNetworkError": "网络错误",
+  "globalSearchUnknownUser": "未知用户",
+  "globalSearchFollow": "关注",
+  "globalSearchFollowed": "已关注",
+  "globalSearchFollowOk": "关注成功",
+
+  "createGroupTitle": "发起群聊",
+  "createGroupAction": "创建",
+  "createGroupName": "群聊名称",
+  "createGroupNameHint": "例如：周末开黑群",
+  "createGroupSelectMembers": "选择成员 ({count})",
+  "@createGroupSelectMembers": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "createGroupNoFriends": "暂无互关好友可选",
+  "createGroupNeedName": "请输入群聊名称",
+  "createGroupNeedMember": "请至少选择一个成员",
+  "createGroupSuccess": "群聊创建成功",
+  "createGroupFailed": "创建失败: {error}",
+  "@createGroupFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "userIdLabel": "ID: {id}",
+  "@userIdLabel": {
+    "placeholders": {
+      "id": {"type": "String"}
+    }
+  },
   "sessionExpired": "登录已失效，请重新登录",
   "settingsAboutLegalese": "沉浸竖屏短剧体验",
   "profileUserFallback": "用户",

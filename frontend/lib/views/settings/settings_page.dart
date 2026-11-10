@@ -104,7 +104,7 @@ class SettingsPage extends StatelessWidget {
               SettingsChrome.switchTile(
                 icon: Icons.dark_mode_rounded,
                 tint: const Color(0xFFE8E6E2),
-                iconColor: ShellSurface.ink,
+                iconColor: ShellSurface.muted,
                 title: l10n.settingsNightMode,
                 subtitle: l10n.settingsNightModeSub,
                 value: tp.themeName == 'dark',

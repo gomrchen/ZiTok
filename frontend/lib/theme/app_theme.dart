@@ -97,6 +97,18 @@ class AppTheme {
         backgroundColor: brightness == Brightness.light ? const Color(0xFFE5E7EB) : const Color(0xFF374151),
         labelStyle: TypographyTokens.caption.copyWith(color: colors.textSecondary),
       ),
+      snackBarTheme: SnackBarThemeData(
+        behavior: SnackBarBehavior.floating,
+        backgroundColor: brightness == Brightness.dark
+            ? const Color(0xFF1F2937)
+            : const Color(0xFF1A1F2A),
+        contentTextStyle: TypographyTokens.body.copyWith(
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        insetPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      ),
     );
   }
 

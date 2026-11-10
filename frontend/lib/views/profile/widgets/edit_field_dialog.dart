@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
 
+import '../../../l10n/l10n_ext.dart';
+import '../../home/shell_surface.dart';
+
 class EditTextDialog extends StatelessWidget {
   final String title;
   final String initial;
@@ -7,21 +10,44 @@ class EditTextDialog extends StatelessWidget {
   final int maxLines;
   final int maxLength;
 
-  const EditTextDialog({super.key, required this.title, required this.initial, required this.hint, this.maxLines = 1, this.maxLength = 40});
+  const EditTextDialog({
+    super.key,
+    required this.title,
+    required this.initial,
+    required this.hint,
+    this.maxLines = 1,
+    this.maxLength = 40,
+  });
 
-  static Future<String?> show(BuildContext context, {required String title, required String initial, required String hint, int maxLines = 1, int maxLength = 40}) {
+  static Future<String?> show(
+    BuildContext context, {
+    required String title,
+    required String initial,
+    required String hint,
+    int maxLines = 1,
+    int maxLength = 40,
+  }) {
     return showDialog<String>(
       context: context,
       barrierDismissible: true,
-      builder: (ctx) => EditTextDialog(title: title, initial: initial, hint: hint, maxLines: maxLines, maxLength: maxLength),
+      builder: (ctx) => EditTextDialog(
+        title: title,
+        initial: initial,
+        hint: hint,
+        maxLines: maxLines,
+        maxLength: maxLength,
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
     final ctrl = TextEditingController(text: initial);
-    return AlertDialog(
-      title: Text(title),
+    final ink = ShellSurface.inkOf(context);
+    final l10n = context.l10n;
+    return ShellSurface.dialog(
+      context: context,
+      title: title,
       content: SingleChildScrollView(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 480),
@@ -29,13 +55,39 @@ class EditTextDialog extends StatelessWidget {
             controller: ctrl,
             maxLines: maxLines,
             maxLength: maxLength,
-            decoration: InputDecoration(hintText: hint),
+            style: TextStyle(color: ink, fontSize: 15),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: TextStyle(color: ink.withValues(alpha: 0.35)),
+              filled: true,
+              fillColor: ShellSurface.canvasOf(context),
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: ShellSurface.lineOf(context)),
+              ),
+              enabledBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: BorderSide(color: ShellSurface.lineOf(context)),
+              ),
+              focusedBorder: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(12),
+                borderSide: const BorderSide(color: ShellSurface.coral, width: 1.4),
+              ),
+            ),
           ),
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('取消')),
-        FilledButton(onPressed: () => Navigator.pop(context, ctrl.text.trim()), child: const Text('保存')),
+        ShellSurface.cancelAction(
+          context,
+          onPressed: () => Navigator.pop(context),
+          label: l10n.commonCancel,
+        ),
+        FilledButton(
+          onPressed: () => Navigator.pop(context, ctrl.text.trim()),
+          style: FilledButton.styleFrom(backgroundColor: ShellSurface.coral),
+          child: Text(l10n.commonSave),
+        ),
       ],
     );
   }
@@ -56,8 +108,10 @@ class GenderSelectDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     int? current = value;
-    return AlertDialog(
-      title: const Text('选择性别'),
+    final l10n = context.l10n;
+    return ShellSurface.dialog(
+      context: context,
+      title: l10n.dialogSelectGender,
       content: StatefulBuilder(
         builder: (context, setState) {
           return RadioGroup<int>(
@@ -69,27 +123,19 @@ class GenderSelectDialog extends StatelessWidget {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                RadioListTile<int>(
-                  title: const Text('男'),
-                  value: 1,
-                ),
-                RadioListTile<int>(
-                  title: const Text('女'),
-                  value: 2,
-                ),
-                RadioListTile<int>(
-                  title: const Text('不显示'),
-                  value: 3,
-                ),
+                RadioListTile<int>(title: Text(l10n.dialogGenderMale), value: 1),
+                RadioListTile<int>(title: Text(l10n.dialogGenderFemale), value: 2),
+                RadioListTile<int>(title: Text(l10n.dialogGenderHidden), value: 3),
               ],
             ),
           );
         },
       ),
       actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消')
+        ShellSurface.cancelAction(
+          context,
+          onPressed: () => Navigator.pop(context),
+          label: l10n.commonCancel,
         ),
       ],
     );

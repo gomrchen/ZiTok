@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../l10n/l10n_ext.dart';
 import '../../theme/theme_tokens.dart';
 import '../../services/search_history_service.dart';
+import '../home/shell_surface.dart';
 
 class SearchPage extends StatefulWidget {
   const SearchPage({super.key});
@@ -66,21 +68,23 @@ class _SearchPageState extends State<SearchPage> {
   }
 
   Future<void> _clearHistory() async {
+    final l10n = context.l10n;
     final confirm = await showDialog<bool>(
       context: context,
-      builder: (context) {
-        final cs = Theme.of(context).colorScheme;
-        return AlertDialog(
-          title: const Text('清除搜索历史'),
-          content: const Text('确定要清除所有搜索历史吗？'),
+      builder: (ctx) {
+        return ShellSurface.dialog(
+          context: ctx,
+          title: l10n.dialogClearSearchHistory,
+          content: Text(l10n.dialogClearSearchHistoryBody),
           actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: Text('取消', style: TextStyle(color: cs.onSurfaceVariant)),
+            ShellSurface.cancelAction(
+              ctx,
+              onPressed: () => Navigator.pop(ctx, false),
+              label: l10n.commonCancel,
             ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: Text('确定', style: TextStyle(color: cs.primary)),
+            ShellSurface.confirmAction(
+              onPressed: () => Navigator.pop(ctx, true),
+              label: l10n.commonConfirm,
             ),
           ],
         );
@@ -92,9 +96,10 @@ class _SearchPageState extends State<SearchPage> {
       _loadHistory();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('搜索历史已清除'),
-            duration: Duration(milliseconds: 1500),
+          SnackBar(
+            content: Text(context.l10n.dialogSearchHistoryCleared),
+            duration: const Duration(milliseconds: 1500),
+            behavior: SnackBarBehavior.floating,
           ),
         );
       }

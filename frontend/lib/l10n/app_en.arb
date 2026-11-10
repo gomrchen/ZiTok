@@ -188,7 +188,90 @@
   "commonBack": "Back",
   "commonCancel": "Cancel",
   "commonConfirm": "OK",
+  "commonSave": "Save",
+  "commonDelete": "Delete",
+  "commonAdd": "Add",
   "commonLoading": "Loading…",
+
+  "dialogClearSearchHistory": "Clear search history",
+  "dialogClearSearchHistoryBody": "Clear all search history?",
+  "dialogSearchHistoryCleared": "Search history cleared",
+  "dialogFollowUser": "Follow {name}",
+  "@dialogFollowUser": {
+    "placeholders": {
+      "name": {"type": "String"}
+    }
+  },
+  "dialogFollowRemarkHint": "Add a note (optional)",
+  "dialogAddTag": "Add tag",
+  "dialogConfirmDelete": "Delete?",
+  "dialogDeleteIrreversible": "This cannot be undone",
+  "dialogResetModeTitle": "Change publish mode",
+  "dialogResetModeBody": "Changing mode clears what you already filled in. Continue?",
+  "dialogResetModeConfirm": "Clear and continue",
+  "dialogExitTitle": "Leave without saving?",
+  "dialogExitBody": "Unsaved edits will be lost. Leave now?",
+  "dialogExitKeep": "Keep editing",
+  "dialogExitConfirm": "Leave",
+  "dialogDiscardTitle": "Discard changes?",
+  "dialogDiscardBody": "You have unsaved changes. Discard them?",
+  "dialogDiscard": "Discard",
+  "dialogSelectGender": "Select gender",
+  "dialogGenderMale": "Male",
+  "dialogGenderFemale": "Female",
+  "dialogGenderHidden": "Prefer not to say",
+
+  "messagesFilterTitle": "Filter messages",
+  "messagesFilterAll": "All messages",
+  "messagesFilterAllSub": "People and groups",
+  "messagesFilterMutual": "Mutual friends",
+  "messagesFilterMutualSub": "Follow each other",
+  "messagesFilterFollowing": "Following",
+  "messagesFilterFollowingSub": "Accounts you follow",
+  "messagesFilterFollowers": "Followers",
+  "messagesFilterFollowersSub": "Accounts following you",
+  "messagesFilterGroups": "Groups",
+  "messagesFilterGroupsSub": "Groups you joined",
+  "messagesAddFriend": "Add friend",
+  "messagesNewGroup": "New group",
+  "messagesRetry": "Retry",
+
+  "globalSearchHint": "Search all users…",
+  "globalSearchEmpty": "Search by user ID or nickname",
+  "globalSearchNotFound": "No users found",
+  "globalSearchFailed": "Search failed",
+  "globalSearchNetworkError": "Network error",
+  "globalSearchUnknownUser": "Unknown user",
+  "globalSearchFollow": "Follow",
+  "globalSearchFollowed": "Following",
+  "globalSearchFollowOk": "Followed",
+
+  "createGroupTitle": "New group",
+  "createGroupAction": "Create",
+  "createGroupName": "Group name",
+  "createGroupNameHint": "e.g. Weekend squad",
+  "createGroupSelectMembers": "Select members ({count})",
+  "@createGroupSelectMembers": {
+    "placeholders": {
+      "count": {"type": "int"}
+    }
+  },
+  "createGroupNoFriends": "No mutual friends to pick",
+  "createGroupNeedName": "Enter a group chat name",
+  "createGroupNeedMember": "Pick at least one member",
+  "createGroupSuccess": "Group created",
+  "createGroupFailed": "Could not create: {error}",
+  "@createGroupFailed": {
+    "placeholders": {
+      "error": {"type": "String"}
+    }
+  },
+  "userIdLabel": "ID: {id}",
+  "@userIdLabel": {
+    "placeholders": {
+      "id": {"type": "String"}
+    }
+  },
   "sessionExpired": "Session expired. Please sign in again",
   "settingsAboutLegalese": "Immersive vertical short dramas",
   "profileUserFallback": "User",

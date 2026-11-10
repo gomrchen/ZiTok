@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+
+import '../../l10n/l10n_ext.dart';
 import '../../providers/messaging_provider.dart';
-import '../../models/social_models.dart'; // 确保引入了 Friend 模型
+import '../../models/social_models.dart';
+import '../home/shell_surface.dart';
 
 class CreateGroupPage extends StatefulWidget {
   const CreateGroupPage({super.key});
@@ -13,31 +16,16 @@ class CreateGroupPage extends StatefulWidget {
 
 class _CreateGroupPageState extends State<CreateGroupPage> {
   final TextEditingController _nameCtrl = TextEditingController();
-
-  // 选中的用户 ID 集合
   final Set<int> _selectedIds = {};
-
-  // 候选人列表 (合并关注和粉丝)
   List<Friend> _candidates = [];
 
   @override
   void initState() {
     super.initState();
-    // 初始化时加载候选人
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final mp = context.read<MessagingProvider>();
-      // 简单去重逻辑：将关注列表和粉丝列表合并
-      final Map<String, Friend> uniqueMap = {};
-      for (var f in mp.following) {
-        uniqueMap[f.id] = f;
-      }
-      for (var f in mp.followers) {
-        uniqueMap[f.id] = f;
-      }
-
-      setState(() {
-        _candidates = uniqueMap.values.toList();
-      });
+      // 与空态文案一致：仅互关好友可拉群
+      setState(() => _candidates = List<Friend>.from(mp.mutualFriends));
     });
   }
 
@@ -48,104 +36,157 @@ class _CreateGroupPageState extends State<CreateGroupPage> {
   }
 
   Future<void> _submit() async {
+    final l10n = context.l10n;
     final name = _nameCtrl.text.trim();
     if (name.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("请输入群名称")));
+      ShellSurface.showTip(context, l10n.createGroupNeedName);
+      return;
+    }
+    if (_candidates.isEmpty) {
+      ShellSurface.showTip(context, l10n.createGroupNoFriends);
       return;
     }
     if (_selectedIds.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("请至少选择一个成员")));
+      ShellSurface.showTip(context, l10n.createGroupNeedMember);
       return;
     }
 
-    // 调用 Provider 创建
     final mp = context.read<MessagingProvider>();
     final msg = await mp.createGroupAction(name, _selectedIds.toList());
-
     if (!mounted) return;
 
-    if (msg == "OK") {
-      Navigator.pop(context); // 关闭页面
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("群聊创建成功")));
+    if (msg == 'OK') {
+      Navigator.pop(context);
+      ShellSurface.showTip(context, l10n.createGroupSuccess);
     } else {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text("创建失败: $msg")));
+      ShellSurface.showTip(context, l10n.createGroupFailed(msg));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text("发起群聊"),
-        actions: [
-          TextButton(
-            onPressed: _submit,
-            child: const Text("创建", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-          )
-        ],
-      ),
-      body: Column(
-        children: [
-          // 1. 群名输入框
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: TextField(
-              controller: _nameCtrl,
-              decoration: const InputDecoration(
-                labelText: "群聊名称",
-                hintText: "例如：周末开黑群",
-                border: OutlineInputBorder(),
-                prefixIcon: Icon(Icons.group_add),
+    final l10n = context.l10n;
+    final ink = ShellSurface.inkOf(context);
+    return AnnotatedRegion(
+      value: ShellSurface.systemUiOf(context),
+      child: Scaffold(
+        backgroundColor: ShellSurface.canvasOf(context),
+        appBar: ShellSurface.appBar(
+          title: l10n.createGroupTitle,
+          context: context,
+          actions: [
+            TextButton(
+              onPressed: _submit,
+              child: Text(
+                l10n.createGroupAction,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: ShellSurface.accent,
+                ),
               ),
             ),
-          ),
-
-          const Divider(height: 1),
-
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text("选择成员 (${_selectedIds.length})", style: TextStyle(color: Colors.grey[600])),
-            ),
-          ),
-
-          // 2. 好友选择列表
-          Expanded(
-            child: _candidates.isEmpty
-                ? const Center(child: Text("暂无互关好友可选"))
-                : ListView.builder(
-              itemCount: _candidates.length,
-              itemBuilder: (context, index) {
-                final friend = _candidates[index];
-                final int fid = int.tryParse(friend.id) ?? 0;
-                final bool isSelected = _selectedIds.contains(fid);
-
-                return CheckboxListTile(
-                  value: isSelected,
-                  activeColor: Theme.of(context).primaryColor,
-                  onChanged: (bool? value) {
-                    setState(() {
-                      if (value == true) {
-                        _selectedIds.add(fid);
-                      } else {
-                        _selectedIds.remove(fid);
-                      }
-                    });
-                  },
-                  secondary: CircleAvatar(
-                    backgroundImage: (friend.avatarUrl.isNotEmpty)
-                        ? CachedNetworkImageProvider(friend.avatarUrl)
-                        : null,
-                    child: friend.avatarUrl.isEmpty ? const Icon(Icons.person) : null,
+          ],
+        ),
+        body: Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(
+                ShellSurface.pagePad,
+                12,
+                ShellSurface.pagePad,
+                8,
+              ),
+              child: TextField(
+                controller: _nameCtrl,
+                style: TextStyle(color: ink, fontSize: 15),
+                decoration: InputDecoration(
+                  labelText: l10n.createGroupName,
+                  hintText: l10n.createGroupNameHint,
+                  labelStyle: TextStyle(color: ink.withValues(alpha: 0.55)),
+                  hintStyle: TextStyle(color: ink.withValues(alpha: 0.28)),
+                  prefixIcon: Icon(Icons.group_add_rounded, color: ShellSurface.mutedOf(context)),
+                  filled: true,
+                  fillColor: ShellSurface.cardOf(context),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: ShellSurface.lineOf(context)),
                   ),
-                  title: Text(friend.name),
-                  subtitle: Text("ID: ${friend.id}"),
-                );
-              },
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide(color: ShellSurface.lineOf(context)),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: const BorderSide(color: ShellSurface.coral, width: 1.4),
+                  ),
+                ),
+              ),
             ),
-          ),
-        ],
+            Divider(height: 1, color: ShellSurface.lineOf(context)),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  l10n.createGroupSelectMembers(_selectedIds.length),
+                  style: ShellSurface.captionOf(context).copyWith(fontSize: 13),
+                ),
+              ),
+            ),
+            Expanded(
+              child: _candidates.isEmpty
+                  ? Center(
+                      child: Text(
+                        l10n.createGroupNoFriends,
+                        style: ShellSurface.captionOf(context).copyWith(fontSize: 14),
+                      ),
+                    )
+                  : ListView.separated(
+                      itemCount: _candidates.length,
+                      separatorBuilder: (_, __) =>
+                          Divider(height: 1, indent: 72, color: ShellSurface.lineOf(context)),
+                      itemBuilder: (context, index) {
+                        final friend = _candidates[index];
+                        final fid = int.tryParse(friend.id) ?? 0;
+                        final isSelected = _selectedIds.contains(fid);
+                        return CheckboxListTile(
+                          value: isSelected,
+                          activeColor: ShellSurface.accent,
+                          checkColor: Colors.white,
+                          side: BorderSide(color: ShellSurface.mutedOf(context)),
+                          onChanged: (bool? value) {
+                            setState(() {
+                              if (value == true) {
+                                _selectedIds.add(fid);
+                              } else {
+                                _selectedIds.remove(fid);
+                              }
+                            });
+                          },
+                          secondary: CircleAvatar(
+                            backgroundColor: ShellSurface.cardOf(context),
+                            backgroundImage: friend.avatarUrl.isNotEmpty
+                                ? CachedNetworkImageProvider(friend.avatarUrl)
+                                : null,
+                            child: friend.avatarUrl.isEmpty
+                                ? Icon(Icons.person_rounded, color: ShellSurface.mutedOf(context))
+                                : null,
+                          ),
+                          title: Text(
+                            friend.name,
+                            style: ShellSurface.bodyStrongOf(context),
+                          ),
+                          subtitle: Text(
+                            l10n.userIdLabel(friend.id),
+                            style: ShellSurface.captionOf(context),
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
       ),
     );
   }
