@@ -156,6 +156,14 @@ vulncheck:
 tidy:
 	go mod tidy
 
+# 本地常驻启停（tmux，避免 IDE/Agent shell 结束后把进程杀掉）
+.PHONY: start-local stop-local
+start-local:
+	@bash $(DIR)/scripts/start-local.sh
+
+stop-local:
+	@bash $(DIR)/scripts/stop-local.sh
+
 # 前端服务相关命令
 .PHONY: frontend frontend-stop frontend-build
 

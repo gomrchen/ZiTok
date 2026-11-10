@@ -208,10 +208,11 @@ type Config struct {
 
 // Init 初始化配置，支持从etcd远程获取配置
 func Init(service string) {
-	// 从环境变量获取etcd地址
+	// 从环境变量获取etcd地址；本地开发未设置时与 entrypoint 保持一致
 	etcdAddr := os.Getenv("ETCD_ADDR")
 	if etcdAddr == "" {
-		panic("ETCD_ADDR environment variable is not set")
+		etcdAddr = "127.0.0.1:2379"
+		_ = os.Setenv("ETCD_ADDR", etcdAddr)
 	}
 	fmt.Printf("Using etcd address: %s\n", etcdAddr)
 

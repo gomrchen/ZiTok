@@ -5,10 +5,10 @@ services:
     image: redis:bookworm
     volumes:
       - ./data/redis:/data
+    # 避开本机已占用的 6379
     ports:
-      - "6379:6379"
-    env_file:
-      - "./env/redis.env"
+      - "16379:6379"
+    command: ["redis-server", "--requirepass", "videohub", "--appendonly", "yes"]
     networks:
       - videohub
 
@@ -18,8 +18,9 @@ services:
     image: mysql:8.0
     env_file:
       - "./env/mysql.env"
+    # 避开本机已占用的 3306
     ports:
-      - "3306:3306"
+      - "23306:3306"
     networks:
       - videohub
     volumes:
@@ -129,25 +130,33 @@ services:
   # etcd 服务，分布式键值存储系统，用于服务发现、配置管理
   videohub-etcd:
     container_name: videohub-etcd
-    image: quay.io/coreos/etcd:v3.5.5
+    # v3.6 为 distroless，无 shell；配置由宿主机 etcdctl 写入
+    image: quay.io/coreos/etcd:v3.6.8
     restart: always
     ports:
       - 2379:2379
       - 2380:2380
-    env_file:
-      - "./env/etcd.env"
     volumes:
-      - ./script:/script
-      - ../config:/config
       - ./data/etcd:/etcd-data
     networks:
       - videohub
-    entrypoint: [ "sh", "-c", "chmod +x /script/etcd-monitor.sh && /script/etcd-monitor.sh & exec etcd" ]
+    command:
+      - /usr/local/bin/etcd
+      - --name=videohub-etcd
+      - --data-dir=/etcd-data
+      - --listen-client-urls=http://0.0.0.0:2379
+      - --advertise-client-urls=http://0.0.0.0:2379
+      - --listen-peer-urls=http://0.0.0.0:2380
+      - --initial-advertise-peer-urls=http://127.0.0.1:2380
+      - --initial-cluster=videohub-etcd=http://127.0.0.1:2380
+      - --initial-cluster-state=new
+      - --initial-cluster-token=videohub-etcd
 
   # Kafka 服务，分布式流处理平台，用于构建实时数据管道和流应用
   kafka:
     container_name: videohub-kafka
-    image: bitnami/kafka:latest
+    # bitnami 公共镜像已迁移到 bitnamilegacy，国内源可用
+    image: bitnamilegacy/kafka:3.5.1
     restart: always
     user: root
     ports:

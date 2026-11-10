@@ -46,6 +46,10 @@ dev_dependencies:
   mockito: ^5.4.4 # 用于模拟依赖
   flutter_launcher_icons: ^0.14.4
 
+# 规避 video_player_avfoundation 2.12.x 在当前 Xcode/Swift 下的 isolation 编译错误
+dependency_overrides:
+  video_player_avfoundation: 2.8.7
+
 flutter_launcher_icons:
   android: true
   ios: true

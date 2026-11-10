@@ -54,6 +54,8 @@ class ErrorHandler {
         return '请求已取消';
       case DioExceptionType.connectionError:
         return '网络连接失败，请检查网络设置';
+      case DioExceptionType.transformTimeout:
+        return '数据转换超时，请稍后重试';
       case DioExceptionType.unknown:
         // 检查是否是网络相关错误
         if (error.error is SocketException) {

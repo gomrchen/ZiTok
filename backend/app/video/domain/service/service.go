@@ -153,7 +153,7 @@ func (s *VideoService) processVideo(ctx context.Context, videoID int64, videoPat
 	}
 
 	// 3. 上传封面到存储系统
-	coverFilename := filepath.Base(coverPath)
+	coverFilename = filepath.Base(coverPath)
 	coverURL := fmt.Sprintf("%s/%s", config.Upload.Video.BaseURL, coverFilename)
 	if err := os.Rename(coverPath, filepath.Join(config.Upload.Video.CoverDir, coverFilename)); err != nil {
 		logger.Errorf("移动封面文件失败：%v", err)
