@@ -559,6 +559,43 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
     }
   }
 
+  Future<void> _pauseForOverlay() async {
+    await _controller?.pause();
+    if (!mounted) return;
+    setState(() {
+      _paused = true;
+      _showPauseHint = false;
+    });
+  }
+
+  Future<void> _resumeIfActive() async {
+    if (!mounted || !widget.active || _locked) return;
+    await _controller?.play();
+    if (mounted) setState(() => _paused = false);
+  }
+
+  Future<void> _openTitle() async {
+    await _pauseForOverlay();
+    if (!mounted) return;
+    await context.push('/drama/${widget.drama.id}');
+    await _resumeIfActive();
+  }
+
+  Future<void> _openCategory(String tag) async {
+    final q = tag.trim();
+    if (q.isEmpty) return;
+    await _pauseForOverlay();
+    if (!mounted) return;
+    await context.push('/theater?category=${Uri.encodeComponent(q)}');
+    await _resumeIfActive();
+  }
+
+  Future<void> _openEpisodeMeta() async {
+    await _pauseForOverlay();
+    await widget.onOpenPicker();
+    await _resumeIfActive();
+  }
+
   void _togglePause() {
     final c = _controller;
     if (c == null || !c.value.isInitialized || _locked || _loading || _speedUp) return;
@@ -755,17 +792,10 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
                 icon: Icons.chat_bubble_outline_rounded,
                 label: _commentCount > 0 ? '$_commentCount' : '评论',
                 onTap: () async {
-                  await _controller?.pause();
-                  setState(() {
-                    _paused = true;
-                    _showPauseHint = false;
-                  });
+                  await _pauseForOverlay();
                   await widget.onOpenComments();
                   await _syncCommentCount();
-                  if (mounted && widget.active && !_locked) {
-                    await _controller?.play();
-                    setState(() => _paused = false);
-                  }
+                  await _resumeIfActive();
                 },
               ),
               PlayerSideAction(
@@ -777,18 +807,7 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
               PlayerSideAction(
                 icon: Icons.list_alt_rounded,
                 label: '选集',
-                onTap: () async {
-                  await _controller?.pause();
-                  setState(() {
-                    _paused = true;
-                    _showPauseHint = false;
-                  });
-                  await widget.onOpenPicker();
-                  if (mounted && widget.active && !_locked) {
-                    await _controller?.play();
-                    if (mounted) setState(() => _paused = false);
-                  }
-                },
+                onTap: _openEpisodeMeta,
               ),
             ],
           ),
@@ -803,7 +822,9 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
               PlayerBottomMeta(
                 title: widget.drama.title,
                 subtitle: episodeSubtitle(widget.episode, category: widget.drama.category),
-                onTitleTap: () => context.push('/drama/${widget.drama.id}'),
+                onTitleTap: _openTitle,
+                onEpisodeTap: _openEpisodeMeta,
+                onTagTap: _openCategory,
               ),
               const SizedBox(height: 8),
               PlayerProgressBar(

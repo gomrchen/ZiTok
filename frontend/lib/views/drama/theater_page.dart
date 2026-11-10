@@ -6,7 +6,9 @@ import '../../providers/drama_provider.dart';
 import '../home/shell_surface.dart';
 
 class TheaterPage extends StatefulWidget {
-  const TheaterPage({super.key});
+  final String? initialCategory;
+
+  const TheaterPage({super.key, this.initialCategory});
 
   @override
   State<TheaterPage> createState() => _TheaterPageState();
@@ -20,14 +22,22 @@ class _TheaterPageState extends State<TheaterPage> {
   @override
   void initState() {
     super.initState();
+    final seed = (widget.initialCategory ?? '').trim();
+    if (seed.isNotEmpty && seed != '全部') {
+      _category = seed;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<DramaProvider>().refreshTheater();
+      context.read<DramaProvider>().refreshTheater(category: _category);
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final dp = context.watch<DramaProvider>();
+    final cats = <String>[
+      ...categories,
+      if (_category != null && !categories.contains(_category)) _category!,
+    ];
     return AnnotatedRegion(
       value: ShellSurface.systemUi,
       child: Scaffold(
@@ -49,10 +59,10 @@ class _TheaterPageState extends State<TheaterPage> {
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 padding: const EdgeInsets.symmetric(horizontal: ShellSurface.pagePad),
-                itemCount: categories.length,
+                itemCount: cats.length,
                 separatorBuilder: (_, __) => const SizedBox(width: 8),
                 itemBuilder: (_, i) {
-                  final c = categories[i];
+                  final c = cats[i];
                   final selected = (_category == null && c == '全部') || _category == c;
                   return _CategoryPill(
                     label: c,

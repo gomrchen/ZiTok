@@ -70,7 +70,13 @@ class AppRouter {
           ),
         ),
         GoRoute(path: '/wallet', builder: _builder((_) => const WalletPage())),
-        GoRoute(path: '/theater', builder: _builder((_) => const TheaterPage())),
+        GoRoute(
+          path: '/theater',
+          builder: _builder((state) {
+            final cat = state.uri.queryParameters['category']?.trim();
+            return TheaterPage(initialCategory: (cat == null || cat.isEmpty) ? null : cat);
+          }),
+        ),
         GoRoute(path: '/watching', builder: _builder((_) => const WatchingPage())),
         // 旧 /video /note /create 路由统一回首页，避免深链崩溃
         GoRoute(path: '/video/:id', redirect: (_, __) => '/home'),

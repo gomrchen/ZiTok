@@ -363,12 +363,16 @@ class PlayerBottomMeta extends StatelessWidget {
   final String title;
   final String subtitle;
   final VoidCallback? onTitleTap;
+  final VoidCallback? onEpisodeTap;
+  final ValueChanged<String>? onTagTap;
 
   const PlayerBottomMeta({
     super.key,
     required this.title,
     required this.subtitle,
     this.onTitleTap,
+    this.onEpisodeTap,
+    this.onTagTap,
   });
 
   static const _titleShadow = <Shadow>[
@@ -394,6 +398,7 @@ class PlayerBottomMeta extends StatelessWidget {
           onTap: onTitleTap,
           behavior: HitTestBehavior.opaque,
           child: Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
                 width: 3,
@@ -415,21 +420,42 @@ class PlayerBottomMeta extends StatelessWidget {
                   ],
                 ),
               ),
-              Expanded(
-                child: Text(
-                  title,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFFFAFAFA),
-                    fontSize: 18,
-                    fontWeight: FontWeight.w700,
-                    height: 1.15,
-                    letterSpacing: 0.8,
-                    fontFamily: 'PingFang SC',
-                    fontFamilyFallback: ['SF Pro Display', 'Microsoft YaHei', 'sans-serif'],
-                    shadows: _titleShadow,
-                  ),
+              Flexible(
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Flexible(
+                      child: Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Color(0xFFFAFAFA),
+                          fontSize: 18,
+                          fontWeight: FontWeight.w700,
+                          height: 1.15,
+                          letterSpacing: 0.8,
+                          fontFamily: 'PingFang SC',
+                          fontFamilyFallback: ['SF Pro Display', 'Microsoft YaHei', 'sans-serif'],
+                          shadows: _titleShadow,
+                        ),
+                      ),
+                    ),
+                    if (onTitleTap != null)
+                      Padding(
+                        padding: const EdgeInsets.only(left: 1),
+                        child: Transform.translate(
+                          // chevron_right 字形略偏上，光学贴齐标题中线
+                          offset: const Offset(-1, 0.5),
+                          child: Icon(
+                            Icons.chevron_right_rounded,
+                            size: 18,
+                            color: Colors.white.withValues(alpha: 0.55),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
             ],
@@ -440,23 +466,38 @@ class PlayerBottomMeta extends StatelessWidget {
           Row(
             children: [
               if (ep.isNotEmpty)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(99),
-                    color: Colors.white.withValues(alpha: 0.12),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
-                  ),
-                  child: Text(
-                    ep,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.92),
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                      height: 1.1,
-                      letterSpacing: 0.3,
-                      fontFamily: 'PingFang SC',
-                      fontFamilyFallback: const ['SF Pro Text', 'Microsoft YaHei', 'sans-serif'],
+                GestureDetector(
+                  onTap: onEpisodeTap,
+                  behavior: HitTestBehavior.opaque,
+                  child: Container(
+                    padding: EdgeInsets.fromLTRB(8, 3, onEpisodeTap != null ? 4 : 8, 3),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(99),
+                      color: Colors.white.withValues(alpha: 0.12),
+                      border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          ep,
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.92),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            height: 1.1,
+                            letterSpacing: 0.3,
+                            fontFamily: 'PingFang SC',
+                            fontFamilyFallback: const ['SF Pro Text', 'Microsoft YaHei', 'sans-serif'],
+                          ),
+                        ),
+                        if (onEpisodeTap != null)
+                          Icon(
+                            Icons.expand_more_rounded,
+                            size: 14,
+                            color: Colors.white.withValues(alpha: 0.7),
+                          ),
+                      ],
                     ),
                   ),
                 ),
@@ -473,21 +514,27 @@ class PlayerBottomMeta extends StatelessWidget {
                   ),
                 ),
                 Flexible(
-                  child: Text(
-                    tag,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.72),
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                      height: 1.1,
-                      letterSpacing: 0.4,
-                      fontFamily: 'PingFang SC',
-                      fontFamilyFallback: const ['SF Pro Text', 'Microsoft YaHei', 'sans-serif'],
-                      shadows: const [
-                        Shadow(color: Color(0x88000000), blurRadius: 6, offset: Offset(0, 1)),
-                      ],
+                  child: GestureDetector(
+                    onTap: onTagTap == null ? null : () => onTagTap!(tag),
+                    behavior: HitTestBehavior.opaque,
+                    child: Text(
+                      tag,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: onTagTap != null ? 0.88 : 0.72),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        height: 1.1,
+                        letterSpacing: 0.4,
+                        decoration: onTagTap != null ? TextDecoration.underline : null,
+                        decorationColor: Colors.white.withValues(alpha: 0.28),
+                        fontFamily: 'PingFang SC',
+                        fontFamilyFallback: const ['SF Pro Text', 'Microsoft YaHei', 'sans-serif'],
+                        shadows: const [
+                          Shadow(color: Color(0x88000000), blurRadius: 6, offset: Offset(0, 1)),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -505,7 +552,6 @@ class PlayerSideAction extends StatelessWidget {
   final String label;
   final VoidCallback onTap;
   final Color? iconColor;
-  final bool active;
 
   const PlayerSideAction({
     super.key,
@@ -513,12 +559,23 @@ class PlayerSideAction extends StatelessWidget {
     required this.label,
     required this.onTap,
     this.iconColor,
-    this.active = false,
   });
+
+  /// Material 书签字形视觉重心偏左，圆内光学居中需微右移
+  Offset get _opticalNudge {
+    if (icon == Icons.bookmark_rounded || icon == Icons.bookmark_border_rounded) {
+      return const Offset(1.2, 0);
+    }
+    if (icon == Icons.list_alt_rounded) {
+      return const Offset(0.4, 0);
+    }
+    return Offset.zero;
+  }
 
   @override
   Widget build(BuildContext context) {
     final color = iconColor ?? Colors.white;
+    final nudge = _opticalNudge;
     return GestureDetector(
       behavior: HitTestBehavior.opaque,
       onTap: onTap,
@@ -529,12 +586,16 @@ class PlayerSideAction extends StatelessWidget {
             Container(
               width: 46,
               height: 46,
+              alignment: Alignment.center,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 color: Colors.black.withValues(alpha: 0.22),
                 border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
               ),
-              child: Icon(icon, color: color, size: 26),
+              child: Transform.translate(
+                offset: nudge,
+                child: Icon(icon, color: color, size: 26),
+              ),
             ),
             const SizedBox(height: 4),
             Text(

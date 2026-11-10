@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:video_player/video_player.dart';
 
@@ -155,6 +156,18 @@ Future<void> showPlayerDramaIntroSheet(BuildContext context, {required Drama dra
       borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
     ),
     builder: (ctx) {
+      Future<void> openDetail() async {
+        Navigator.pop(ctx);
+        await context.push('/drama/${drama.id}');
+      }
+
+      Future<void> openCategory(String tag) async {
+        final q = tag.trim();
+        if (q.isEmpty) return;
+        Navigator.pop(ctx);
+        await context.push('/theater?category=${Uri.encodeComponent(q)}');
+      }
+
       return SafeArea(
         child: Padding(
           padding: const EdgeInsets.fromLTRB(20, 14, 20, 24),
@@ -173,52 +186,67 @@ Future<void> showPlayerDramaIntroSheet(BuildContext context, {required Drama dra
                 ),
               ),
               const SizedBox(height: 16),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: SizedBox(
-                      width: 72,
-                      height: 96,
-                      child: drama.coverUrl.isEmpty
-                          ? const ColoredBox(color: Color(0xFF2A2D36))
-                          : Image.network(drama.coverUrl, fit: BoxFit.cover),
+              InkWell(
+                onTap: openDetail,
+                borderRadius: BorderRadius.circular(12),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: SizedBox(
+                        width: 72,
+                        height: 96,
+                        child: drama.coverUrl.isEmpty
+                            ? const ColoredBox(color: Color(0xFF2A2D36))
+                            : Image.network(drama.coverUrl, fit: BoxFit.cover),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          drama.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.w800,
-                            height: 1.2,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          '${drama.totalEpisodes}集 · 免费${drama.freeEpisodeCount}集'
-                          '${drama.bundlePrice > 0 ? ' · 整剧${drama.bundlePrice}币' : ''}',
-                          style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12.5),
-                        ),
-                        if (drama.category.isNotEmpty) ...[
-                          const SizedBox(height: 6),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
                           Text(
-                            drama.category,
-                            style: TextStyle(color: kPlayerPrimary.withValues(alpha: 0.95), fontSize: 12, fontWeight: FontWeight.w700),
+                            drama.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              height: 1.2,
+                            ),
                           ),
+                          const SizedBox(height: 8),
+                          Text(
+                            '${drama.totalEpisodes}集 · 免费${drama.freeEpisodeCount}集'
+                            '${drama.bundlePrice > 0 ? ' · 整剧${drama.bundlePrice}币' : ''}',
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.7), fontSize: 12.5),
+                          ),
+                          if (drama.category.isNotEmpty) ...[
+                            const SizedBox(height: 6),
+                            GestureDetector(
+                              onTap: () => openCategory(drama.category),
+                              behavior: HitTestBehavior.opaque,
+                              child: Text(
+                                drama.category,
+                                style: TextStyle(
+                                  color: kPlayerPrimary.withValues(alpha: 0.95),
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                  decoration: TextDecoration.underline,
+                                  decorationColor: kPlayerPrimary.withValues(alpha: 0.35),
+                                ),
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
                     ),
-                  ),
-                ],
+                    Icon(Icons.chevron_right_rounded, color: Colors.white.withValues(alpha: 0.45)),
+                  ],
+                ),
               ),
               if (tags.isNotEmpty) ...[
                 const SizedBox(height: 14),
@@ -227,14 +255,18 @@ Future<void> showPlayerDramaIntroSheet(BuildContext context, {required Drama dra
                   runSpacing: 8,
                   children: [
                     for (final t in tags.take(8))
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(99),
-                          color: Colors.white.withValues(alpha: 0.08),
-                          border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                      InkWell(
+                        onTap: () => openCategory(t),
+                        borderRadius: BorderRadius.circular(99),
+                        child: Ink(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(99),
+                            color: Colors.white.withValues(alpha: 0.08),
+                            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                          ),
+                          child: Text(t, style: const TextStyle(color: Colors.white70, fontSize: 11.5)),
                         ),
-                        child: Text(t, style: const TextStyle(color: Colors.white70, fontSize: 11.5)),
                       ),
                   ],
                 ),
@@ -251,6 +283,20 @@ Future<void> showPlayerDramaIntroSheet(BuildContext context, {required Drama dra
                   color: Colors.white.withValues(alpha: 0.72),
                   fontSize: 13.5,
                   height: 1.45,
+                ),
+              ),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                height: 44,
+                child: FilledButton(
+                  onPressed: openDetail,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: kPlayerPrimary,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('进入详情页', style: TextStyle(fontWeight: FontWeight.w800)),
                 ),
               ),
             ],

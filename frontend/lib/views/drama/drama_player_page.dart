@@ -29,7 +29,6 @@ class DramaPlayerPage extends StatefulWidget {
 
 class _DramaPlayerPageState extends State<DramaPlayerPage> {
   final PageController _pageController = PageController();
-  final Map<int, Future<void> Function()> _moreHandlers = {};
   int _index = 0;
 
   @override
@@ -83,67 +82,32 @@ class _DramaPlayerPageState extends State<DramaPlayerPage> {
       );
     }
 
-    final top = MediaQuery.viewPaddingOf(context).top;
-    final bal = dp.wallet?.balance;
-    final showMore = context.watch<SettingsProvider>().playerMoreButton;
-
+    // 封面连播对齐红果：右上不挂更多/金币，沉浸只留画面与侧栏
     return ColoredBox(
       color: Colors.black,
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          PageView.builder(
-            scrollDirection: Axis.vertical,
-            controller: _pageController,
-            itemCount: dp.feed.length,
-            onPageChanged: (i) {
-              setState(() => _index = i);
-              dp.reportProgress(dp.feed[i]);
-              if (i >= dp.feed.length - 2) dp.loadMoreFeed();
-            },
-            itemBuilder: (context, i) {
-              final item = dp.feed[i];
-              final next = i + 1 < dp.feed.length ? dp.feed[i + 1] : null;
-              return _EpisodeSlide(
-                key: ValueKey('feed-ep-${item.episode.id}'),
-                item: item,
-                itemIndex: i,
-                active: i == _index,
-                favorited: dp.favorites.any((d) => d.id == item.drama.id),
-                nextLabel: next == null
-                    ? null
-                    : '《${next.drama.title}》第${next.episode.episodeNo}集',
-                onEnded: _goNext,
-                onRegisterMore: (index, handler) {
-                  if (handler == null) {
-                    _moreHandlers.remove(index);
-                  } else {
-                    _moreHandlers[index] = handler;
-                  }
-                },
-              );
-            },
-          ),
-          Positioned(
-            top: top + 8,
-            right: 12,
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (showMore) ...[
-                  PlayerMoreButton(
-                    onTap: () => _moreHandlers[_index]?.call(),
-                  ),
-                  const SizedBox(width: 8),
-                ],
-                PlayerCoinChip(
-                  balance: bal ?? 0,
-                  onTap: () => context.push('/wallet'),
-                ),
-              ],
-            ),
-          ),
-        ],
+      child: PageView.builder(
+        scrollDirection: Axis.vertical,
+        controller: _pageController,
+        itemCount: dp.feed.length,
+        onPageChanged: (i) {
+          setState(() => _index = i);
+          dp.reportProgress(dp.feed[i]);
+          if (i >= dp.feed.length - 2) dp.loadMoreFeed();
+        },
+        itemBuilder: (context, i) {
+          final item = dp.feed[i];
+          final next = i + 1 < dp.feed.length ? dp.feed[i + 1] : null;
+          return _EpisodeSlide(
+            key: ValueKey('feed-ep-${item.episode.id}'),
+            item: item,
+            active: i == _index,
+            favorited: dp.favorites.any((d) => d.id == item.drama.id),
+            nextLabel: next == null
+                ? null
+                : '《${next.drama.title}》第${next.episode.episodeNo}集',
+            onEnded: _goNext,
+          );
+        },
       ),
     );
   }
@@ -151,22 +115,18 @@ class _DramaPlayerPageState extends State<DramaPlayerPage> {
 
 class _EpisodeSlide extends StatefulWidget {
   final FeedItem item;
-  final int itemIndex;
   final bool active;
   final bool favorited;
   final String? nextLabel;
   final VoidCallback onEnded;
-  final void Function(int index, Future<void> Function()? handler) onRegisterMore;
 
   const _EpisodeSlide({
     super.key,
     required this.item,
-    required this.itemIndex,
     required this.active,
     required this.favorited,
     required this.nextLabel,
     required this.onEnded,
-    required this.onRegisterMore,
   });
 
   @override
@@ -184,8 +144,6 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
   bool _speedUp = false;
   bool _endedHandled = false;
   bool _awaitingNext = false;
-  bool _muted = false;
-  double _baseSpeed = 1.0;
   int _likeCount = 0;
   int _commentCount = 0;
   String? _error;
@@ -198,17 +156,12 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
   void initState() {
     super.initState();
     _favorited = widget.favorited;
-    widget.onRegisterMore(widget.itemIndex, _openMore);
     _prepare();
   }
 
   @override
   void didUpdateWidget(covariant _EpisodeSlide oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (widget.itemIndex != oldWidget.itemIndex) {
-      oldWidget.onRegisterMore(oldWidget.itemIndex, null);
-      widget.onRegisterMore(widget.itemIndex, _openMore);
-    }
     if (widget.favorited != oldWidget.favorited) {
       _favorited = widget.favorited;
     }
@@ -221,7 +174,7 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
       _controller?.pause();
       _stopProgressTimer();
       if (_speedUp) {
-        _controller?.setPlaybackSpeed(_baseSpeed);
+        _controller?.setPlaybackSpeed(1.0);
         _speedUp = false;
       }
       _awaitingNext = false;
@@ -425,6 +378,71 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
     if (ok == true && mounted) await _prepare();
   }
 
+  Future<void> _pauseForOverlay() async {
+    await _controller?.pause();
+    if (!mounted) return;
+    setState(() {
+      _paused = true;
+      _showPauseHint = false;
+    });
+  }
+
+  Future<void> _resumeIfActive() async {
+    if (!mounted || !widget.active) return;
+    await _controller?.play();
+    if (mounted) setState(() => _paused = false);
+  }
+
+  Future<void> _openComments() async {
+    await _pauseForOverlay();
+    if (!mounted) return;
+    await showEpisodeCommentsSheet(context, episodeId: widget.item.episode.id);
+    await _syncCommentCount();
+    await _resumeIfActive();
+  }
+
+  Future<void> _openPicker() async {
+    final item = widget.item;
+    await _pauseForOverlay();
+    if (!mounted) return;
+    final ep = await showEpisodePickerSheet(
+      context,
+      drama: item.drama,
+      currentEpisodeId: item.episode.id,
+    );
+    if (!mounted) return;
+    if (ep != null) {
+      if (ep.id == item.episode.id) {
+        await _resumeIfActive();
+        return;
+      }
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => EpisodePlayPage(drama: item.drama, episode: ep),
+        ),
+      );
+      await _resumeIfActive();
+    } else {
+      await _resumeIfActive();
+    }
+  }
+
+  Future<void> _openTitle() async {
+    await _pauseForOverlay();
+    if (!mounted) return;
+    await context.push('/drama/${widget.item.drama.id}');
+    await _resumeIfActive();
+  }
+
+  Future<void> _openCategory(String tag) async {
+    final q = tag.trim();
+    if (q.isEmpty) return;
+    await _pauseForOverlay();
+    if (!mounted) return;
+    await context.push('/theater?category=${Uri.encodeComponent(q)}');
+    await _resumeIfActive();
+  }
+
   void _togglePause() {
     final c = _controller;
     if (c == null || !c.value.isInitialized || _locked || _loading || _speedUp) return;
@@ -476,64 +494,12 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
   }
 
   void _onLongPressEnd() {
-    _controller?.setPlaybackSpeed(_baseSpeed);
+    _controller?.setPlaybackSpeed(1.0);
     if (mounted) setState(() => _speedUp = false);
-  }
-
-  Future<void> _toggleMute() async {
-    final c = _controller;
-    if (c == null || !c.value.isInitialized) return;
-    final next = !_muted;
-    await c.setVolume(next ? 0 : 1);
-    if (mounted) setState(() => _muted = next);
-  }
-
-  Future<void> _pickSpeed() async {
-    final c = _controller;
-    if (c == null || !c.value.isInitialized) return;
-    final picked = await showPlayerSpeedSheet(context, current: _baseSpeed);
-    if (picked == null || !mounted) return;
-    await c.setPlaybackSpeed(picked);
-    setState(() => _baseSpeed = picked);
-  }
-
-  Future<void> _openMore() async {
-    final item = widget.item;
-    await _controller?.pause();
-    if (mounted) {
-      setState(() {
-        _paused = true;
-        _showPauseHint = false;
-      });
-    }
-    if (!mounted) return;
-    final action = await showPlayerMoreSheet(
-      context,
-      muted: _muted,
-      speed: _baseSpeed,
-    );
-    if (!mounted) return;
-    switch (action) {
-      case PlayerMoreAction.speed:
-        await _pickSpeed();
-      case PlayerMoreAction.mute:
-        await _toggleMute();
-      case PlayerMoreAction.intro:
-        await showPlayerDramaIntroSheet(context, drama: item.drama);
-      case PlayerMoreAction.share:
-        await shareDramaEpisode(context, drama: item.drama, episode: item.episode);
-      case null:
-        break;
-    }
-    if (widget.active && mounted && !_locked) {
-      await _controller?.play();
-      if (mounted) setState(() => _paused = false);
-    }
   }
 
   @override
   void dispose() {
-    widget.onRegisterMore(widget.itemIndex, null);
     _stopProgressTimer();
     _burstTimer?.cancel();
     _tapTimer?.cancel();
@@ -623,20 +589,7 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
               PlayerSideAction(
                 icon: Icons.chat_bubble_outline_rounded,
                 label: _commentCount > 0 ? '$_commentCount' : '评论',
-                onTap: () async {
-                  await _controller?.pause();
-                  setState(() {
-                    _paused = true;
-                    _showPauseHint = false;
-                  });
-                  if (!context.mounted) return;
-                  await showEpisodeCommentsSheet(context, episodeId: item.episode.id);
-                  await _syncCommentCount();
-                  if (widget.active && mounted) {
-                    await _controller?.play();
-                    setState(() => _paused = false);
-                  }
-                },
+                onTap: _openComments,
               ),
               PlayerSideAction(
                 icon: _favorited ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
@@ -647,40 +600,7 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
               PlayerSideAction(
                 icon: Icons.list_alt_rounded,
                 label: '选集',
-                onTap: () async {
-                  await _controller?.pause();
-                  setState(() {
-                    _paused = true;
-                    _showPauseHint = false;
-                  });
-                  if (!context.mounted) return;
-                  final ep = await showEpisodePickerSheet(
-                    context,
-                    drama: item.drama,
-                    currentEpisodeId: item.episode.id,
-                  );
-                  if (!mounted) return;
-                  if (ep != null) {
-                    if (ep.id == item.episode.id) {
-                      await _controller?.play();
-                      if (mounted) setState(() => _paused = false);
-                      return;
-                    }
-                    if (!mounted) return;
-                    await Navigator.of(this.context).push(
-                      MaterialPageRoute(
-                        builder: (_) => EpisodePlayPage(drama: item.drama, episode: ep),
-                      ),
-                    );
-                    if (widget.active && mounted) {
-                      await _controller?.play();
-                      if (mounted) setState(() => _paused = false);
-                    }
-                  } else if (widget.active && mounted) {
-                    await _controller?.play();
-                    if (mounted) setState(() => _paused = false);
-                  }
-                },
+                onTap: _openPicker,
               ),
             ],
           ),
@@ -695,7 +615,9 @@ class _EpisodeSlideState extends State<_EpisodeSlide> {
               PlayerBottomMeta(
                 title: item.drama.title,
                 subtitle: episodeSubtitle(item.episode, category: item.drama.category),
-                onTitleTap: () => context.push('/drama/${item.drama.id}'),
+                onTitleTap: _openTitle,
+                onEpisodeTap: _openPicker,
+                onTagTap: _openCategory,
               ),
               const SizedBox(height: 8),
               PlayerProgressBar(

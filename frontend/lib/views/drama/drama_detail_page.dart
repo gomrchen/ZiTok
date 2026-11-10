@@ -39,9 +39,10 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
       _loading = true;
       _error = null;
     });
+    final dp = context.read<DramaProvider>();
     try {
-      final svc = context.read<DramaProvider>().dramaService;
-      final resp = await svc.detail(widget.dramaId);
+      final resp = await dp.dramaService.detail(widget.dramaId);
+      if (!mounted) return;
       final raw = resp.data;
       if (raw is! Map || '${raw['code']}' != '10000') {
         throw Exception('加载失败');
@@ -52,9 +53,9 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
           .map((e) => Episode.fromJson(Map<String, dynamic>.from(e)))
           .toList()
         ..sort((a, b) => a.episodeNo.compareTo(b.episodeNo));
-      final dp = context.read<DramaProvider>();
       for (final ep in eps.where((e) => !e.isFree).take(12)) {
         final info = await dp.loadPlayInfo(ep.id);
+        if (!mounted) return;
         if (info != null && !info.locked) {
           _unlocked.add(ep.id);
         }
