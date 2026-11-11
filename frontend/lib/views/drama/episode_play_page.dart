@@ -124,6 +124,7 @@ class _EpisodePlayPageState extends State<EpisodePlayPage> {
       context,
       drama: widget.drama,
       currentEpisodeId: cur.id,
+      episodes: _episodes,
     );
     if (!mounted || ep == null) return;
     final i = _episodes.indexWhere((e) => e.id == ep.id);

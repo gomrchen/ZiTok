@@ -10,6 +10,7 @@ import '../../models/drama_models.dart';
 import '../../providers/drama_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../utils/url_utils.dart';
+import '../../widgets/glass_nav.dart';
 import '../home/shell_surface.dart';
 
 /// 短剧个人中心 — 夜戏光影：墨色氛围头图 + 金币条 + 色块入口 + 横滑海报
@@ -378,21 +379,10 @@ class _HeroBlock extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        ClipOval(
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                            child: Material(
-                              color: Colors.white.withValues(alpha: 0.16),
-                              child: InkWell(
-                                onTap: onEdit,
-                                child: const SizedBox(
-                                  width: 42,
-                                  height: 42,
-                                  child: Icon(Icons.edit_outlined, color: Colors.white, size: 18),
-                                ),
-                              ),
-                            ),
-                          ),
+                        GlassNavButton(
+                          icon: Icons.edit_outlined,
+                          size: 42,
+                          onPressed: onEdit,
                         ),
                       ],
                     ),

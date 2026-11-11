@@ -32,7 +32,8 @@ func (c *Client) WritePump() {
 
 	for range ticker.C {
 		if err := c.SendMessage(websocket.PingMessage, nil); err != nil {
-			log.Printf("error writing ping message: %v", err)
+			// 连接已关时写 ping 失败属预期，降噪
+			log.Printf("websocket ping stopped (conn closed): %v", err)
 			return
 		}
 	}

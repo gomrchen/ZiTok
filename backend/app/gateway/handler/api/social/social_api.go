@@ -538,7 +538,16 @@ func ConnectWebSocket(ctx context.Context, c *app.RequestContext) {
 		for {
 			messageType, message, err := conn.ReadMessage()
 			if err != nil {
-				klog.Errorf("读取消息错误: %v", err)
+				// 正常断连（切页/热重启/杀进程）不打 Error，避免监测误报
+				if websocket.IsCloseError(err,
+					websocket.CloseNormalClosure,
+					websocket.CloseGoingAway,
+					websocket.CloseNoStatusReceived,
+				) {
+					klog.Infof("WebSocket 正常关闭: uid=%d err=%v", userID, err)
+				} else {
+					klog.Warnf("WebSocket 读取结束: uid=%d err=%v", userID, err)
+				}
 				return
 			}
 

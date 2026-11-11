@@ -186,7 +186,7 @@ func UploadEpisodeVideo(ctx context.Context, c *app.RequestContext) {
 		pack.RespError(c, err)
 		return
 	}
-	// StaticFS Root=src/storage → 公开路径 /videos/<file>
+	// 公开路径 /videos/<file>（Range handler）
 	// App/iOS 模拟器需绝对地址才能播
 	url := "http://127.0.0.1:28880/videos/" + name
 	ep := &drama.Episode{

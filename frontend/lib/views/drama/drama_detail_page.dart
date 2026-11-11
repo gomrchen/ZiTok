@@ -15,6 +15,7 @@ import 'drama_detail_loader.dart';
 import 'episode_label.dart';
 import 'episode_play_page.dart';
 import 'media_url.dart';
+import 'player_episode_chrome.dart';
 import 'player_overlay.dart';
 import 'player_session.dart';
 import 'unlock_sheet.dart';
@@ -334,7 +335,7 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
                               accent: true,
                             ),
                             if (d.playCount > 0)
-                              _MetaBadge(label: _formatCount(d.playCount)),
+                              _MetaBadge(label: _playCountLabel(d.playCount)),
                           ],
                         ),
                         if (tags.where((t) => t != d.category.trim()).isNotEmpty) ...[
@@ -465,14 +466,11 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
       ),
     );
   }
+}
 
-  static String _formatCount(int n) {
-    if (n >= 10000) {
-      final v = n / 10000;
-      return '${v.toStringAsFixed(v >= 10 ? 0 : 1)}万播放';
-    }
-    return '$n播放';
-  }
+String _playCountLabel(int n) {
+  final s = formatPlayerCount(n);
+  return s.isEmpty ? '0播放' : '$s播放';
 }
 
 class _HeroCover extends StatelessWidget {

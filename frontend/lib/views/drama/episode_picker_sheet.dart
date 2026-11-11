@@ -12,10 +12,13 @@ const _kPrimary = Color(0xFF2ED3BE);
 const _kCell = Color(0xFF232A36);
 
 /// 红果风格选集面板：封面信息 + 分集宫格（锁 / 正在播高亮）
+/// [episodes] 有预载时跳过二次详情请求，仅按需探测解锁。
 Future<Episode?> showEpisodePickerSheet(
   BuildContext context, {
   required Drama drama,
   required int currentEpisodeId,
+  List<Episode>? episodes,
+  Set<int>? unlocked,
 }) {
   return showModalBottomSheet<Episode>(
     context: context,
@@ -39,6 +42,8 @@ Future<Episode?> showEpisodePickerSheet(
             child: _EpisodePickerBody(
               drama: drama,
               currentEpisodeId: currentEpisodeId,
+              preloadedEpisodes: episodes,
+              preloadedUnlocked: unlocked,
             ),
           ),
         ),
@@ -50,10 +55,14 @@ Future<Episode?> showEpisodePickerSheet(
 class _EpisodePickerBody extends StatefulWidget {
   final Drama drama;
   final int currentEpisodeId;
+  final List<Episode>? preloadedEpisodes;
+  final Set<int>? preloadedUnlocked;
 
   const _EpisodePickerBody({
     required this.drama,
     required this.currentEpisodeId,
+    this.preloadedEpisodes,
+    this.preloadedUnlocked,
   });
 
   @override
@@ -82,19 +91,29 @@ class _EpisodePickerBodyState extends State<_EpisodePickerBody> {
     });
     try {
       final dp = context.read<DramaProvider>();
-      final bundle = await loadDramaDetailBundle(
-        dp,
-        widget.drama.id,
-        probeUnlocked: true,
-      );
+      final pre = widget.preloadedEpisodes;
+      late final List<Episode> eps;
+      late final Set<int> unlocked;
+      if (pre != null && pre.isNotEmpty) {
+        eps = List<Episode>.from(pre);
+        unlocked = widget.preloadedUnlocked ??
+            await probeUnlockedEpisodeIds(dp, eps);
+      } else {
+        final bundle = await loadDramaDetailBundle(
+          dp,
+          widget.drama.id,
+          probeUnlocked: true,
+        );
+        eps = bundle.episodes;
+        unlocked = bundle.unlocked;
+      }
       if (!mounted) return;
-      final eps = bundle.episodes;
       final cur = eps.indexWhere((e) => e.id == widget.currentEpisodeId);
       setState(() {
         _episodes = eps;
         _unlocked
           ..clear()
-          ..addAll(bundle.unlocked);
+          ..addAll(unlocked);
         _loading = false;
         if (cur >= 0) _rangeIndex = cur ~/ _rangeSize;
       });

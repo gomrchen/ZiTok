@@ -4,10 +4,6 @@ class RelationService {
   final Dio dio;
   RelationService(this.dio);
 
-  Future<Response> follow({required int targetUid}) {
-    return dio.post('/api/relation/auth/follow', data: {'target_uid': targetUid});
-  }
-
   // 关注列表 (type=0)
   Future<Response> friendsList({required int userId}) {
     return dio.get('/social/friend/requests', queryParameters: {
@@ -39,7 +35,7 @@ class RelationService {
   Future<Response> addFriend({
     required int userId,
     required int friendId,
-    String remark = ''
+    String remark = '',
   }) {
     return dio.post('/social/friend', queryParameters: {
       'user_id': userId,
@@ -48,13 +44,11 @@ class RelationService {
     });
   }
 
-  // 【新增】创建群聊
-  // 根据截图，参数需要 name, type, creator_id, member_ids
   Future<Response> createChatRoom({
     required String name,
     required int creatorId,
     required List<int> memberIds,
-    int type = 2, // 截图显示 type 为 2
+    int type = 2,
   }) {
     return dio.post('/social/chatroom', data: {
       'name': name,
@@ -65,7 +59,6 @@ class RelationService {
   }
 
   /// 获取群聊详情（含成员）
-  /// 正确路由：GET /social/chatroom/:room_id（不是 /chatroom/members）
   Future<Response> getChatRoomMembers({
     required int roomId,
     required int userId,
@@ -74,10 +67,5 @@ class RelationService {
       'room_id': roomId,
       'user_id': userId,
     });
-  }
-
-  String chatUrl() {
-    final base = dio.options.baseUrl.replaceFirst('http', 'ws');
-    return '$base/api/relation/auth/chat';
   }
 }

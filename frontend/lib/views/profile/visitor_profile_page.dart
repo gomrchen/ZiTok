@@ -2,7 +2,6 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import '../../app.dart';
 import '../../models/user_models.dart';
@@ -423,7 +422,11 @@ class _VisitorProfilePageState extends State<VisitorProfilePage> {
             final video = _videos[index];
             return _VideoThumbnail(
               video: video,
-              onTap: () => context.push('/video/${video.id}'),
+              onTap: () {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('作品播放入口已下线')),
+                );
+              },
             );
           },
           childCount: _videos.length,

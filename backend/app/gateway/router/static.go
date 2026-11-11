@@ -31,8 +31,22 @@ func RegisterStaticRoutes(h *server.Hertz) {
 	// 视频单独走 Range 友好 handler，避免 iOS AVPlayer -12939
 	h.GET("/videos/*filepath", serveVideoRange)
 
-	h.StaticFS("/", &app.FS{
-		Root: "src/storage",
+	// 按前缀挂载，Root 用 storage 根：请求 /avatars/x → src/storage/avatars/x
+	// 切勿再 StaticFS("/")，否则未匹配的 /api/* 会落到 fs 并打 Error
+	h.StaticFS("/avatars", &app.FS{Root: "src/storage"})
+	h.StaticFS("/covers", &app.FS{Root: "src/storage"})
+	h.StaticFS("/chat", &app.FS{Root: "src/storage"})
+
+	h.NoRoute(func(ctx context.Context, c *app.RequestContext) {
+		path := string(c.Path())
+		if strings.HasPrefix(path, "/api/") {
+			c.JSON(consts.StatusNotFound, map[string]any{
+				"code":    "40400",
+				"message": "not found",
+			})
+			return
+		}
+		c.Status(consts.StatusNotFound)
 	})
 }
 

@@ -3,12 +3,12 @@ import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../l10n/l10n_ext.dart';
 import '../../providers/messaging_provider.dart';
-import '../../models/social_models.dart'; // 确保引入了模型文件以识别 Friend/Conversation
+import '../../models/social_models.dart';
 import '../../services/user_session.dart';
 import '../chat/chat_page.dart';
 import '../chat/friend_search_page.dart';
-import '../chat/global_search_page.dart'; // 全网搜索（添加好友）
-import '../chat/create_group_page.dart'; // 【新增】新建群聊页面
+import '../chat/global_search_page.dart';
+import '../chat/create_group_page.dart';
 import '../home/shell_surface.dart';
 
 /// 消息列表筛选类型
