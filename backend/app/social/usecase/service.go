@@ -28,6 +28,7 @@ func (s *useCase) GetPrivateMessages(ctx context.Context, senderID, receiverID i
 			ReceiverID: msg.ReceiverID,
 			Content:    msg.Content,
 			IsRead:     msg.IsRead,
+			CreateAt:   msg.CreateAt,
 		}
 		domainMessages = append(domainMessages, domainMsg)
 	}
@@ -227,11 +228,13 @@ func (s *useCase) GetUserFriends(ctx context.Context, userID int64) ([]*model.Fr
 		// 只添加状态为已接受的好友关系
 		if friendship.Status == model.FriendStatusAccepted {
 			domainFriendship := &model.Friendship{
-				ID:       friendship.ID,
-				UserID:   friendship.UserID,
-				FriendID: friendship.FriendID,
-				Status:   friendship.Status,
-				Remark:   friendship.Remark,
+				ID:        friendship.ID,
+				UserID:    friendship.UserID,
+				FriendID:  friendship.FriendID,
+				Status:    friendship.Status,
+				Remark:    friendship.Remark,
+				CreatedAt: friendship.CreatedAt,
+				UpdatedAt: friendship.UpdatedAt,
 			}
 			domainFriendships = append(domainFriendships, domainFriendship)
 		}
@@ -241,7 +244,7 @@ func (s *useCase) GetUserFriends(ctx context.Context, userID int64) ([]*model.Fr
 }
 
 // 好友申请相关 gateway
-func (s *useCase) CreateFriendRequest(ctx context.Context, senderID, receiverID int64, message string) error {
+func (s *useCase) CreateFriendRequest(ctx context.Context, senderID, receiverID int64, message string) (*model.FriendRequest, error) {
 	request := &model.FriendRequest{
 		SenderID:   senderID,
 		ReceiverID: receiverID,
@@ -249,10 +252,9 @@ func (s *useCase) CreateFriendRequest(ctx context.Context, senderID, receiverID 
 		Status:     model.FriendRequestStatusPending,
 	}
 	if err := s.db.CreateFriendRequest(ctx, request); err != nil {
-		return err
+		return nil, err
 	}
-
-	return nil
+	return request, nil
 }
 
 func (s *useCase) GetFriendRequests(ctx context.Context, userID int64, status int8) ([]*model.FriendRequest, error) {
@@ -268,7 +270,10 @@ func (s *useCase) GetFriendRequests(ctx context.Context, userID int64, status in
 			ID:         request.ID,
 			ReceiverID: request.ReceiverID,
 			SenderID:   request.SenderID,
+			Message:    request.Message,
 			Status:     request.Status,
+			CreatedAt:  request.CreatedAt,
+			UpdatedAt:  request.UpdatedAt,
 		}
 		domainRequests = append(domainRequests, domainRequest)
 	}

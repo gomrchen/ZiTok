@@ -10,11 +10,17 @@ type (
 	DramaFavorite = core.DramaFavorite
 	FeedItem      = core.FeedItem
 	PlayInfo      = core.PlayInfo
+	DramaOpsStat    = core.DramaOpsStat
+	CategoryStat    = core.CategoryStat
+	EpisodeOpsStat  = core.EpisodeOpsStat
 )
 
 var (
 	DB                   = core.DB
 	ListDramas           = core.ListDramas
+	ListDramasFiltered   = core.ListDramasFiltered
+	ListDramasFilteredSort = core.ListDramasFilteredSort
+	ListEpisodeOpsStats  = core.ListEpisodeOpsStats
 	GetDrama             = core.GetDrama
 	ListEpisodes         = core.ListEpisodes
 	GetEpisode           = core.GetEpisode
@@ -23,9 +29,27 @@ var (
 	UpdateDrama          = core.UpdateDrama
 	CreateEpisode        = core.CreateEpisode
 	UpdateEpisode        = core.UpdateEpisode
-	SoftDeleteDrama      = core.SoftDeleteDrama
-	UpsertProgress       = core.UpsertProgress
-	ListContinueWatching = core.ListContinueWatching
+	SoftDeleteDrama         = core.SoftDeleteDrama
+	RestoreDrama            = core.RestoreDrama
+	BatchRestoreDramas      = core.BatchRestoreDramas
+	HardDeleteDrama         = core.HardDeleteDrama
+	BatchHardDeleteDramas   = core.BatchHardDeleteDramas
+	SetDramaStatus          = core.SetDramaStatus
+	SoftDeleteEpisode       = core.SoftDeleteEpisode
+	ListTopDramas           = core.ListTopDramas
+	ListTopDramasBy         = core.ListTopDramasBy
+	BatchSetEpisodePricing  = core.BatchSetEpisodePricing
+	ListWatchingByUser      = core.ListWatchingByUser
+	ListCategories          = core.ListCategories
+	ListCategoryStats       = core.ListCategoryStats
+	CreateCategory          = core.CreateCategory
+	RenameCategory          = core.RenameCategory
+	DeleteCategory          = core.DeleteCategory
+	GetDramaOpsStat         = core.GetDramaOpsStat
+	BatchSetDramaStatus     = core.BatchSetDramaStatus
+	SetEpisodeNo            = core.SetEpisodeNo
+	UpsertProgress         = core.UpsertProgress
+	ListContinueWatching   = core.ListContinueWatching
 	Favorite             = core.Favorite
 	Unfavorite           = core.Unfavorite
 	ListFavorites        = core.ListFavorites

@@ -6,12 +6,17 @@ import (
 )
 
 func PackPrivateMessage(msg *model.PrivateMessage) *rpcmodel.PrivateMessage {
+	if msg == nil {
+		return nil
+	}
 	return &rpcmodel.PrivateMessage{
 		Id:         msg.ID,
 		SenderId:   msg.SenderID,
 		ReceiverId: msg.ReceiverID,
 		Content:    msg.Content,
 		IsRead:     msg.IsRead,
+		CreatedAt:  msg.CreateAt,
+		UpdatedAt:  msg.CreateAt,
 	}
 }
 
@@ -83,53 +88,75 @@ func PackChatMessageList(msgs []*model.ChatMessage) []*rpcmodel.ChatMessage {
 }
 
 func PackFriend(friend *model.Friendship) *rpcmodel.Friendship {
+	if friend == nil {
+		return nil
+	}
 	return &rpcmodel.Friendship{
-		Id:       friend.ID,
-		UserId:   friend.UserID,
-		FriendId: friend.FriendID,
-		Status:   friend.Status,
+		Id:        friend.ID,
+		UserId:    friend.UserID,
+		FriendId:  friend.FriendID,
+		Status:    friend.Status,
+		CreatedAt: friend.CreatedAt,
+		UpdatedAt: friend.UpdatedAt,
 	}
 }
 
 func PackFriendList(friends []*model.Friendship) []*rpcmodel.Friendship {
 	friendList := make([]*rpcmodel.Friendship, 0, len(friends))
 	for _, friend := range friends {
-		friendList = append(friendList, PackFriend(friend))
+		if packed := PackFriend(friend); packed != nil {
+			friendList = append(friendList, packed)
+		}
 	}
 	return friendList
 }
 
 func PackFriendRequest(request *model.FriendRequest) *rpcmodel.FriendRequest {
+	if request == nil {
+		return nil
+	}
+	msg := request.Message
 	return &rpcmodel.FriendRequest{
 		Id:         request.ID,
 		SenderId:   request.SenderID,
 		ReceiverId: request.ReceiverID,
-		Message:    &request.Message,
+		Message:    &msg,
 		Status:     request.Status,
+		CreatedAt:  request.CreatedAt,
+		UpdatedAt:  request.UpdatedAt,
 	}
 }
 
 func PackFriendRequestList(requests []*model.FriendRequest) []*rpcmodel.FriendRequest {
 	requestList := make([]*rpcmodel.FriendRequest, 0, len(requests))
 	for _, request := range requests {
-		requestList = append(requestList, PackFriendRequest(request))
+		if packed := PackFriendRequest(request); packed != nil {
+			requestList = append(requestList, packed)
+		}
 	}
 	return requestList
 }
 
 func PackFriendship(friendship *model.Friendship) *rpcmodel.Friendship {
+	if friendship == nil {
+		return nil
+	}
 	return &rpcmodel.Friendship{
-		Id:       friendship.ID,
-		UserId:   friendship.UserID,
-		FriendId: friendship.FriendID,
-		Status:   friendship.Status,
+		Id:        friendship.ID,
+		UserId:    friendship.UserID,
+		FriendId:  friendship.FriendID,
+		Status:    friendship.Status,
+		CreatedAt: friendship.CreatedAt,
+		UpdatedAt: friendship.UpdatedAt,
 	}
 }
 
 func PackFriendshipList(friendships []*model.Friendship) []*rpcmodel.Friendship {
 	friendshipList := make([]*rpcmodel.Friendship, 0, len(friendships))
 	for _, friendship := range friendships {
-		friendshipList = append(friendshipList, PackFriendship(friendship))
+		if packed := PackFriendship(friendship); packed != nil {
+			friendshipList = append(friendshipList, packed)
+		}
 	}
 	return friendshipList
 }

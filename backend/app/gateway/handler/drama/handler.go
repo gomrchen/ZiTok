@@ -23,7 +23,11 @@ func ListDramas(ctx context.Context, c *app.RequestContext) {
 }
 
 func GetDramaDetail(ctx context.Context, c *app.RequestContext) {
-	id, _ := strconv.ParseInt(c.Param("id"), 10, 64)
+	id, err := strconv.ParseInt(c.Param("id"), 10, 64)
+	if err != nil || id <= 0 {
+		pack.RespError(c, errno.ParamVerifyError)
+		return
+	}
 	uid, _ := pkgcontext.GetUserID(ctx)
 	d, eps, fav, err := rpc.GetDramaDetailRPC(ctx, id, uid)
 	if err != nil {

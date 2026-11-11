@@ -51,14 +51,20 @@ func Register(ctx context.Context, c *app.RequestContext) {
 		pack.RespError(c, errno.ParamVerifyError.WithError(err))
 		return
 	}
-	if err := rpc.VerifyEmailCode(ctx, *req.Email, req.Code); err != nil {
+	email := req.GetEmail()
+	if email == "" {
+		pack.RespError(c, errno.ParamVerifyError.WithMessage("email required"))
+		return
+	}
+	if err := rpc.VerifyEmailCode(ctx, email, req.Code); err != nil {
 		pack.RespError(c, err)
 		return
 	}
+	emailCopy := email
 	resp, err := rpc.RegisterRPC(ctx, &user.RegisterRequest{
 		Username: req.Username,
 		Password: req.Password,
-		Email:    req.Email, // 新增字段
+		Email:    &emailCopy,
 	})
 	if err != nil {
 		pack.RespError(c, err)

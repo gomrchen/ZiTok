@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"sync"
+	"time"
 
 	"github.com/yxrxy/videoHub/pkg/base/client"
 	"gorm.io/gorm"
@@ -31,6 +32,16 @@ func DB() (*gorm.DB, error) {
 var StatusAll int8 = -1
 
 func ListDramas(page, size int, category string, status *int8) ([]Drama, int64, error) {
+	return ListDramasFiltered(page, size, category, "", status)
+}
+
+// ListDramasFiltered 支持分类 / 关键词 / 状态筛选（运营后台用）
+// status=-2 表示仅已软删
+func ListDramasFiltered(page, size int, category, keyword string, status *int8) ([]Drama, int64, error) {
+	return ListDramasFilteredSort(page, size, category, keyword, status, "")
+}
+
+func ListDramasFilteredSort(page, size int, category, keyword string, status *int8, sort string) ([]Drama, int64, error) {
 	db, err := DB()
 	if err != nil {
 		return nil, 0, err
@@ -38,25 +49,74 @@ func ListDramas(page, size int, category string, status *int8) ([]Drama, int64, 
 	if page < 1 {
 		page = 1
 	}
-	if size < 1 || size > 50 {
+	if size < 1 || size > 100 {
 		size = 20
 	}
-	q := db.Model(&Drama{}).Where("deleted_at IS NULL")
-	if status == nil {
-		q = q.Where("status = 1")
-	} else if *status != StatusAll {
-		q = q.Where("status = ?", *status)
+	q := db.Model(&Drama{})
+	if status != nil && *status == -2 {
+		q = q.Where("deleted_at IS NOT NULL")
+	} else {
+		q = q.Where("deleted_at IS NULL")
+		if status == nil {
+			q = q.Where("status = 1")
+		} else if *status != StatusAll {
+			q = q.Where("status = ?", *status)
+		}
 	}
 	if category != "" {
 		q = q.Where("category = ?", category)
+	}
+	if keyword != "" {
+		like := "%" + keyword + "%"
+		q = q.Where("title LIKE ? OR description LIKE ? OR tags LIKE ?", like, like, like)
 	}
 	var total int64
 	if err := q.Count(&total).Error; err != nil {
 		return nil, 0, err
 	}
+	order := "updated_at DESC, id DESC"
+	switch sort {
+	case "play_desc":
+		order = "play_count DESC, id DESC"
+	case "play_asc":
+		order = "play_count ASC, id ASC"
+	case "created_desc":
+		order = "created_at DESC, id DESC"
+	case "id_asc":
+		order = "id ASC"
+	case "revenue_desc":
+		// 按解锁收入排序：子查询汇总后回填
+		type row struct {
+			Drama
+			Rev int64 `gorm:"column:unlock_revenue"`
+		}
+		var rows []row
+		base := q.Session(&gorm.Session{})
+		err = base.Select("drama.*, COALESCE((SELECT SUM(price) FROM unlock_purchase u WHERE u.drama_id = drama.id),0) AS unlock_revenue").
+			Order("unlock_revenue DESC, id DESC").
+			Offset((page - 1) * size).Limit(size).Scan(&rows).Error
+		if err != nil {
+			return nil, 0, err
+		}
+		list := make([]Drama, 0, len(rows))
+		for _, r := range rows {
+			item := r.Drama
+			item.UnlockRevenue = r.Rev
+			list = append(list, item)
+		}
+		return list, total, nil
+	}
 	var list []Drama
-	err = q.Order("play_count DESC, id DESC").Offset((page - 1) * size).Limit(size).Find(&list).Error
-	return list, total, err
+	err = q.Order(order).Offset((page - 1) * size).Limit(size).Find(&list).Error
+	if err != nil {
+		return nil, 0, err
+	}
+	for i := range list {
+		var rev int64
+		db.Table("unlock_purchase").Where("drama_id = ?", list[i].ID).Select("COALESCE(SUM(price),0)").Scan(&rev)
+		list[i].UnlockRevenue = rev
+	}
+	return list, total, nil
 }
 
 func GetDrama(id int64) (*Drama, error) {
@@ -146,7 +206,515 @@ func SoftDeleteDrama(id int64) error {
 	if err != nil {
 		return err
 	}
-	return db.Model(&Drama{}).Where("id = ?", id).Update("status", 2).Error
+	now := time.Now()
+	return db.Model(&Drama{}).Where("id = ? AND deleted_at IS NULL", id).Updates(map[string]any{
+		"deleted_at": now,
+		"status":     int8(2),
+	}).Error
+}
+
+func RestoreDrama(id int64) error {
+	db, err := DB()
+	if err != nil {
+		return err
+	}
+	return db.Model(&Drama{}).Where("id = ?", id).Updates(map[string]any{
+		"deleted_at": nil,
+		"status":     int8(2), // 恢复后默认下架，需手动上架
+	}).Error
+}
+
+func BatchRestoreDramas(ids []int64) (int64, error) {
+	db, err := DB()
+	if err != nil {
+		return 0, err
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	res := db.Model(&Drama{}).Where("id IN ? AND deleted_at IS NOT NULL", ids).Updates(map[string]any{
+		"deleted_at": nil,
+		"status":     int8(2),
+	})
+	return res.RowsAffected, res.Error
+}
+
+func HardDeleteDrama(id int64) error {
+	db, err := DB()
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	_ = db.Model(&Episode{}).Where("drama_id = ?", id).Update("deleted_at", now).Error
+	return db.Unscoped().Where("id = ?", id).Delete(&Drama{}).Error
+}
+
+func BatchHardDeleteDramas(ids []int64) (int64, error) {
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	var n int64
+	for _, id := range ids {
+		if err := HardDeleteDrama(id); err != nil {
+			return n, err
+		}
+		n++
+	}
+	return n, nil
+}
+
+func ensureCategoryTable(db *gorm.DB) error {
+	return db.AutoMigrate(&CategoryCatalog{})
+}
+
+func CreateCategory(name string, sortOrder int) error {
+	db, err := DB()
+	if err != nil {
+		return err
+	}
+	if err := ensureCategoryTable(db); err != nil {
+		return err
+	}
+	name = trimSpace(name)
+	if name == "" {
+		return fmt.Errorf("分类名不能为空")
+	}
+	if len([]rune(name)) > 32 {
+		return fmt.Errorf("分类名过长")
+	}
+	var n int64
+	_ = db.Model(&CategoryCatalog{}).Where("name = ?", name).Count(&n).Error
+	if n > 0 {
+		return fmt.Errorf("分类已存在")
+	}
+	// 剧目里已有同名也视为存在
+	_ = db.Model(&Drama{}).Where("deleted_at IS NULL AND category = ?", name).Count(&n).Error
+	if n > 0 {
+		// 同步进目录即可
+		return db.Clauses(clause.OnConflict{DoNothing: true}).Create(&CategoryCatalog{Name: name, SortOrder: sortOrder}).Error
+	}
+	return db.Create(&CategoryCatalog{Name: name, SortOrder: sortOrder}).Error
+}
+
+func RenameCategory(from, to string) (int64, error) {
+	db, err := DB()
+	if err != nil {
+		return 0, err
+	}
+	_ = ensureCategoryTable(db)
+	from = trimSpace(from)
+	to = trimSpace(to)
+	if from == "" || to == "" {
+		return 0, fmt.Errorf("分类名不能为空")
+	}
+	if from == to {
+		return 0, nil
+	}
+	var exist int64
+	_ = db.Model(&Drama{}).Where("deleted_at IS NULL AND category = ?", to).Count(&exist).Error
+	if exist == 0 {
+		_ = db.Model(&CategoryCatalog{}).Where("name = ?", to).Count(&exist).Error
+	}
+	if exist > 0 {
+		return 0, fmt.Errorf("目标分类已存在")
+	}
+	res := db.Model(&Drama{}).Where("deleted_at IS NULL AND category = ?", from).Update("category", to)
+	if res.Error != nil {
+		return 0, res.Error
+	}
+	sortOrder := 0
+	var cat CategoryCatalog
+	if err := db.Where("name = ?", from).First(&cat).Error; err == nil {
+		sortOrder = cat.SortOrder
+		_ = db.Delete(&CategoryCatalog{}, "name = ?", from).Error
+	}
+	_ = db.Clauses(clause.OnConflict{DoNothing: true}).Create(&CategoryCatalog{Name: to, SortOrder: sortOrder}).Error
+	return res.RowsAffected, nil
+}
+
+// DeleteCategory 删除分类。moveTo 非空时把剧目迁移过去；为空则要求该分类下无剧目。
+func DeleteCategory(name, moveTo string) (int64, error) {
+	db, err := DB()
+	if err != nil {
+		return 0, err
+	}
+	_ = ensureCategoryTable(db)
+	name = trimSpace(name)
+	moveTo = trimSpace(moveTo)
+	if name == "" {
+		return 0, fmt.Errorf("分类名不能为空")
+	}
+	var moved int64
+	var cnt int64
+	_ = db.Model(&Drama{}).Where("deleted_at IS NULL AND category = ?", name).Count(&cnt).Error
+	if cnt > 0 {
+		if moveTo == "" {
+			return 0, fmt.Errorf("分类下仍有 %d 部剧，请先迁移或填写 move_to", cnt)
+		}
+		if moveTo == name {
+			return 0, fmt.Errorf("迁移目标不能与原分类相同")
+		}
+		res := db.Model(&Drama{}).Where("deleted_at IS NULL AND category = ?", name).Update("category", moveTo)
+		if res.Error != nil {
+			return 0, res.Error
+		}
+		moved = res.RowsAffected
+		_ = db.Clauses(clause.OnConflict{DoNothing: true}).Create(&CategoryCatalog{Name: moveTo}).Error
+	}
+	_ = db.Delete(&CategoryCatalog{}, "name = ?", name).Error
+	return moved, nil
+}
+
+func trimSpace(s string) string {
+	for len(s) > 0 && (s[0] == ' ' || s[0] == '\t') {
+		s = s[1:]
+	}
+	for len(s) > 0 && (s[len(s)-1] == ' ' || s[len(s)-1] == '\t') {
+		s = s[:len(s)-1]
+	}
+	return s
+}
+
+type CategoryStat struct {
+	Category   string `json:"category"`
+	Total      int64  `json:"total"`
+	Online     int64  `json:"online"`
+	PlaySum    int64  `json:"play_sum"`
+	RevenueSum int64  `json:"revenue_sum"`
+}
+
+func ListCategoryStats() ([]CategoryStat, error) {
+	db, err := DB()
+	if err != nil {
+		return nil, err
+	}
+	_ = ensureCategoryTable(db)
+	type row struct {
+		Category   string
+		Total      int64
+		Online     int64
+		PlaySum    int64
+		RevenueSum int64
+	}
+	var rows []row
+	err = db.Raw(`
+		SELECT d.category AS category,
+		       COUNT(DISTINCT d.id) AS total,
+		       SUM(CASE WHEN d.status = 1 THEN 1 ELSE 0 END) AS online,
+		       COALESCE(SUM(d.play_count),0) AS play_sum,
+		       COALESCE((
+		         SELECT SUM(u.price) FROM unlock_purchase u
+		         INNER JOIN drama d2 ON d2.id = u.drama_id
+		         WHERE d2.deleted_at IS NULL AND d2.category = d.category
+		       ),0) AS revenue_sum
+		FROM drama d
+		WHERE d.deleted_at IS NULL AND d.category <> ''
+		GROUP BY d.category
+		ORDER BY revenue_sum DESC, total DESC, d.category ASC
+	`).Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	byName := map[string]CategoryStat{}
+	for _, r := range rows {
+		byName[r.Category] = CategoryStat{
+			Category: r.Category, Total: r.Total, Online: r.Online, PlaySum: r.PlaySum, RevenueSum: r.RevenueSum,
+		}
+	}
+	var catalog []CategoryCatalog
+	_ = db.Order("sort_order ASC, name ASC").Find(&catalog).Error
+	for _, c := range catalog {
+		if _, ok := byName[c.Name]; !ok {
+			byName[c.Name] = CategoryStat{Category: c.Name}
+		}
+	}
+	out := make([]CategoryStat, 0, len(byName))
+	for _, v := range byName {
+		out = append(out, v)
+	}
+	// 稳定排序：收入 desc, 总量 desc, 名 asc
+	for i := 0; i < len(out); i++ {
+		for j := i + 1; j < len(out); j++ {
+			a, b := out[i], out[j]
+			swap := false
+			if a.RevenueSum != b.RevenueSum {
+				swap = a.RevenueSum < b.RevenueSum
+			} else if a.Total != b.Total {
+				swap = a.Total < b.Total
+			} else {
+				swap = a.Category > b.Category
+			}
+			if swap {
+				out[i], out[j] = out[j], out[i]
+			}
+		}
+	}
+	return out, nil
+}
+
+func ListTopDramasBy(sort string, limit int) ([]Drama, error) {
+	db, err := DB()
+	if err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	if sort == "unlock" || sort == "revenue" {
+		type row struct {
+			Drama
+			Rev int64 `gorm:"column:rev"`
+		}
+		var rows []row
+		err = db.Raw(`
+			SELECT d.*, COALESCE(SUM(u.price),0) AS rev
+			FROM drama d
+			LEFT JOIN unlock_purchase u ON u.drama_id = d.id
+			WHERE d.deleted_at IS NULL
+			GROUP BY d.id
+			ORDER BY rev DESC, d.play_count DESC, d.id DESC
+			LIMIT ?
+		`, limit).Scan(&rows).Error
+		if err != nil {
+			return nil, err
+		}
+		list := make([]Drama, 0, len(rows))
+		for _, r := range rows {
+			item := r.Drama
+			item.UnlockRevenue = r.Rev
+			list = append(list, item)
+		}
+		return list, nil
+	}
+	list, err := ListTopDramas(limit)
+	if err != nil {
+		return nil, err
+	}
+	// 播放榜也附带收入，方便对照
+	for i := range list {
+		var rev int64
+		db.Table("unlock_purchase").Where("drama_id = ?", list[i].ID).Select("COALESCE(SUM(price),0)").Scan(&rev)
+		list[i].UnlockRevenue = rev
+	}
+	return list, nil
+}
+
+type EpisodeOpsStat struct {
+	ID            int64  `json:"id"`
+	DramaID       int64  `json:"drama_id"`
+	EpisodeNo     int    `json:"episode_no"`
+	Title         string `json:"title"`
+	IsFree        bool   `json:"is_free"`
+	UnlockPrice   int    `json:"unlock_price"`
+	VisitCount    int64  `json:"visit_count"`
+	Duration      int64  `json:"duration"`
+	UnlockCount   int64  `json:"unlock_count"`
+	UnlockRevenue int64  `json:"unlock_revenue"`
+}
+
+func ListEpisodeOpsStats(dramaID int64) ([]EpisodeOpsStat, error) {
+	db, err := DB()
+	if err != nil {
+		return nil, err
+	}
+	var rows []EpisodeOpsStat
+	err = db.Raw(`
+		SELECT e.id, e.drama_id, e.episode_no, e.title, e.is_free, e.unlock_price,
+		       e.visit_count, e.duration,
+		       COALESCE(COUNT(u.id),0) AS unlock_count,
+		       COALESCE(SUM(u.price),0) AS unlock_revenue
+		FROM episode e
+		LEFT JOIN unlock_purchase u ON u.episode_id = e.id AND u.unlock_type = 1
+		WHERE e.drama_id = ? AND e.deleted_at IS NULL
+		GROUP BY e.id
+		ORDER BY e.episode_no ASC
+	`, dramaID).Scan(&rows).Error
+	return rows, err
+}
+
+func SetDramaStatus(id int64, status int8) error {
+	db, err := DB()
+	if err != nil {
+		return err
+	}
+	return db.Model(&Drama{}).Where("id = ? AND deleted_at IS NULL", id).Update("status", status).Error
+}
+
+func ListCategories() ([]string, error) {
+	db, err := DB()
+	if err != nil {
+		return nil, err
+	}
+	_ = ensureCategoryTable(db)
+	seen := map[string]struct{}{}
+	var cats []string
+	var fromDrama []string
+	_ = db.Model(&Drama{}).Where("deleted_at IS NULL AND category <> ''").
+		Distinct().Order("category ASC").Pluck("category", &fromDrama).Error
+	for _, c := range fromDrama {
+		if _, ok := seen[c]; ok {
+			continue
+		}
+		seen[c] = struct{}{}
+		cats = append(cats, c)
+	}
+	var catalog []CategoryCatalog
+	_ = db.Order("sort_order ASC, name ASC").Find(&catalog).Error
+	for _, c := range catalog {
+		if _, ok := seen[c.Name]; ok {
+			continue
+		}
+		seen[c.Name] = struct{}{}
+		cats = append(cats, c.Name)
+	}
+	return cats, nil
+}
+
+type DramaOpsStat struct {
+	DramaID      int64  `json:"drama_id"`
+	Title        string `json:"title"`
+	Status       int8   `json:"status"`
+	PlayCount    int64  `json:"play_count"`
+	EpisodeCount int64  `json:"episode_count"`
+	UnlockCount  int64  `json:"unlock_count"`
+	UnlockRevenue int64 `json:"unlock_revenue"`
+	WatchingCount int64 `json:"watching_count"`
+	FavCount     int64  `json:"fav_count"`
+}
+
+func GetDramaOpsStat(id int64) (*DramaOpsStat, error) {
+	db, err := DB()
+	if err != nil {
+		return nil, err
+	}
+	d, err := GetDrama(id)
+	if err != nil {
+		return nil, err
+	}
+	st := &DramaOpsStat{
+		DramaID:   d.ID,
+		Title:     d.Title,
+		Status:    d.Status,
+		PlayCount: d.PlayCount,
+	}
+	db.Model(&Episode{}).Where("drama_id = ? AND deleted_at IS NULL", id).Count(&st.EpisodeCount)
+	db.Table("unlock_purchase").Where("drama_id = ?", id).Count(&st.UnlockCount)
+	db.Table("unlock_purchase").Where("drama_id = ?", id).Select("COALESCE(SUM(price),0)").Scan(&st.UnlockRevenue)
+	db.Model(&WatchProgress{}).Where("drama_id = ?", id).Count(&st.WatchingCount)
+	db.Model(&DramaFavorite{}).Where("drama_id = ?", id).Count(&st.FavCount)
+	return st, nil
+}
+
+func BatchSetDramaStatus(ids []int64, status int8) (int64, error) {
+	db, err := DB()
+	if err != nil {
+		return 0, err
+	}
+	if len(ids) == 0 {
+		return 0, nil
+	}
+	res := db.Model(&Drama{}).Where("id IN ? AND deleted_at IS NULL", ids).Update("status", status)
+	return res.RowsAffected, res.Error
+}
+
+func SetEpisodeNo(episodeID int64, newNo int) error {
+	db, err := DB()
+	if err != nil {
+		return err
+	}
+	if newNo <= 0 {
+		return fmt.Errorf("集号无效")
+	}
+	ep, err := GetEpisode(episodeID)
+	if err != nil {
+		return err
+	}
+	var conflict Episode
+	err = db.Where("drama_id = ? AND episode_no = ? AND id <> ? AND deleted_at IS NULL", ep.DramaID, newNo, episodeID).
+		First(&conflict).Error
+	if err == nil {
+		// 交换集号：冲突集临时挪到负数再互换
+		tmp := -conflict.ID
+		_ = db.Model(&Episode{}).Where("id = ?", conflict.ID).Update("episode_no", tmp).Error
+		if err := db.Model(&Episode{}).Where("id = ?", episodeID).Update("episode_no", newNo).Error; err != nil {
+			return err
+		}
+		return db.Model(&Episode{}).Where("id = ?", conflict.ID).Update("episode_no", ep.EpisodeNo).Error
+	}
+	if err != gorm.ErrRecordNotFound {
+		return err
+	}
+	return db.Model(&Episode{}).Where("id = ?", episodeID).Update("episode_no", newNo).Error
+}
+
+func SoftDeleteEpisode(id int64) error {
+	db, err := DB()
+	if err != nil {
+		return err
+	}
+	ep, err := GetEpisode(id)
+	if err != nil {
+		return err
+	}
+	now := time.Now()
+	if err := db.Model(&Episode{}).Where("id = ?", id).Update("deleted_at", now).Error; err != nil {
+		return err
+	}
+	_ = db.Model(&Drama{}).Where("id = ? AND total_episodes > 0", ep.DramaID).
+		UpdateColumn("total_episodes", gorm.Expr("total_episodes - 1")).Error
+	return nil
+}
+
+func ListTopDramas(limit int) ([]Drama, error) {
+	db, err := DB()
+	if err != nil {
+		return nil, err
+	}
+	if limit <= 0 {
+		limit = 10
+	}
+	var list []Drama
+	err = db.Where("deleted_at IS NULL").Order("play_count DESC, id DESC").Limit(limit).Find(&list).Error
+	return list, err
+}
+
+// BatchSetEpisodePricing：前 freeCount 集免费，其余统一 unlockPrice
+func BatchSetEpisodePricing(dramaID int64, freeCount, unlockPrice int) (int64, error) {
+	db, err := DB()
+	if err != nil {
+		return 0, err
+	}
+	if unlockPrice < 0 {
+		unlockPrice = 0
+	}
+	if freeCount < 0 {
+		freeCount = 0
+	}
+	eps, err := ListEpisodes(dramaID)
+	if err != nil {
+		return 0, err
+	}
+	var n int64
+	for _, ep := range eps {
+		free := ep.EpisodeNo <= freeCount
+		price := unlockPrice
+		if free {
+			price = 0
+		}
+		if err := db.Model(&Episode{}).Where("id = ?", ep.ID).Updates(map[string]any{
+			"is_free":      free,
+			"unlock_price": price,
+		}).Error; err != nil {
+			return n, err
+		}
+		n++
+	}
+	_ = db.Model(&Drama{}).Where("id = ?", dramaID).Update("free_episode_count", freeCount).Error
+	return n, nil
+}
+
+func ListWatchingByUser(userID int64, limit int) ([]WatchProgress, error) {
+	return ListContinueWatching(userID, limit)
 }
 
 func UpsertProgress(p *WatchProgress) error {
@@ -340,6 +908,10 @@ func EnsureSeed() error {
 	db, err := DB()
 	if err != nil {
 		return err
+	}
+	_ = ensureCategoryTable(db)
+	for i, name := range []string{"甜宠", "古装", "青春"} {
+		_ = db.Clauses(clause.OnConflict{DoNothing: true}).Create(&CategoryCatalog{Name: name, SortOrder: i + 1}).Error
 	}
 	var n int64
 	if err := db.Model(&Drama{}).Count(&n).Error; err != nil {

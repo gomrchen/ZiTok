@@ -7,11 +7,12 @@ class RelationRepository {
   RelationRepository({required this.api});
 
   /// 内部工具：批量获取详情
-  /// [idKey] 对方ID在JSON中的字段名 (sender_id 或 receiver_id)
+  /// [idKey] 对方ID在JSON中的字段名 (sender_id / receiver_id / friend_id)
   Future<List<Friend>> _fetchDetails(List listData, String idKey) async {
     final futures = listData.map((item) async {
-      // 获取目标ID (可以是好友，也可以是自己)
-      final targetId = item[idKey];
+      if (item is! Map) return null;
+      // 获取目标ID：优先指定字段，再兜底常见字段
+      final targetId = item[idKey] ?? item['friend_id'] ?? item['user_id'] ?? item['sender_id'] ?? item['receiver_id'];
       final int onlineStatus = item['status'] ?? 0;
 
       if (targetId == null) return null;
@@ -37,35 +38,39 @@ class RelationRepository {
   }
 
   /// 获取关注列表 (我的关注)
-  /// 对应接口: /social/friend/requests?type=0
+  /// 优先 /social/friends；兼容旧接口 /social/friend/requests?type=0
   Future<List<Friend>> getFollowingList(int uid) async {
+    try {
+      final friendsResp = await api.getFriends(userId: uid);
+      final friendsData = friendsResp.data;
+      if (friendsData['code'] == '10000' || friendsData['code'] == 10000) {
+        final list = friendsData['data'];
+        final rows = list is List ? list : (list is Map ? (list['friend_list'] ?? list['list'] ?? []) : []);
+        final parsed = await _fetchDetails(rows is List ? rows : [], 'friend_id');
+        if (parsed.isNotEmpty) return parsed;
+      }
+    } catch (_) {}
     try {
       final response = await api.friendsList(userId: uid);
       final data = response.data;
-
       if (data['code'] == '10000' || data['code'] == 10000) {
-        // 【关键】在 type=0 列表中，sender_id 是对方 ID
+        // 兼容：type=0 时 sender_id 是对方
         return await _fetchDetails(data['data'] ?? [], 'sender_id');
       }
-    } catch (e) {
-      // Ignore error silently
-    }
+    } catch (_) {}
     return [];
   }
 
   /// 获取粉丝列表 (关注我的)
-  /// 对应接口: /social/friend/requests?type=1
+  /// 对应接口: /social/friend/requests?type=1（receiver_id 为粉丝）
   Future<List<Friend>> getFollowersList(int uid) async {
     try {
       final response = await api.fansList(uid: uid);
       final data = response.data;
       if (data['code'] == '10000' || data['code'] == 10000) {
-        // 假设 type=1 时，receiver_id 是粉丝 ID
         return await _fetchDetails(data['data'] ?? [], 'receiver_id');
       }
-    } catch (e) {
-      // Ignore error silently
-    }
+    } catch (_) {}
     return [];
   }
 

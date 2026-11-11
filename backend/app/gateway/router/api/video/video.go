@@ -30,6 +30,8 @@ func Register(r *server.Hertz) {
 				_video.GET("/list", append(_getvideolistMw(), video.GetVideoList)...)
 				_video.POST("/publish", append(_publishMw(), publishGone)...)
 				_video.GET("/recommend", append(_recommendMw(), video.Recommend)...)
+				// 兼容旧客户端 /video/feed，避免被 /:video_id 吃掉并 ParseInt("feed")
+				_video.GET("/feed", append(_recommendMw(), video.Recommend)...)
 				_video.POST("/search", append(_searchvideoMw(), video.SearchVideo)...)
 				_video.POST("/semantic", append(_semanticsearchMw(), video.SemanticSearch)...)
 				_video.DELETE("/:video_id", append(_deletevideoMw(), video.DeleteVideo)...)

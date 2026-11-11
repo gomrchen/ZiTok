@@ -28,7 +28,7 @@ type SocialUseCase interface {
 	GetUserFriends(ctx context.Context, userID int64) ([]*model.Friendship, error)
 
 	// 好友申请相关
-	CreateFriendRequest(ctx context.Context, senderID, receiverID int64, message string) error
+	CreateFriendRequest(ctx context.Context, senderID, receiverID int64, message string) (*model.FriendRequest, error)
 	GetFriendRequests(ctx context.Context, userID int64, status int8) ([]*model.FriendRequest, error)
 	HandleFriendRequest(ctx context.Context, requestID int64, status int8) error
 

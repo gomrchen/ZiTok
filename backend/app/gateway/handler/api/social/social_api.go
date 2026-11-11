@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -39,29 +40,92 @@ func initGlobalManager() {
 // SendPrivateMessage .
 // @router /api/v1/social/private/message [POST]
 func SendPrivateMessage(ctx context.Context, c *app.RequestContext) {
-	var err error
-	var req api.SendPrivateMessageRequest
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+	// 宽松绑定：sender_id 可缺省（取登录用户）；兼容 to_user_id
+	var loose struct {
+		SenderID   int64  `json:"sender_id" form:"sender_id" query:"sender_id"`
+		ReceiverID int64  `json:"receiver_id" form:"receiver_id" query:"receiver_id"`
+		ToUserID   int64  `json:"to_user_id" form:"to_user_id" query:"to_user_id"`
+		Content    string `json:"content" form:"content" query:"content"`
+	}
+	_ = c.Bind(&loose)
+	senderID := loose.SenderID
+	if senderID <= 0 {
+		if uid, gerr := metainfoContext.GetUserID(ctx); gerr == nil && uid > 0 {
+			senderID = uid
+		}
+	}
+	if senderID <= 0 {
+		auth := string(c.GetHeader("Authorization"))
+		token := auth
+		if len(token) > 7 && (token[:7] == "Bearer " || token[:7] == "bearer ") {
+			token = token[7:]
+		}
+		if token != "" {
+			if claims, perr := jwt.ParseToken(token); perr == nil && claims != nil {
+				senderID = claims.UserID
+			}
+		}
+	}
+	receiverID := loose.ReceiverID
+	if receiverID <= 0 {
+		receiverID = loose.ToUserID
+	}
+	if senderID <= 0 || receiverID <= 0 || loose.Content == "" {
+		pack.RespError(c, errno.ParamVerifyError.WithMessage("sender_id, receiver_id and content required"))
 		return
 	}
-	err = globalService.SendPrivateMessage(req.SenderID, req.ReceiverID, req.Content)
+	msg, err := rpc.SendPrivateMessageRPC(ctx, &social.SendPrivateMessageRequest{
+		SenderId:   senderID,
+		ReceiverId: receiverID,
+		Content:    loose.Content,
+	})
 	if err != nil {
 		pack.RespError(c, err)
 		return
 	}
-	pack.RespSuccess(c)
+	initGlobalManager()
+	if globalService != nil {
+		// 在线推送失败不影响落库成功
+		_ = globalService.SendPrivateMessage(senderID, receiverID, loose.Content)
+	}
+	pack.RespData(c, msg)
 }
 
 // GetPrivateMessages .
 // @router /api/v1/social/private/messages [GET]
 func GetPrivateMessages(ctx context.Context, c *app.RequestContext) {
-	var err error
 	var req api.GetPrivateMessagesRequest
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+	_ = c.Bind(&req)
+	if req.UserID <= 0 {
+		if uid, gerr := metainfoContext.GetUserID(ctx); gerr == nil && uid > 0 {
+			req.UserID = uid
+		}
+	}
+	if req.UserID <= 0 {
+		auth := string(c.GetHeader("Authorization"))
+		token := auth
+		if len(token) > 7 && (token[:7] == "Bearer " || token[:7] == "bearer ") {
+			token = token[7:]
+		}
+		if token != "" {
+			if claims, perr := jwt.ParseToken(token); perr == nil && claims != nil {
+				req.UserID = claims.UserID
+			}
+		}
+	}
+	// query 显式兜底（部分客户端/绑定器对 required query 不可靠）+ 兼容 to_user_id
+	if req.OtherUserID <= 0 {
+		for _, key := range []string{"other_user_id", "to_user_id"} {
+			if v := c.Query(key); v != "" {
+				if id, perr := strconv.ParseInt(v, 10, 64); perr == nil && id > 0 {
+					req.OtherUserID = id
+					break
+				}
+			}
+		}
+	}
+	if req.UserID <= 0 || req.OtherUserID <= 0 {
+		pack.RespError(c, errno.ParamVerifyError.WithMessage("user_id and other_user_id required"))
 		return
 	}
 	resp, _, err := rpc.GetPrivateMessagesRPC(ctx, &social.GetPrivateMessagesRequest{
@@ -172,11 +236,20 @@ func GetUserChatRooms(ctx context.Context, c *app.RequestContext) {
 // SendChatMessage .
 // @router /api/v1/social/chatroom/message [POST]
 func SendChatMessage(ctx context.Context, c *app.RequestContext) {
-	var err error
 	var req api.SendChatMessageRequest
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+	_ = c.Bind(&req)
+	if req.RoomID <= 0 {
+		if id, perr := strconv.ParseInt(c.Param("room_id"), 10, 64); perr == nil {
+			req.RoomID = id
+		}
+	}
+	if req.SenderID <= 0 {
+		if uid, gerr := metainfoContext.GetUserID(ctx); gerr == nil && uid > 0 {
+			req.SenderID = uid
+		}
+	}
+	if req.SenderID <= 0 || req.RoomID <= 0 || req.Content == "" {
+		pack.RespError(c, errno.ParamVerifyError.WithMessage("room_id, sender_id and content required"))
 		return
 	}
 
@@ -240,18 +313,34 @@ func AddFriend(ctx context.Context, c *app.RequestContext) {
 // GetFriendship .
 // @router /api/v1/social/friendship/:friend_id [GET]
 func GetFriendship(ctx context.Context, c *app.RequestContext) {
-	var err error
 	var req api.GetFriendshipRequest
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+	_ = c.Bind(&req) // query 可选；path / JWT 可补全，避免严格 required 校验误伤
+	if req.FriendID <= 0 {
+		if id, perr := strconv.ParseInt(c.Param("friend_id"), 10, 64); perr == nil {
+			req.FriendID = id
+		}
+	}
+	if req.UserID <= 0 {
+		if uid, gerr := metainfoContext.GetUserID(ctx); gerr == nil && uid > 0 {
+			req.UserID = uid
+		}
+	}
+	if req.UserID <= 0 || req.FriendID <= 0 {
+		pack.RespError(c, errno.ParamVerifyError)
 		return
 	}
 
 	resp, err := rpc.GetFriendshipRPC(ctx, &social.GetFriendshipRequest{
+		UserId:   req.UserID,
 		FriendId: req.FriendID,
 	})
 	if err != nil {
+		// 未建立好友关系时返回空对象，避免前端当成服务故障
+		msg := err.Error()
+		if strings.Contains(msg, "record not found") || strings.Contains(msg, "好友关系不存在") {
+			pack.RespData(c, map[string]any{"friend": nil})
+			return
+		}
 		pack.RespError(c, err)
 		return
 	}
@@ -261,11 +350,27 @@ func GetFriendship(ctx context.Context, c *app.RequestContext) {
 // GetUserFriends .
 // @router /api/v1/social/friends [GET]
 func GetUserFriends(ctx context.Context, c *app.RequestContext) {
-	var err error
 	var req api.GetUserFriendsRequest
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+	_ = c.Bind(&req)
+	if req.UserID <= 0 {
+		if uid, gerr := metainfoContext.GetUserID(ctx); gerr == nil && uid > 0 {
+			req.UserID = uid
+		}
+	}
+	if req.UserID <= 0 {
+		auth := string(c.GetHeader("Authorization"))
+		token := auth
+		if len(token) > 7 && (token[:7] == "Bearer " || token[:7] == "bearer ") {
+			token = token[7:]
+		}
+		if token != "" {
+			if claims, perr := jwt.ParseToken(token); perr == nil && claims != nil {
+				req.UserID = claims.UserID
+			}
+		}
+	}
+	if req.UserID <= 0 {
+		pack.RespError(c, errno.ParamVerifyError.WithMessage("user_id required"))
 		return
 	}
 
@@ -284,18 +389,24 @@ func GetUserFriends(ctx context.Context, c *app.RequestContext) {
 // CreateFriendRequest .
 // @router /api/v1/social/friend/request [POST]
 func CreateFriendRequest(ctx context.Context, c *app.RequestContext) {
-	var err error
 	var req api.CreateFriendRequestRequest
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+	_ = c.Bind(&req)
+	if req.SenderID <= 0 {
+		if uid, gerr := metainfoContext.GetUserID(ctx); gerr == nil && uid > 0 {
+			req.SenderID = uid
+		}
+	}
+	if req.SenderID <= 0 || req.ReceiverID <= 0 {
+		pack.RespError(c, errno.ParamVerifyError.WithMessage("sender_id and receiver_id required"))
 		return
 	}
 
-	resp, err := rpc.CreateFriendRequestRPC(ctx, &social.CreateFriendRequestRequest{
+	rpcReq := &social.CreateFriendRequestRequest{
 		SenderId:   req.SenderID,
 		ReceiverId: req.ReceiverID,
-	})
+		Message:    req.Message,
+	}
+	resp, err := rpc.CreateFriendRequestRPC(ctx, rpcReq)
 	if err != nil {
 		pack.RespError(c, err)
 		return
@@ -306,11 +417,27 @@ func CreateFriendRequest(ctx context.Context, c *app.RequestContext) {
 // GetFriendRequests .
 // @router /api/v1/social/friend/requests [GET]
 func GetFriendRequests(ctx context.Context, c *app.RequestContext) {
-	var err error
 	var req api.GetFriendRequestsRequest
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+	_ = c.Bind(&req)
+	if req.UserID <= 0 {
+		if uid, gerr := metainfoContext.GetUserID(ctx); gerr == nil && uid > 0 {
+			req.UserID = uid
+		}
+	}
+	if req.UserID <= 0 {
+		auth := string(c.GetHeader("Authorization"))
+		token := auth
+		if len(token) > 7 && (token[:7] == "Bearer " || token[:7] == "bearer ") {
+			token = token[7:]
+		}
+		if token != "" {
+			if claims, perr := jwt.ParseToken(token); perr == nil && claims != nil {
+				req.UserID = claims.UserID
+			}
+		}
+	}
+	if req.UserID <= 0 {
+		pack.RespError(c, errno.ParamVerifyError.WithMessage("user_id required"))
 		return
 	}
 
@@ -375,11 +502,15 @@ func MarkMessageRead(ctx context.Context, c *app.RequestContext) {
 // GetUnreadMessageCount .
 // @router /api/v1/social/messages/unread/count [GET]
 func GetUnreadMessageCount(ctx context.Context, c *app.RequestContext) {
-	var err error
 	var req api.GetUnreadMessageCountRequest
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+	_ = c.Bind(&req)
+	if req.UserID <= 0 {
+		if uid, gerr := metainfoContext.GetUserID(ctx); gerr == nil && uid > 0 {
+			req.UserID = uid
+		}
+	}
+	if req.UserID <= 0 {
+		pack.RespError(c, errno.ParamVerifyError.WithMessage("user_id required"))
 		return
 	}
 

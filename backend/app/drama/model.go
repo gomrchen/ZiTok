@@ -18,6 +18,8 @@ type Drama struct {
 	CreatedAt        time.Time  `gorm:"column:created_at" json:"created_at"`
 	UpdatedAt        time.Time  `gorm:"column:updated_at" json:"updated_at"`
 	DeletedAt        *time.Time `gorm:"column:deleted_at" json:"-"`
+	// UnlockRevenue 运营榜/列表附加字段，非表列
+	UnlockRevenue    int64      `gorm:"-" json:"unlock_revenue,omitempty"`
 }
 
 func (Drama) TableName() string { return "drama" }
@@ -61,6 +63,16 @@ type DramaFavorite struct {
 }
 
 func (DramaFavorite) TableName() string { return "user_drama_favorite" }
+
+// CategoryCatalog 运营预置分类目录（可空分类；与剧目 category 字段联动）
+type CategoryCatalog struct {
+	Name      string    `gorm:"column:name;primaryKey;size:64" json:"name"`
+	SortOrder int       `gorm:"column:sort_order;default:0" json:"sort_order"`
+	CreatedAt time.Time `gorm:"column:created_at" json:"created_at"`
+	UpdatedAt time.Time `gorm:"column:updated_at" json:"updated_at"`
+}
+
+func (CategoryCatalog) TableName() string { return "drama_category" }
 
 type FeedItem struct {
 	Drama   Drama   `json:"drama"`

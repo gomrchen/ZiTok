@@ -28,6 +28,7 @@ func (s *SocialDB) SendPrivateMessage(ctx context.Context, msg *model.PrivateMes
 		return err
 	}
 	msg.ID = dbMsg.ID
+	msg.CreateAt = dbMsg.CreatedAt.Unix()
 	return nil
 }
 
@@ -58,6 +59,7 @@ func (s *SocialDB) GetPrivateMessages(ctx context.Context, senderID, receiverID 
 			ReceiverID: dbMsg.ReceiverID,
 			Content:    dbMsg.Content,
 			IsRead:     dbMsg.IsRead,
+			CreateAt:   dbMsg.CreatedAt.Unix(),
 		}
 	}
 
@@ -229,11 +231,13 @@ func (s *SocialDB) GetFriendship(ctx context.Context, userID, friendID int64) (*
 	}
 
 	return &model.Friendship{
-		ID:       dbFriendship.ID,
-		UserID:   dbFriendship.UserID,
-		FriendID: dbFriendship.FriendID,
-		Status:   dbFriendship.Status,
-		Remark:   dbFriendship.Remark,
+		ID:        dbFriendship.ID,
+		UserID:    dbFriendship.UserID,
+		FriendID:  dbFriendship.FriendID,
+		Status:    dbFriendship.Status,
+		Remark:    dbFriendship.Remark,
+		CreatedAt: dbFriendship.CreatedAt.Unix(),
+		UpdatedAt: dbFriendship.UpdatedAt.Unix(),
 	}, nil
 }
 
@@ -249,11 +253,13 @@ func (s *SocialDB) GetUserFriends(ctx context.Context, userID int64) ([]model.Fr
 	friendships := make([]model.Friendship, len(dbFriendships))
 	for i, dbFriendship := range dbFriendships {
 		friendships[i] = model.Friendship{
-			ID:       dbFriendship.ID,
-			UserID:   dbFriendship.UserID,
-			FriendID: dbFriendship.FriendID,
-			Status:   dbFriendship.Status,
-			Remark:   dbFriendship.Remark,
+			ID:        dbFriendship.ID,
+			UserID:    dbFriendship.UserID,
+			FriendID:  dbFriendship.FriendID,
+			Status:    dbFriendship.Status,
+			Remark:    dbFriendship.Remark,
+			CreatedAt: dbFriendship.CreatedAt.Unix(),
+			UpdatedAt: dbFriendship.UpdatedAt.Unix(),
 		}
 	}
 
@@ -268,33 +274,84 @@ func (s *SocialDB) CreateFriendRequest(ctx context.Context, request *model.Frien
 		Message:    request.Message,
 		Status:     request.Status,
 	}
-	return s.db.WithContext(ctx).Create(dbRequest).Error
+	if err := s.db.WithContext(ctx).Create(dbRequest).Error; err != nil {
+		return err
+	}
+	request.ID = dbRequest.ID
+	return nil
 }
 
-func (s *SocialDB) GetFriendRequests(ctx context.Context, userID int64, status int8) ([]model.FriendRequest, error) {
-	var dbRequests []Friendship
-	query := s.db.WithContext(ctx)
-	if status == 0 {
-		query = s.db.WithContext(ctx).Where("user_id = ?", userID)
-	} else if status == model.FriendStatusAccepted {
-		query = s.db.WithContext(ctx).Where("friend_id = ?", userID)
+func (s *SocialDB) GetFriendRequests(ctx context.Context, userID int64, reqType int8) ([]model.FriendRequest, error) {
+	// 兼容 App：type=0 我关注的 / type=1 关注我的（基于 friendship）
+	// type=2 收到的好友申请 / type=3 发出的好友申请（基于 friend_request）
+	switch reqType {
+	case 0, 1:
+		return s.listFollowAsRequests(ctx, userID, reqType == 1)
+	case 3:
+		return s.listFriendRequests(ctx, userID, true)
+	default: // 2 或其它：收到的申请
+		return s.listFriendRequests(ctx, userID, false)
 	}
+}
 
-	if err := query.Order("created_at DESC").Find(&dbRequests).Error; err != nil {
+func (s *SocialDB) listFriendRequests(ctx context.Context, userID int64, sent bool) ([]model.FriendRequest, error) {
+	var dbRequests []FriendRequest
+	query := s.db.WithContext(ctx).Model(&FriendRequest{})
+	if sent {
+		query = query.Where("sender_id = ?", userID)
+	} else {
+		query = query.Where("receiver_id = ?", userID)
+	}
+	if err := query.Order("id DESC").Find(&dbRequests).Error; err != nil {
 		return nil, err
 	}
-
 	requests := make([]model.FriendRequest, len(dbRequests))
 	for i, dbRequest := range dbRequests {
 		requests[i] = model.FriendRequest{
 			ID:         dbRequest.ID,
-			ReceiverID: dbRequest.UserID,
-			SenderID:   dbRequest.FriendID,
+			SenderID:   dbRequest.SenderID,
+			ReceiverID: dbRequest.ReceiverID,
+			Message:    dbRequest.Message,
 			Status:     dbRequest.Status,
+			CreatedAt:  dbRequest.CreatedAt.Unix(),
+			UpdatedAt:  dbRequest.UpdatedAt.Unix(),
 		}
 	}
-
 	return requests, nil
+}
+
+// listFollowAsRequests 将关注关系映射为 FriendRequest 形状，供旧客户端解析 sender_id/receiver_id。
+func (s *SocialDB) listFollowAsRequests(ctx context.Context, userID int64, followers bool) ([]model.FriendRequest, error) {
+	var rows []Friendship
+	q := s.db.WithContext(ctx).Model(&Friendship{}).Where("status = ?", model.FriendStatusAccepted)
+	if followers {
+		q = q.Where("friend_id = ?", userID)
+	} else {
+		q = q.Where("user_id = ?", userID)
+	}
+	if err := q.Order("id DESC").Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	out := make([]model.FriendRequest, 0, len(rows))
+	for _, row := range rows {
+		item := model.FriendRequest{
+			ID:        row.ID,
+			Status:    row.Status,
+			CreatedAt: row.CreatedAt.Unix(),
+			UpdatedAt: row.UpdatedAt.Unix(),
+		}
+		if followers {
+			// 粉丝：Flutter 读 receiver_id
+			item.SenderID = userID
+			item.ReceiverID = row.UserID
+		} else {
+			// 关注：Flutter 读 sender_id
+			item.SenderID = row.FriendID
+			item.ReceiverID = userID
+		}
+		out = append(out, item)
+	}
+	return out, nil
 }
 
 func (s *SocialDB) UpdateFriendRequest(ctx context.Context, requestID int64, status int8) error {

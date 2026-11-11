@@ -38,6 +38,7 @@ type PrivateMessage struct {
 	ReceiverID int64  // 接收者ID
 	Content    string // 消息内容
 	IsRead     bool   // 是否已读
+	CreateAt   int64  // 创建时间 unix
 }
 
 // ChatRoom 聊天室模型
@@ -70,11 +71,13 @@ type ChatMessage struct {
 
 // Friendship 好友关系模型
 type Friendship struct {
-	ID       int64  // 主键ID
-	UserID   int64  // 用户ID
-	FriendID int64  // 好友ID
-	Status   int8   // 状态：0=待确认,1=已接受,2=已拒绝,3=已拉黑
-	Remark   string // 好友备注
+	ID        int64  // 主键ID
+	UserID    int64  // 用户ID
+	FriendID  int64  // 好友ID
+	Status    int8   // 状态：0=待确认,1=已接受,2=已拒绝,3=已拉黑
+	Remark    string // 好友备注
+	CreatedAt int64  // 创建时间 unix
+	UpdatedAt int64  // 更新时间 unix
 }
 
 // FriendRequest 好友申请模型
@@ -84,6 +87,8 @@ type FriendRequest struct {
 	ReceiverID int64  // 接收者ID
 	Message    string // 申请消息
 	Status     int8   // 状态：0=待处理,1=已接受,2=已拒绝
+	CreatedAt  int64  // 创建时间 unix
+	UpdatedAt  int64  // 更新时间 unix
 }
 
 // MessageReadStatus 消息已读状态模型

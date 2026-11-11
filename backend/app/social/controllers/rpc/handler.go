@@ -208,9 +208,11 @@ func (h *SocialHandler) CreateFriendRequest(ctx context.Context, req *social.Cre
 		message = *req.Message
 	}
 
-	if err = h.useCase.CreateFriendRequest(ctx, req.SenderId, req.ReceiverId, message); err != nil {
+	created, err := h.useCase.CreateFriendRequest(ctx, req.SenderId, req.ReceiverId, message)
+	if err != nil {
 		return
 	}
+	r.Request = pack.PackFriendRequest(created)
 	r.Base = base.BuildBaseResp(err)
 	return
 }

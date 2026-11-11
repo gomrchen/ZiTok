@@ -1,6 +1,57 @@
-* { box-sizing: border-box; }
-html, body, #root { margin: 0; min-height: 100%; }
+:root {
+  --bg: #f5f6f8;
+  --bg-panel: #ffffff;
+  --bg-panel-2: #f0f2f5;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --ink: #1f2329;
+  --muted: #8a8f99;
+  --line: #e5e6eb;
+  --line-strong: #d0d3d9;
+  --accent: #3d7eff;
+  --accent-2: #1a9f6e;
+  --accent-3: #c58a00;
+  --accent-warn: #d97706;
+  --danger: #e25555;
+  --rail: #14161c;
+  --rail-text: #9aa1ad;
+  --rail-active: #ffffff;
+  --rail-line: #2a2f3a;
+  --shadow: none;
+  --radius: 4px;
+  --font-ui: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+  --font-num: 'Noto Sans SC', 'PingFang SC', ui-sans-serif, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  min-height: 100%;
+}
+
 body {
-  font-family: "PingFang SC", "Noto Sans SC", system-ui, sans-serif;
-  background: #f5f5f5;
+  font-family: var(--font-ui);
+  color: var(--ink);
+  background: var(--bg);
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: rgba(61, 126, 255, 0.22);
+}
+
+@keyframes fade-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }

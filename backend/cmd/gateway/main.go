@@ -53,6 +53,7 @@ func main() {
 
 	router.GeneratedRegister(h)
 	router.RegisterDramaRoutes(h)
+	router.RegisterFeedRoutes(h)
 	router.RegisterLogoutRoute(h)
 	router.RegisterCommerceRoutes(h)
 	router.RegisterAdminRoutes(h)

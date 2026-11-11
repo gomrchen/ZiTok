@@ -4,7 +4,7 @@ class RelationService {
   final Dio dio;
   RelationService(this.dio);
 
-  // 关注列表 (type=0)
+  // 关注列表兼容旧接口 (type=0 → sender_id)
   Future<Response> friendsList({required int userId}) {
     return dio.get('/social/friend/requests', queryParameters: {
       'user_id': userId,
@@ -12,7 +12,16 @@ class RelationService {
     });
   }
 
-  // 粉丝列表 (type=1)
+  // 正式好友/关注列表
+  Future<Response> getFriends({required int userId}) {
+    return dio.get('/social/friends', queryParameters: {
+      'user_id': userId,
+      'page': 1,
+      'size': 50,
+    });
+  }
+
+  // 粉丝列表 (type=1 → receiver_id)
   Future<Response> fansList({required int uid}) {
     return dio.get('/social/friend/requests', queryParameters: {
       'user_id': uid,
