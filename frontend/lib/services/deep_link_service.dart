@@ -10,10 +10,17 @@ class DeepLinkService {
   DeepLinkService._();
   static final DeepLinkService instance = DeepLinkService._();
 
+  static const _allowedHttpsHosts = <String>{
+    'zitok.app',
+    'www.zitok.app',
+  };
+
   AppLinks? _links;
   StreamSubscription<Uri>? _sub;
   GoRouter? _router;
   bool _pluginMissing = false;
+  String? _lastHandled;
+  DateTime? _lastHandledAt;
 
   void attach(GoRouter router) {
     _router = router;
@@ -34,7 +41,6 @@ class DeepLinkService {
           }
         },
       );
-      // 冷启动
       unawaited(_links!.getInitialLink().then((uri) {
         if (uri != null) _handle(uri);
       }).catchError((Object e) {
@@ -49,6 +55,7 @@ class DeepLinkService {
   void dispose() {
     _sub?.cancel();
     _sub = null;
+    _router = null;
   }
 
   static bool _isMissingPlugin(Object e) =>
@@ -58,6 +65,14 @@ class DeepLinkService {
   void _handle(Uri uri) {
     final path = mapToAppPath(uri);
     if (path == null) return;
+    final now = DateTime.now();
+    if (_lastHandled == path &&
+        _lastHandledAt != null &&
+        now.difference(_lastHandledAt!) < const Duration(milliseconds: 800)) {
+      return;
+    }
+    _lastHandled = path;
+    _lastHandledAt = now;
     final router = _router;
     if (router == null) return;
     try {
@@ -67,48 +82,61 @@ class DeepLinkService {
     }
   }
 
+  /// 分享 / 海报用的统一深链文案
+  static String buildDramaEpisodeLink({required int dramaId, required int episodeId}) {
+    if (dramaId <= 0) return 'zitok://home';
+    if (episodeId <= 0) return 'zitok://drama/$dramaId';
+    return 'zitok://drama/$dramaId?ep=$episodeId';
+  }
+
+  static bool _isDigits(String? s) {
+    if (s == null || s.isEmpty) return false;
+    if (s.length > 18) return false;
+    for (var i = 0; i < s.length; i++) {
+      final c = s.codeUnitAt(i);
+      if (c < 0x30 || c > 0x39) return false;
+    }
+    return true;
+  }
+
+  static String? _dramaPath(String id, String? ep) {
+    if (!_isDigits(id)) return null;
+    if (ep == null || ep.isEmpty) return '/drama/$id';
+    if (!_isDigits(ep)) return '/drama/$id';
+    return '/drama/$id?ep=$ep';
+  }
+
   /// 将自定义 scheme / https 映射为 go_router 路径
   static String? mapToAppPath(Uri uri) {
-    // zitok://drama/123?ep=456
     if (uri.scheme == 'zitok') {
-      final host = uri.host; // drama
+      final host = uri.host;
       final segs = uri.pathSegments;
       if (host == 'drama' && segs.isNotEmpty) {
-        final id = segs.first;
-        final ep = uri.queryParameters['ep'];
-        return ep == null || ep.isEmpty ? '/drama/$id' : '/drama/$id?ep=$ep';
+        return _dramaPath(segs.first, uri.queryParameters['ep']);
       }
-      // zitok:///drama/123
       if (segs.isNotEmpty && segs.first == 'drama' && segs.length >= 2) {
-        final id = segs[1];
-        final ep = uri.queryParameters['ep'];
-        return ep == null || ep.isEmpty ? '/drama/$id' : '/drama/$id?ep=$ep';
+        return _dramaPath(segs[1], uri.queryParameters['ep']);
       }
-      // zitok://home | zitok://watching | zitok://theater
-      if (host == 'home' || host == 'watching' || host == 'theater' || host == 'wallet') {
-        return '/$host';
-      }
-      if (segs.length == 1 &&
-          (segs.first == 'home' ||
-              segs.first == 'watching' ||
-              segs.first == 'theater' ||
-              segs.first == 'wallet')) {
-        return '/${segs.first}';
+      const tabs = {'home', 'watching', 'theater', 'wallet'};
+      if (tabs.contains(host)) return '/$host';
+      if (segs.length == 1 && tabs.contains(segs.first)) return '/${segs.first}';
+      return null;
+    }
+
+    if (uri.scheme == 'http' || uri.scheme == 'https') {
+      if (!_allowedHttpsHosts.contains(uri.host.toLowerCase())) return null;
+      final segs = uri.pathSegments;
+      if (segs.length >= 2 && segs[0] == 'drama') {
+        return _dramaPath(segs[1], uri.queryParameters['ep']);
       }
       return null;
     }
 
-    // https://zitok.app/drama/123?ep= 或纯 path
-    if (uri.scheme == 'http' || uri.scheme == 'https' || uri.scheme.isEmpty) {
+    // 仅允许应用内纯 path（scheme 为空）
+    if (uri.scheme.isEmpty && uri.path.startsWith('/drama/')) {
       final segs = uri.pathSegments;
       if (segs.length >= 2 && segs[0] == 'drama') {
-        final id = segs[1];
-        final ep = uri.queryParameters['ep'];
-        return ep == null || ep.isEmpty ? '/drama/$id' : '/drama/$id?ep=$ep';
-      }
-      // 已是 app 内 path：/drama/1?ep=2
-      if (uri.path.startsWith('/drama/')) {
-        return uri.hasQuery ? '${uri.path}?${uri.query}' : uri.path;
+        return _dramaPath(segs[1], uri.queryParameters['ep']);
       }
     }
     return null;

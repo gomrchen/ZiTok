@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../l10n/l10n_ext.dart';
 import '../../providers/drama_provider.dart';
+import '../../widgets/drama_network_cover.dart';
 import '../home/shell_surface.dart';
 
 class WatchingPage extends StatefulWidget {
@@ -157,13 +158,7 @@ class _WatchRow extends StatelessWidget {
                 child: SizedBox(
                   width: 58,
                   height: 78,
-                  child: coverUrl.isNotEmpty
-                      ? Image.network(coverUrl, fit: BoxFit.cover)
-                      : ColoredBox(
-                          color: ShellSurface.isDark(context)
-                              ? const Color(0xFF1F2937)
-                              : const Color(0xFFD9D4CC),
-                        ),
+                  child: DramaNetworkCover(url: coverUrl),
                 ),
               ),
               const SizedBox(width: 12),

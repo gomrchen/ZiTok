@@ -50,13 +50,6 @@ class ShellSurface {
     );
   }
 
-  /// 兼容旧调用（浅色）；优先使用 [systemUiOf]
-  static SystemUiOverlayStyle get systemUi => SystemUiOverlayStyle.dark.copyWith(
-        statusBarColor: Colors.transparent,
-        systemNavigationBarColor: canvas,
-        systemNavigationBarIconBrightness: Brightness.dark,
-      );
-
   static AppBar appBar({
     required String title,
     BuildContext? context,
@@ -73,13 +66,7 @@ class ShellSurface {
             ? IconButton(
                 tooltip: MaterialLocalizations.of(context).backButtonTooltip,
                 icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                onPressed: () {
-                  if (context.canPop()) {
-                    context.pop();
-                  } else {
-                    context.go('/home');
-                  }
-                },
+                onPressed: () => popOrHome(context),
               )
             : null);
     return AppBar(
@@ -102,8 +89,13 @@ class ShellSurface {
       foregroundColor: inkColor,
       actions: actions,
       bottom: bottom,
-      systemOverlayStyle:
-          context != null ? systemUiOf(context) : systemUi,
+      systemOverlayStyle: context != null
+          ? systemUiOf(context)
+          : SystemUiOverlayStyle.dark.copyWith(
+              statusBarColor: Colors.transparent,
+              systemNavigationBarColor: canvas,
+              systemNavigationBarIconBrightness: Brightness.dark,
+            ),
     );
   }
 
@@ -123,27 +115,6 @@ class ShellSurface {
 
   static TextStyle captionOf(BuildContext context) => TextStyle(
         color: inkOf(context).withValues(alpha: 0.48),
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
-        height: 1.2,
-      );
-
-  static TextStyle get sectionTitle => const TextStyle(
-        color: ink,
-        fontSize: 16,
-        fontWeight: FontWeight.w800,
-        letterSpacing: 0.2,
-      );
-
-  static TextStyle get bodyStrong => const TextStyle(
-        color: ink,
-        fontSize: 14,
-        fontWeight: FontWeight.w700,
-        height: 1.2,
-      );
-
-  static TextStyle get caption => TextStyle(
-        color: ink.withValues(alpha: 0.48),
         fontSize: 12,
         fontWeight: FontWeight.w500,
         height: 1.2,
@@ -233,5 +204,14 @@ class ShellSurface {
         behavior: SnackBarBehavior.floating,
       ),
     );
+  }
+
+  /// 有导航栈则 pop，否则回首页（深链 go 落地场景）
+  static void popOrHome(BuildContext context) {
+    if (context.canPop()) {
+      context.pop();
+    } else {
+      context.go('/home');
+    }
   }
 }

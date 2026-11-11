@@ -152,6 +152,145 @@ class PlayerSpeedBadge extends StatelessWidget {
   }
 }
 
+/// 播放失败重试面板
+class PlayerPlaybackErrorPanel extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+
+  const PlayerPlaybackErrorPanel({
+    super.key,
+    required this.message,
+    required this.onRetry,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('播放失败', style: TextStyle(color: Colors.white, fontSize: 16)),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+              maxLines: 4,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(color: Colors.white70, fontSize: 12),
+            ),
+            const SizedBox(height: 12),
+            FilledButton(onPressed: onRetry, child: const Text('重试')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 锁定蒙层 + 解锁按钮
+class PlayerUnlockGate extends StatelessWidget {
+  final VoidCallback onUnlock;
+
+  const PlayerUnlockGate({super.key, required this.onUnlock});
+
+  @override
+  Widget build(BuildContext context) {
+    return ColoredBox(
+      color: Colors.black54,
+      child: Center(
+        child: FilledButton(onPressed: onUnlock, child: const Text('解锁本集')),
+      ),
+    );
+  }
+}
+
+/// 全屏点击 / 双击 / 长按手势层
+class PlayerGestureSurface extends StatelessWidget {
+  final VoidCallback onTap;
+  final GestureTapDownCallback onDoubleTapDown;
+  final GestureLongPressStartCallback onLongPressStart;
+  final GestureLongPressEndCallback onLongPressEnd;
+  final VoidCallback onLongPressCancel;
+
+  const PlayerGestureSurface({
+    super.key,
+    required this.onTap,
+    required this.onDoubleTapDown,
+    required this.onLongPressStart,
+    required this.onLongPressEnd,
+    required this.onLongPressCancel,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Positioned.fill(
+      child: GestureDetector(
+        behavior: HitTestBehavior.opaque,
+        onTap: onTap,
+        onDoubleTapDown: onDoubleTapDown,
+        onLongPressStart: onLongPressStart,
+        onLongPressEnd: onLongPressEnd,
+        onLongPressCancel: onLongPressCancel,
+        child: const SizedBox.expand(),
+      ),
+    );
+  }
+}
+
+/// 加载 / 缓冲 / 错误 / 锁定 / 暂停提示 / 倍速 / 点赞爆发
+class PlayerPlaybackStatusStack extends StatelessWidget {
+  final bool loading;
+  final bool locked;
+  final bool speedUp;
+  final bool showPauseHint;
+  final bool paused;
+  final PlayHandle? player;
+  final String? error;
+  final VoidCallback onRetry;
+  final VoidCallback onUnlock;
+  final Offset? burstPos;
+  final bool showBuffering;
+
+  const PlayerPlaybackStatusStack({
+    super.key,
+    required this.loading,
+    required this.locked,
+    required this.speedUp,
+    required this.showPauseHint,
+    required this.paused,
+    required this.player,
+    required this.error,
+    required this.onRetry,
+    required this.onUnlock,
+    this.burstPos,
+    this.showBuffering = true,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (burstPos != null) PlayerLikeBurst(localPos: burstPos!),
+        if (loading) const Center(child: CircularProgressIndicator(color: Colors.white)),
+        if (!loading && !locked && showBuffering) PlayerBufferingHint(handle: player),
+        if (error != null) PlayerPlaybackErrorPanel(message: error!, onRetry: onRetry),
+        if (locked) PlayerUnlockGate(onUnlock: onUnlock),
+        if (showPauseHint && !locked && !loading && !speedUp) PlayerPauseHint(paused: paused),
+        if (speedUp)
+          const Positioned(
+            top: 120,
+            left: 0,
+            right: 0,
+            child: PlayerSpeedBadge(),
+          ),
+      ],
+    );
+  }
+}
+
 /// 片尾下一集提示
 class PlayerNextEpisodeHint extends StatelessWidget {
   final String episodeLabel;

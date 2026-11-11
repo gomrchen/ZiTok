@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../l10n/l10n_ext.dart';
 import '../../providers/drama_provider.dart';
+import '../../widgets/drama_network_cover.dart';
 import '../home/shell_surface.dart';
 
 class TheaterPage extends StatefulWidget {
@@ -54,6 +55,8 @@ class _TheaterPageState extends State<TheaterPage> {
         appBar: ShellSurface.appBar(
           title: l10n.theaterTitle,
           context: context,
+          // 深链/独立路由 go('/theater') 无系统返回；壳内 Tab 仍走 /home，不强制出后退
+          forceBack: GoRouterState.of(context).matchedLocation == '/theater',
           actions: [
             IconButton(
               icon: const Icon(Icons.search_rounded),
@@ -130,18 +133,11 @@ class _TheaterPageState extends State<TheaterPage> {
                                     ),
                                     child: ClipRRect(
                                       borderRadius: BorderRadius.circular(12),
-                                      child: d.coverUrl.isEmpty
-                                          ? ColoredBox(
-                                              color: ShellSurface.isDark(context)
-                                                  ? const Color(0xFF1F2937)
-                                                  : const Color(0xFFD9D4CC),
-                                            )
-                                          : Image.network(
-                                              d.coverUrl,
-                                              fit: BoxFit.cover,
-                                              width: double.infinity,
-                                              height: double.infinity,
-                                            ),
+                                      child: DramaNetworkCover(
+                                        url: d.coverUrl,
+                                        width: double.infinity,
+                                        height: double.infinity,
+                                      ),
                                     ),
                                   ),
                                 ),

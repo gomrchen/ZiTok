@@ -9,6 +9,7 @@ import 'package:media_kit_video/media_kit_video.dart';
 import 'package:video_player/video_player.dart' hide VideoTrack;
 
 import '../../widgets/cover_video.dart';
+import 'media_url.dart';
 import 'player_cast_quality.dart';
 
 /// 统一播放句柄：屏蔽 video_player / media_kit 差异
@@ -50,14 +51,10 @@ class VpPlayHandle implements PlayHandle {
   VpPlayHandle(this.controller);
 
   static Future<VpPlayHandle> open(String url) async {
-    final trimmed = url.trim();
+    final trimmed = sanitizeHttpMediaUrl(url);
+    if (trimmed == null) throw StateError('invalid url');
     VideoPlayerController c;
-    final lower = trimmed.toLowerCase();
-    final progressive = lower.contains('.mp4') ||
-        lower.contains('.mov') ||
-        lower.contains('.m4v') ||
-        lower.contains('.webm');
-    if (progressive && !lower.contains('m3u8')) {
+    if (isProgressiveVideoUrl(trimmed)) {
       try {
         final file = await DefaultCacheManager().getSingleFile(trimmed);
         c = VideoPlayerController.file(File(file.path));
@@ -159,9 +156,11 @@ class MkPlayHandle extends ChangeNotifier implements PlayHandle {
   }
 
   static Future<MkPlayHandle> open(String url) async {
+    final trimmed = sanitizeHttpMediaUrl(url);
+    if (trimmed == null) throw StateError('invalid url');
     final player = Player();
     final handle = MkPlayHandle._(player);
-    await player.open(Media(url.trim()), play: false);
+    await player.open(Media(trimmed), play: false);
     // 等到有时长或开始缓冲后再标 ready
     await player.stream.duration.first.timeout(
       const Duration(seconds: 20),
@@ -264,8 +263,8 @@ class MkPlayHandle extends ChangeNotifier implements PlayHandle {
       notifyListeners();
       return;
     }
-    final ext = externalUrl?.trim() ?? '';
-    if (ext.startsWith('http')) {
+    final ext = sanitizeHttpMediaUrl(externalUrl);
+    if (ext != null) {
       await player.setSubtitleTrack(SubtitleTrack.uri(ext, title: '外挂字幕'));
       notifyListeners();
       return;
@@ -334,8 +333,8 @@ class MkPlayHandle extends ChangeNotifier implements PlayHandle {
 
 /// 剧集页优先 media_kit（HLS/多码率更好）；失败回退 video_player
 Future<PlayHandle> openPlayHandle(String url, {bool preferMediaKit = true}) async {
-  final u = url.trim();
-  if (u.isEmpty) throw StateError('empty url');
+  final u = sanitizeHttpMediaUrl(url);
+  if (u == null) throw StateError('invalid url');
   if (preferMediaKit) {
     try {
       return await MkPlayHandle.open(u);

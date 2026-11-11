@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'media_url.dart';
 import 'player_overlay.dart';
 
 class VideoQualityOption {
@@ -28,8 +29,8 @@ List<VideoQualityOption> buildQualityOptions({
   if (rawQualities != null) {
     for (final e in rawQualities) {
       if (e is! Map) continue;
-      final url = '${e['url'] ?? e['video_url'] ?? ''}'.trim();
-      if (url.isEmpty) continue;
+      final url = sanitizeHttpMediaUrl('${e['url'] ?? e['video_url'] ?? ''}');
+      if (url == null) continue;
       final label = '${e['label'] ?? e['name'] ?? '清晰度'}'.trim();
       out.add(VideoQualityOption(
         label: label.isEmpty ? '清晰度' : label,
@@ -38,11 +39,11 @@ List<VideoQualityOption> buildQualityOptions({
       ));
     }
   }
-  if (out.isEmpty && primaryUrl.trim().isNotEmpty) {
-    final u = primaryUrl.trim();
-    final hls = u.toLowerCase().contains('m3u8');
+  final primary = sanitizeHttpMediaUrl(primaryUrl);
+  if (out.isEmpty && primary != null) {
+    final hls = primary.toLowerCase().contains('m3u8');
     // 无真实多码率时只展示当前档，避免「高清/标清」同 URL 假切换
-    out.add(VideoQualityOption(label: hls ? '自动 · HLS' : '自动', url: u, isHls: hls));
+    out.add(VideoQualityOption(label: hls ? '自动 · HLS' : '自动', url: primary, isHls: hls));
   }
   // 去重：同 URL 只保留第一条
   final seen = <String>{};
@@ -151,45 +152,13 @@ Future<void> showCastSheet(
                   );
                 },
               ),
-              ListTile(
-                contentPadding: EdgeInsets.zero,
-                enabled: url.isNotEmpty,
-                leading: Icon(
-                  Icons.link_rounded,
-                  color: Colors.white.withValues(alpha: url.isEmpty ? 0.35 : 1),
-                ),
-                title: Text(
-                  '复制播放链接',
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: url.isEmpty ? 0.45 : 1),
-                  ),
-                ),
-                subtitle: Text(
-                  url.isEmpty ? '当前无可复制地址' : '用于电视 / 浏览器 / 第三方投屏 App',
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 12),
-                ),
-                onTap: url.isEmpty
-                    ? null
-                    : () async {
-                        await Clipboard.setData(ClipboardData(text: url));
-                        if (!context.mounted) return;
-                        Navigator.pop(ctx);
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('播放链接已复制'),
-                            behavior: SnackBarBehavior.floating,
-                            duration: Duration(milliseconds: 1400),
-                          ),
-                        );
-                      },
-              ),
               if (link.isNotEmpty)
                 ListTile(
                   contentPadding: EdgeInsets.zero,
                   leading: const Icon(Icons.share_rounded, color: Colors.white),
                   title: const Text('复制打开链接', style: TextStyle(color: Colors.white)),
                   subtitle: Text(
-                    '好友用手机打开本集：zitok://…',
+                    '推荐：好友用手机打开本集',
                     style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 12),
                   ),
                   onTap: () async {
@@ -207,6 +176,38 @@ Future<void> showCastSheet(
                 ),
               ListTile(
                 contentPadding: EdgeInsets.zero,
+                enabled: url.isNotEmpty && isHttpMediaUrl(url),
+                leading: Icon(
+                  Icons.link_rounded,
+                  color: Colors.white.withValues(alpha: url.isEmpty ? 0.35 : 1),
+                ),
+                title: Text(
+                  '复制直链（谨慎）',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: url.isEmpty ? 0.45 : 1),
+                  ),
+                ),
+                subtitle: Text(
+                  url.isEmpty ? '当前无可复制地址' : '可能含临时播放凭证，勿公开发布',
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.45), fontSize: 12),
+                ),
+                onTap: !isHttpMediaUrl(url)
+                    ? null
+                    : () async {
+                        await Clipboard.setData(ClipboardData(text: url));
+                        if (!context.mounted) return;
+                        Navigator.pop(ctx);
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('直链已复制，请勿外传'),
+                            behavior: SnackBarBehavior.floating,
+                            duration: Duration(milliseconds: 1600),
+                          ),
+                        );
+                      },
+              ),
+              ListTile(
+                contentPadding: EdgeInsets.zero,
                 leading: Icon(Icons.cast_rounded, color: Colors.white.withValues(alpha: 0.55)),
                 title: Text('Chromecast / DLNA', style: TextStyle(color: Colors.white.withValues(alpha: 0.7))),
                 subtitle: Text(
@@ -217,7 +218,7 @@ Future<void> showCastSheet(
                   Navigator.pop(ctx);
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
-                      content: Text('可先「复制播放链接」到电视端 App'),
+                      content: Text('可先「复制打开链接」或谨慎复制直链'),
                       behavior: SnackBarBehavior.floating,
                     ),
                   );

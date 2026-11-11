@@ -7,6 +7,9 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:video_player/video_player.dart';
 import 'package:wakelock_plus/wakelock_plus.dart';
 
+import 'media_url.dart';
+import 'player_handle.dart';
+
 /// 播放中保持屏幕常亮（多 slide 用 holder 引用，避免快切竞态）
 class PlayerWakelock {
   static bool _enabled = false;
@@ -104,15 +107,6 @@ class PlayerNetworkGuard {
   }
 }
 
-bool _isProgressiveVideoUrl(String url) {
-  final u = url.toLowerCase();
-  if (u.contains('m3u8')) return false;
-  return u.contains('.mp4') ||
-      u.contains('.mov') ||
-      u.contains('.m4v') ||
-      u.contains('.webm');
-}
-
 class _PreloadedPlayer {
   final String url;
   final VideoPlayerController controller;
@@ -130,8 +124,8 @@ class EpisodeVideoPreload {
     required int episodeId,
     required String url,
   }) async {
-    final trimmed = url.trim();
-    if (trimmed.isEmpty || episodeId <= 0) return;
+    final trimmed = sanitizeHttpMediaUrl(url);
+    if (trimmed == null || episodeId <= 0) return;
     final hit = _ready[episodeId];
     if (hit != null && hit.url == trimmed) return;
     if (_inflight.containsKey(episodeId)) {
@@ -150,7 +144,7 @@ class EpisodeVideoPreload {
   static Future<void> _doWarm(int episodeId, String url) async {
     try {
       late final VideoPlayerController c;
-      if (_isProgressiveVideoUrl(url)) {
+      if (isProgressiveVideoUrl(url)) {
         try {
           final file = await _cache.getSingleFile(url);
           c = VideoPlayerController.file(file);
@@ -196,8 +190,9 @@ class EpisodeVideoPreload {
 
   /// 打开播放：优先本地缓存文件，否则网络
   static Future<VideoPlayerController> openController(String url) async {
-    final trimmed = url.trim();
-    if (_isProgressiveVideoUrl(trimmed)) {
+    final trimmed = sanitizeHttpMediaUrl(url);
+    if (trimmed == null) throw StateError('invalid url');
+    if (isProgressiveVideoUrl(trimmed)) {
       try {
         final file = await _cache.getSingleFile(trimmed);
         if (await file.exists()) {
@@ -252,5 +247,37 @@ class PlayerProgressStore {
       }
     }
     return best;
+  }
+
+  static String formatClock(int sec) {
+    final s = sec < 0 ? 0 : sec;
+    final m = s ~/ 60;
+    final r = s % 60;
+    return '$m:${r.toString().padLeft(2, '0')}';
+  }
+
+  /// 解析进度并 seek；返回实际续播秒数，无需续播时返回 null
+  static Future<int?> seekIfNeeded({
+    required PlayHandle player,
+    required int episodeId,
+    required Iterable<({int episodeId, int positionSec})> cloudHints,
+    bool Function()? isMounted,
+  }) async {
+    final sec = await resolveResumeSec(episodeId: episodeId, cloudHints: cloudHints);
+    if (sec < 5) return null;
+    for (var i = 0; i < 20; i++) {
+      if (isMounted != null && !isMounted()) return null;
+      if (player.duration.inSeconds > 0) break;
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+    }
+    if (isMounted != null && !isMounted()) return null;
+    final dur = player.duration.inSeconds;
+    if (dur > 0 && sec >= dur - 3) return null;
+    try {
+      await player.seekTo(Duration(seconds: sec));
+      return sec;
+    } catch (_) {
+      return null;
+    }
   }
 }

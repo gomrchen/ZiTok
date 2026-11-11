@@ -9,9 +9,11 @@ import 'package:zitok/l10n/app_localizations.dart';
 
 import '../../models/drama_models.dart';
 import '../../providers/drama_provider.dart';
+import '../home/shell_surface.dart';
 import 'episode_label.dart';
 import 'episode_play_page.dart';
 import 'player_overlay.dart';
+import 'player_session.dart';
 import 'unlock_sheet.dart';
 
 const _kBg = Color(0xFF0A0C12);
@@ -82,7 +84,7 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = '加载失败，请稍后重试';
         _loading = false;
       });
     }
@@ -169,11 +171,13 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
     if (d == null) return;
     final was = _favorite;
     setState(() => _favorite = !was);
-    try {
-      await context.read<DramaProvider>().toggleFavorite(d.id, currentlyFav: was);
-    } catch (_) {
-      if (mounted) setState(() => _favorite = was);
-    }
+    final next = await toggleDramaFavorite(
+      dp: context.read<DramaProvider>(),
+      dramaId: d.id,
+      currentlyFav: was,
+    );
+    if (!mounted) return;
+    setState(() => _favorite = next ?? was);
   }
 
   @override
@@ -191,6 +195,10 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
         appBar: AppBar(
           backgroundColor: _kBg,
           foregroundColor: Colors.white,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+            onPressed: () => ShellSurface.popOrHome(context),
+          ),
         ),
         body: Center(
           child: Column(
@@ -237,7 +245,7 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
                   padding: const EdgeInsets.only(left: 8),
                   child: _GlassIconButton(
                     icon: Icons.arrow_back_ios_new_rounded,
-                    onTap: () => Navigator.of(context).maybePop(),
+                    onTap: () => ShellSurface.popOrHome(context),
                   ),
                 ),
                 actions: [

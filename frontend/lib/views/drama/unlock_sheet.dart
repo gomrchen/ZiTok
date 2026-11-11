@@ -74,8 +74,8 @@ class _UnlockSheetBodyState extends State<_UnlockSheetBody> {
       } else {
         setState(() => _error = '操作失败，请稍后重试');
       }
-    } catch (e) {
-      if (mounted) setState(() => _error = '$e');
+    } catch (_) {
+      if (mounted) setState(() => _error = '操作失败，请稍后重试');
     } finally {
       if (mounted) setState(() => _busy = false);
     }

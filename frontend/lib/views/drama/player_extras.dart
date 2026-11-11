@@ -7,14 +7,18 @@ import 'package:go_router/go_router.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../models/drama_models.dart';
+import '../../services/deep_link_service.dart';
 import 'player_handle.dart';
 import 'player_overlay.dart';
 
 /// 系统分享面板；原生未链上或失败时回退复制文案
 Future<void> shareDramaEpisode(BuildContext context, {required Drama drama, required Episode episode}) async {
-  // 自定义 scheme 已接 app_links；https 域名 Universal Link 仍可后置
+  final link = DeepLinkService.buildDramaEpisodeLink(
+    dramaId: drama.id,
+    episodeId: episode.id,
+  );
   final text =
-      '《${drama.title}》第${episode.episodeNo}集 · ${drama.category.isEmpty ? '短剧' : drama.category}\n来 ZiTok 一起追：zitok://drama/${drama.id}?ep=${episode.id}';
+      '《${drama.title}》第${episode.episodeNo}集 · ${drama.category.isEmpty ? '短剧' : drama.category}\n来 ZiTok 一起追：$link';
 
   // iPad/Mac 弹层需要锚点，否则可能直接抛错
   final box = context.findRenderObject() as RenderBox?;
