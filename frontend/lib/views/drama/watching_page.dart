@@ -30,7 +30,11 @@ class _WatchingPageState extends State<WatchingPage> {
       value: ShellSurface.systemUiOf(context),
       child: Scaffold(
         backgroundColor: ShellSurface.canvasOf(context),
-        appBar: ShellSurface.appBar(title: l10n.watchingTitle, context: context),
+        appBar: ShellSurface.appBar(
+          title: l10n.watchingTitle,
+          context: context,
+          forceBack: true,
+        ),
         body: RefreshIndicator(
           color: ShellSurface.coral,
           backgroundColor: ShellSurface.cardOf(context),

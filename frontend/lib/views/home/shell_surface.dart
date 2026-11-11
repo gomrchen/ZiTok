@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
 
 /// 非首页 Tab 统一画布：剧场 / 消息 / 我的 与壳层底色对齐
 /// 常量保留浅色品牌默认；运行时请用 *Of(context) 跟随夜晚模式。
@@ -61,10 +62,29 @@ class ShellSurface {
     BuildContext? context,
     List<Widget>? actions,
     PreferredSizeWidget? bottom,
+    Widget? leading,
+    /// 深链 go 进入时系统不会自动出返回键；为 true 则始终展示可回退按钮
+    bool forceBack = false,
   }) {
     final inkColor = context != null ? inkOf(context) : ink;
     final bg = context != null ? canvasOf(context) : canvas;
+    final Widget? resolvedLeading = leading ??
+        (forceBack && context != null
+            ? IconButton(
+                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
+                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
+                onPressed: () {
+                  if (context.canPop()) {
+                    context.pop();
+                  } else {
+                    context.go('/home');
+                  }
+                },
+              )
+            : null);
     return AppBar(
+      leading: resolvedLeading,
+      automaticallyImplyLeading: resolvedLeading == null,
       title: Text(
         title,
         style: TextStyle(
