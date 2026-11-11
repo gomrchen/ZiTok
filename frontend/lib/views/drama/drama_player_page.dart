@@ -279,31 +279,16 @@ class _EpisodeSlideState extends State<_EpisodeSlide> with EpisodeSlidePlaybackM
       compact: true,
     );
     if (!mounted) return;
-    switch (action) {
-      case PlayerMoreAction.speed:
-        await pickSpeed();
-      case PlayerMoreAction.mute:
-        await toggleMute();
-      case PlayerMoreAction.intro:
-        await showPlayerDramaIntroSheet(context, drama: widget.item.drama);
-      case PlayerMoreAction.share:
-        await shareDramaEpisode(
-          context,
-          drama: widget.item.drama,
-          episode: widget.item.episode,
-        );
-      case PlayerMoreAction.pip:
-        await _openSystemPip();
-        break;
-      case PlayerMoreAction.quality:
-      case PlayerMoreAction.cast:
-      case PlayerMoreAction.subtitle:
-      case PlayerMoreAction.poster:
-        showPlayerTip(context, '请点「观看完整短剧」使用该功能');
-        break;
-      case null:
-        break;
-    }
+    await dispatchPlayerMoreAction(
+      context,
+      action: action,
+      drama: widget.item.drama,
+      episode: widget.item.episode,
+      onSpeed: pickSpeed,
+      onMute: toggleMute,
+      onPip: _openSystemPip,
+      compactExtrasHint: true,
+    );
     await resumeIfActive();
   }
 

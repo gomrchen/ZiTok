@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -11,6 +12,8 @@ import '../../services/user_service.dart';
 import '../../theme/theme_tokens.dart';
 import '../../utils/url_utils.dart';
 import '../../utils/app_config.dart';
+import '../../widgets/glass_nav.dart';
+import '../home/shell_surface.dart';
 
 /// 访客个人主页（只读）
 class VisitorProfilePage extends StatefulWidget {
@@ -128,7 +131,8 @@ class _VisitorProfilePageState extends State<VisitorProfilePage> {
 
     if (_error != null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('用户主页')),
+        backgroundColor: ShellSurface.canvasOf(context),
+        appBar: ShellSurface.appBar(title: '用户主页', context: context),
         body: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -200,82 +204,112 @@ class _VisitorProfilePageState extends State<VisitorProfilePage> {
   }
 
   Widget _buildHeader(User user, ThemeData theme, ColorScheme cs) {
-    return Stack(
-      children: [
-        // 背景图
-        Container(
-          height: 180,
-          decoration: BoxDecoration(
-            color: cs.primaryContainer,
-            image: user.profileBackgroundImageUrl != null && user.profileBackgroundImageUrl!.isNotEmpty
-                ? DecorationImage(
-                    image: CachedNetworkImageProvider(user.profileBackgroundImageUrl!),
-                    fit: BoxFit.cover,
-                  )
-                : null,
-          ),
-        ),
-        // 渐变遮罩
-        Container(
-          height: 180,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                Colors.transparent,
-                cs.surface.withValues(alpha: 0.8),
-              ],
-            ),
-          ),
-        ),
-        // 返回按钮
-        Positioned(
-          top: Spacing.sm,
-          left: Spacing.sm,
-          child: Container(
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.black.withValues(alpha: 0.3),
-            ),
-            child: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
-              onPressed: () => Navigator.of(context).pop(),
-            ),
-          ),
-        ),
-        // 头像
-        Positioned(
-          bottom: 0,
-          left: 0,
-          right: 0,
-          child: Center(
-            child: Container(
+    final topInset = MediaQuery.paddingOf(context).top;
+    final headerH = topInset + 168;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(statusBarColor: Colors.transparent),
+      child: SizedBox(
+        height: headerH,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            DecoratedBox(
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: cs.surface, width: 4),
-              ),
-              child: CircleAvatar(
-                radius: 48,
-                backgroundColor: cs.primaryContainer,
-                backgroundImage: user.avatarUrl != null && user.avatarUrl!.isNotEmpty
-                    ? CachedNetworkImageProvider(user.avatarUrl!)
-                    : null,
-                child: user.avatarUrl == null || user.avatarUrl!.isEmpty
-                    ? Text(
-                        (user.username.isNotEmpty ? user.username[0] : '?').toUpperCase(),
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: cs.onPrimaryContainer,
-                        ),
+                gradient: const LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [Color(0xFF2ED3BE), Color(0xFF1AAE9A)],
+                ),
+                image: user.profileBackgroundImageUrl != null &&
+                        user.profileBackgroundImageUrl!.isNotEmpty
+                    ? DecorationImage(
+                        image: CachedNetworkImageProvider(user.profileBackgroundImageUrl!),
+                        fit: BoxFit.cover,
                       )
                     : null,
               ),
             ),
-          ),
+            // 顶部遮罩：导航可读
+            const DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0x66000000),
+                    Colors.transparent,
+                  ],
+                  stops: [0.0, 0.45],
+                ),
+              ),
+            ),
+            // 底部遮罩衔接内容区
+            Align(
+              alignment: Alignment.bottomCenter,
+              child: Container(
+                height: 100,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                    colors: [
+                      cs.surface,
+                      cs.surface.withValues(alpha: 0.85),
+                      Colors.transparent,
+                    ],
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: topInset + 6,
+              left: 12,
+              child: GlassNavButton(
+                tooltip: '返回',
+                icon: Icons.arrow_back_ios_new_rounded,
+                onPressed: () => ShellSurface.popOrHome(context),
+              ),
+            ),
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: cs.surface, width: 3.5),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: Color(0x33000000),
+                        blurRadius: 12,
+                        offset: Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: CircleAvatar(
+                    radius: 46,
+                    backgroundColor: cs.primaryContainer,
+                    backgroundImage: user.avatarUrl != null && user.avatarUrl!.isNotEmpty
+                        ? CachedNetworkImageProvider(user.avatarUrl!)
+                        : null,
+                    child: user.avatarUrl == null || user.avatarUrl!.isEmpty
+                        ? Text(
+                            (user.username.isNotEmpty ? user.username[0] : '?').toUpperCase(),
+                            style: TextStyle(
+                              fontSize: 30,
+                              fontWeight: FontWeight.bold,
+                              color: cs.onPrimaryContainer,
+                            ),
+                          )
+                        : null,
+                  ),
+                ),
+              ),
+            ),
+          ],
         ),
-      ],
+      ),
     );
   }
 

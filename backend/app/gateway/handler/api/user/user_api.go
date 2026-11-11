@@ -15,7 +15,9 @@ import (
 	"github.com/yxrxy/videoHub/app/gateway/pack"
 	"github.com/yxrxy/videoHub/app/gateway/rpc"
 	"github.com/yxrxy/videoHub/kitex_gen/user"
+	metainfoContext "github.com/yxrxy/videoHub/pkg/base/context"
 	"github.com/yxrxy/videoHub/pkg/errno"
+	"github.com/yxrxy/videoHub/pkg/jwt"
 )
 
 // inferImageContentType：Flutter MultipartFile.fromBytes 常不带 Content-Type，需按扩展名兜底
@@ -134,9 +136,27 @@ func RefreshToken(ctx context.Context, c *app.RequestContext) {
 func GetUserInfo(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req api.UserInfoRequest
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+	// 不强制校验：user_id 可缺省，缺省取当前登录用户
+	_ = c.Bind(&req)
+	if req.UserID <= 0 {
+		if uid, gerr := metainfoContext.GetUserID(ctx); gerr == nil && uid > 0 {
+			req.UserID = uid
+		}
+	}
+	if req.UserID <= 0 {
+		auth := string(c.GetHeader("Authorization"))
+		token := strings.TrimSpace(auth)
+		if len(token) > 7 && (token[:7] == "Bearer " || token[:7] == "bearer ") {
+			token = strings.TrimSpace(token[7:])
+		}
+		if token != "" {
+			if claims, perr := jwt.ParseToken(token); perr == nil && claims != nil {
+				req.UserID = claims.UserID
+			}
+		}
+	}
+	if req.UserID <= 0 {
+		pack.RespError(c, errno.ParamVerifyError.WithMessage("user_id required"))
 		return
 	}
 	resp, err := rpc.GetUserInfoRPC(ctx, &user.UserInfoRequest{

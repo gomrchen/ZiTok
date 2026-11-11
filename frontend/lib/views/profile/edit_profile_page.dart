@@ -1,6 +1,5 @@
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
+import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:crop_your_image/crop_your_image.dart';
 import 'package:provider/provider.dart';
@@ -17,6 +16,8 @@ import '../../utils/error_handler.dart';
 import '../../utils/url_utils.dart';
 import 'widgets/edit_field_dialog.dart';
 import '../../models/user_models.dart'; // 导入用户模型以使用 Gender 枚举
+import '../../widgets/glass_nav.dart';
+import '../home/shell_surface.dart';
 
 /// 编辑资料页
 class EditProfilePage extends StatefulWidget {
@@ -114,36 +115,91 @@ class _EditProfilePageState extends State<EditProfilePage> {
     }
   }
 
+  ProfileProvider? _profile;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // dispose 时 Element 已 deactivate，不能再 context.read
+    _profile ??= context.read<ProfileProvider>();
+  }
+
   @override
   void dispose() {
-    // 移除监听器
-    context.read<ProfileProvider>().removeListener(_onProfileChanged);
+    _profile?.removeListener(_onProfileChanged);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    return Scaffold(
-      body: SafeArea(
-        top: true,
-        bottom: false,
-        child: LayoutBuilder(
+    final topInset = MediaQuery.paddingOf(context).top;
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.light.copyWith(
+        statusBarColor: Colors.transparent,
+      ),
+      child: Scaffold(
+        backgroundColor: cs.surface,
+        body: LayoutBuilder(
           builder: (context, constraints) {
-            final headerHeight = constraints.maxWidth * 0.36;
+            // 沉浸封面：状态栏 + 导航 + 头像区
+            final headerHeight = topInset + 188;
             return CustomScrollView(
+              physics: const BouncingScrollPhysics(),
               slivers: [
                 SliverAppBar(
-                  pinned: false,
+                  pinned: true,
                   floating: false,
                   snap: false,
+                  stretch: true,
                   automaticallyImplyLeading: false,
-                  toolbarHeight: 56,
-                  backgroundColor: Colors.transparent,
-                  flexibleSpace: _buildHeader(context, headerHeight, cs),
+                  toolbarHeight: 52,
                   expandedHeight: headerHeight,
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  scrolledUnderElevation: 0,
+                  // 导航固定在 AppBar 层，收起后仍可操作
+                  leadingWidth: 56,
+                  leading: Padding(
+                    padding: const EdgeInsets.only(left: 10),
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: GlassNavButton(
+                        tooltip: '返回',
+                        icon: Icons.arrow_back_ios_new_rounded,
+                        onPressed: () => ShellSurface.popOrHome(context),
+                      ),
+                    ),
+                  ),
+                  actions: [
+                    Padding(
+                      padding: const EdgeInsets.only(right: 12),
+                      child: Center(
+                        child: GlassNavChip(
+                          icon: _uploadingBackdrop
+                              ? Icons.hourglass_top_rounded
+                              : Icons.photo_camera_outlined,
+                          label: _uploadingBackdrop ? '上传中' : '更换封面',
+                          onPressed: _uploadingBackdrop ? null : _onChangeBackdrop,
+                        ),
+                      ),
+                    ),
+                  ],
+                  flexibleSpace: FlexibleSpaceBar(
+                    stretchModes: const [
+                      StretchMode.zoomBackground,
+                      StretchMode.fadeTitle,
+                    ],
+                    background: _buildHeader(context, headerHeight, cs),
+                  ),
                 ),
-                SliverToBoxAdapter(child: _buildInfoCard(context, cs)),
+                // 内容卡片上沿圆角压住封面，形成柔和衔接
+                SliverToBoxAdapter(
+                  child: Transform.translate(
+                    offset: const Offset(0, -18),
+                    child: _buildInfoCard(context, cs),
+                  ),
+                ),
               ],
             );
           },
@@ -152,51 +208,79 @@ class _EditProfilePageState extends State<EditProfilePage> {
     );
   }
 
-// 顶部头部（封面 + 头像）
-  Widget _buildHeader(BuildContext context, double headerHeight, ColorScheme cs) {
-    // 检查是否有背景图URL
-    final profileProvider = context.read<ProfileProvider>();
-    final user = profileProvider.user;
-    final String? backdropUrl = user?.profileBackgroundImageUrl;
+  /// 顶部头部背景：沉浸封面 + 渐变遮罩 + 头像/完成度（导航在 AppBar leading/actions）
+  Widget _buildHeader(
+    BuildContext context,
+    double headerHeight,
+    ColorScheme cs,
+  ) {
+    final profileProvider = context.watch<ProfileProvider>();
+    final String? backdropUrl = profileProvider.user?.profileBackgroundImageUrl;
 
     return Stack(
       fit: StackFit.expand,
       children: [
-        // 背景容器 - 支持预览图和网络图
         _buildHeaderBackground(headerHeight, backdropUrl),
-        Positioned(
-          top: Spacing.sm,
-          left: Spacing.sm,
-          child: _roundIcon(
-            icon: Icons.arrow_back,
-            onPressed: () => context.pop(),
-          ),
-        ),
-        Positioned(
-          top: Spacing.sm,
-          right: Spacing.sm,
-          child: _roundIcon(
-            icon: Icons.camera_alt_outlined,
-            onPressed: _uploadingBackdrop ? null : _onChangeBackdrop,
-          ),
-        ),
-        Positioned.fill(
-          child: Align(
-            alignment: Alignment.bottomCenter,
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: Spacing.md),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildAvatarButton(cs),
-                  const SizedBox(height: Spacing.sm),
-                  SizedBox(
-                    width: MediaQuery.of(context).size.width * 0.6,
-                    child: _buildProgress(cs),
-                  ),
-                ],
+        // 顶部遮罩：状态栏与导航可读
+        const Positioned(
+          left: 0,
+          right: 0,
+          top: 0,
+          height: 120,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0x99000000),
+                    Color(0x33000000),
+                    Colors.transparent,
+                  ],
+                  stops: [0.0, 0.55, 1.0],
+                ),
               ),
             ),
+          ),
+        ),
+        // 底部遮罩：头像与进度条可读
+        const Positioned(
+          left: 0,
+          right: 0,
+          bottom: 0,
+          height: 140,
+          child: IgnorePointer(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Color(0xB3000000),
+                    Color(0x40000000),
+                    Colors.transparent,
+                  ],
+                  stops: [0.0, 0.45, 1.0],
+                ),
+              ),
+            ),
+          ),
+        ),
+        Positioned(
+          left: 0,
+          right: 0,
+          bottom: 36,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildAvatarButton(cs),
+              const SizedBox(height: 10),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 56),
+                child: _buildProgress(),
+              ),
+            ],
           ),
         ),
       ],
@@ -241,73 +325,52 @@ class _EditProfilePageState extends State<EditProfilePage> {
 
 
   Widget _buildAvatarButton(ColorScheme cs) {
-    final double radius = 42;
+    const double radius = 44;
+    DecorationImage? image;
+    if (_avatarPreview != null) {
+      image = DecorationImage(image: MemoryImage(_avatarPreview!), fit: BoxFit.cover);
+    } else if (_avatarUrl != null && _avatarUrl!.isNotEmpty) {
+      image = DecorationImage(image: NetworkImage(_avatarUrl!), fit: BoxFit.cover);
+    }
+
     return Semantics(
       label: '更换头像',
-      child: SizedBox(
-        width: radius * 2,
-        height: radius * 2,
+      child: Material(
+        color: Colors.transparent,
         child: InkWell(
           onTap: _uploadingAvatar ? null : _showAvatarPickerSheet,
-          borderRadius: BorderRadius.circular(radius),
-          child: Stack(
-              alignment: Alignment.center,
+          customBorder: const CircleBorder(),
+          child: Container(
+            width: radius * 2,
+            height: radius * 2,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFF2BD2C4),
+              image: image,
+              border: Border.all(color: Colors.white.withValues(alpha: 0.92), width: 3),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x40000000),
+                  blurRadius: 16,
+                  offset: Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Stack(
+              fit: StackFit.expand,
               children: [
-                // 头像显示：优先显示预览图，其次显示网络头像，最后显示默认图标
-                if (_avatarPreview != null)
-                  Container(
-                    width: radius * 2,
-                    height: radius * 2,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF2BD2C4),
-                      image: DecorationImage(
-                        image: MemoryImage(_avatarPreview!),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  )
-                else if (_avatarUrl != null && _avatarUrl!.isNotEmpty)
-                  Container(
-                    width: radius * 2,
-                    height: radius * 2,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF2BD2C4),
-                      image: DecorationImage(
-                        image: NetworkImage(_avatarUrl!),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                  )
-                else
-                  Container(
-                    width: radius * 2,
-                    height: radius * 2,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Color(0xFF2BD2C4),
-                    ),
-                    child: Icon(
-                      Icons.person,
-                      color: Colors.white,
-                      size: 32,
-                    ),
-                  ),
-                // 覆盖层：相机图标和文字
-                Container(
-                  width: radius * 2,
-                  height: radius * 2,
+                if (image == null)
+                  const Icon(Icons.person_rounded, color: Colors.white, size: 36),
+                DecoratedBox(
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.4),
+                    color: Colors.black.withValues(alpha: 0.38),
                     shape: BoxShape.circle,
                   ),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
-                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        _uploadingAvatar ? Icons.hourglass_bottom : Icons.camera_alt,
+                        _uploadingAvatar ? Icons.hourglass_top_rounded : Icons.camera_alt_rounded,
                         color: Colors.white,
                         size: 22,
                       ),
@@ -315,37 +378,46 @@ class _EditProfilePageState extends State<EditProfilePage> {
                       Text(
                         _uploadingAvatar ? '上传中' : '更换头像',
                         style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                          color: Colors.white,
-                          fontSize: 10,
-                        ),
+                              color: Colors.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              letterSpacing: 0.2,
+                            ),
                       ),
                     ],
                   ),
                 ),
               ],
             ),
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildProgress(ColorScheme cs) {
+  Widget _buildProgress() {
     return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
       children: [
         Expanded(
           child: ClipRRect(
-            borderRadius: Radii.sm,
+            borderRadius: BorderRadius.circular(999),
             child: LinearProgressIndicator(
               value: _completion / 100,
-              minHeight: 8,
-              backgroundColor: Colors.white.withValues(alpha: 0.35),
+              minHeight: 6,
+              backgroundColor: Colors.white.withValues(alpha: 0.28),
               color: Colors.white,
             ),
           ),
         ),
-        const SizedBox(width: Spacing.sm),
-        Text('资料完成度 $_completion%', style: Theme.of(context).textTheme.bodySmall?.copyWith(color: Colors.white)),
+        const SizedBox(width: 10),
+        Text(
+          '资料完成度 $_completion%',
+          style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                color: Colors.white.withValues(alpha: 0.95),
+                fontWeight: FontWeight.w600,
+                letterSpacing: 0.2,
+              ),
+        ),
       ],
     );
   }
@@ -359,15 +431,34 @@ class _EditProfilePageState extends State<EditProfilePage> {
     return Container(
       decoration: BoxDecoration(
         color: cs.surface,
-        borderRadius: BorderRadius.only(topLeft: Radius.circular(16), topRight: Radius.circular(16)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x14000000),
+            blurRadius: 12,
+            offset: Offset(0, -2),
+          ),
+        ],
       ),
       child: Column(
         children: [
+          // 顶部拖拽感装饰条
+          Padding(
+            padding: const EdgeInsets.only(top: 10, bottom: 4),
+            child: Container(
+              width: 36,
+              height: 4,
+              decoration: BoxDecoration(
+                color: cs.onSurface.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+          ),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: Spacing.md, vertical: Spacing.sm),
             child: Row(
               children: [
-                Icon(Icons.info_outline, color: cs.primary),
+                Icon(Icons.info_outline_rounded, color: cs.primary, size: 18),
                 const SizedBox(width: Spacing.sm),
                 Text('完善资料，获得更多关注', style: Theme.of(context).textTheme.bodySmall),
               ],
@@ -581,19 +672,6 @@ class _EditProfilePageState extends State<EditProfilePage> {
         const SizedBox(height: Spacing.sm),
         Text(text),
       ],
-    );
-  }
-
-  // 统一半透明圆形 icon
-  Widget _roundIcon({required IconData icon, required VoidCallback? onPressed}) {
-    return Container(
-      decoration: const ShapeDecoration(color: Color(0x33000000), shape: CircleBorder()),
-      child: IconButton(
-        iconSize: 22,
-        splashRadius: 20,
-        onPressed: onPressed,
-        icon: Icon(icon, color: Colors.white),
-      ),
     );
   }
 

@@ -6,7 +6,7 @@ import (
 	"github.com/yxrxy/videoHub/app/social/domain/model"
 )
 
-func (s *SocialService) SavePrivateMessage(ctx context.Context, senderID, receiverID int64, content string) error {
+func (s *SocialService) SavePrivateMessage(ctx context.Context, senderID, receiverID int64, content string) (*model.PrivateMessage, error) {
 	msg := &model.PrivateMessage{
 		SenderID:   senderID,
 		ReceiverID: receiverID,
@@ -14,9 +14,9 @@ func (s *SocialService) SavePrivateMessage(ctx context.Context, senderID, receiv
 		IsRead:     false,
 	}
 	if err := s.db.SendPrivateMessage(ctx, msg); err != nil {
-		return err
+		return nil, err
 	}
-	return nil
+	return msg, nil
 }
 
 // CreateChatRoom 创建聊天室成员

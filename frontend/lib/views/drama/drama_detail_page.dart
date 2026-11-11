@@ -9,9 +9,12 @@ import 'package:zitok/l10n/app_localizations.dart';
 
 import '../../models/drama_models.dart';
 import '../../providers/drama_provider.dart';
+import '../../widgets/glass_nav.dart';
 import '../home/shell_surface.dart';
+import 'drama_detail_loader.dart';
 import 'episode_label.dart';
 import 'episode_play_page.dart';
+import 'media_url.dart';
 import 'player_overlay.dart';
 import 'player_session.dart';
 import 'unlock_sheet.dart';
@@ -57,34 +60,27 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
     });
     final dp = context.read<DramaProvider>();
     try {
-      final resp = await dp.dramaService.detail(widget.dramaId);
-      if (!mounted) return;
-      final raw = resp.data;
-      if (raw is! Map || '${raw['code']}' != '10000') {
-        throw Exception('加载失败');
-      }
-      final data = Map<String, dynamic>.from(raw['data'] as Map);
-      final eps = (data['episodes'] as List? ?? [])
-          .whereType<Map>()
-          .map((e) => Episode.fromJson(Map<String, dynamic>.from(e)))
-          .toList()
-        ..sort((a, b) => a.episodeNo.compareTo(b.episodeNo));
-      final unlocked = await probeUnlockedEpisodeIds(dp, eps);
+      final bundle = await loadDramaDetailBundle(
+        dp,
+        widget.dramaId,
+        probeUnlocked: true,
+        parseDrama: true,
+      );
       if (!mounted) return;
       setState(() {
-        _drama = Drama.fromJson(Map<String, dynamic>.from(data['drama'] as Map));
-        _episodes = eps;
+        _drama = bundle.drama;
+        _episodes = bundle.episodes;
         _unlocked
           ..clear()
-          ..addAll(unlocked);
-        _favorite = data['favorite'] == true;
+          ..addAll(bundle.unlocked);
+        _favorite = bundle.favorite;
         _loading = false;
       });
       _maybeAutoPlay();
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '加载失败，请稍后重试';
+        _error = playerFriendlyError(e, fallback: '加载失败，请稍后重试');
         _loading = false;
       });
     }
@@ -195,9 +191,17 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
         appBar: AppBar(
           backgroundColor: _kBg,
           foregroundColor: Colors.white,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-            onPressed: () => ShellSurface.popOrHome(context),
+          elevation: 0,
+          scrolledUnderElevation: 0,
+          leading: Padding(
+            padding: const EdgeInsets.only(left: 8),
+            child: Center(
+              child: GlassNavButton(
+                tooltip: '返回',
+                icon: Icons.arrow_back_ios_new_rounded,
+                onPressed: () => ShellSurface.popOrHome(context),
+              ),
+            ),
           ),
         ),
         body: Center(
@@ -243,41 +247,48 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
                 leadingWidth: 56,
                 leading: Padding(
                   padding: const EdgeInsets.only(left: 8),
-                  child: _GlassIconButton(
-                    icon: Icons.arrow_back_ios_new_rounded,
-                    onTap: () => ShellSurface.popOrHome(context),
+                  child: Center(
+                    child: GlassNavButton(
+                      tooltip: '返回',
+                      icon: Icons.arrow_back_ios_new_rounded,
+                      onPressed: () => ShellSurface.popOrHome(context),
+                    ),
                   ),
                 ),
                 actions: [
                   if (bal != null)
                     Padding(
                       padding: const EdgeInsets.only(right: 6),
-                      child: _GlassChip(
-                        onTap: () => context.push('/wallet'),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.monetization_on_rounded,
-                                size: 15, color: Color(0xFFFFC857)),
-                            const SizedBox(width: 4),
-                            Text(
-                              '$bal',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 13,
+                      child: Center(
+                        child: GlassNavChip(
+                          onPressed: () => context.push('/wallet'),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.monetization_on_rounded,
+                                  size: 15, color: Color(0xFFFFC857)),
+                              const SizedBox(width: 4),
+                              Text(
+                                '$bal',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w700,
+                                  fontSize: 13,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   Padding(
                     padding: const EdgeInsets.only(right: 12),
-                    child: _GlassIconButton(
-                      icon: _favorite ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-                      iconColor: _favorite ? kPlayerAccent : Colors.white,
-                      onTap: _toggleFavorite,
+                    child: Center(
+                      child: GlassNavButton(
+                        icon: _favorite ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
+                        iconColor: _favorite ? kPlayerAccent : Colors.white,
+                        onPressed: _toggleFavorite,
+                      ),
                     ),
                   ),
                 ],
@@ -527,70 +538,6 @@ class _HeroCover extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _GlassIconButton extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  final Color iconColor;
-
-  const _GlassIconButton({
-    required this.icon,
-    required this.onTap,
-    this.iconColor = Colors.white,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(22),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Material(
-            color: Colors.white.withValues(alpha: 0.12),
-            child: InkWell(
-              onTap: onTap,
-              child: SizedBox(
-                width: 40,
-                height: 40,
-                child: Icon(icon, size: 18, color: iconColor),
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _GlassChip extends StatelessWidget {
-  final Widget child;
-  final VoidCallback onTap;
-
-  const _GlassChip({required this.child, required this.onTap});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(20),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Material(
-            color: Colors.white.withValues(alpha: 0.12),
-            child: InkWell(
-              onTap: onTap,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-                child: child,
-              ),
-            ),
-          ),
-        ),
-      ),
     );
   }
 }

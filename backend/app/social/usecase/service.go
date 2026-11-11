@@ -8,11 +8,8 @@ import (
 )
 
 // SendPrivateMessage 私信相关
-func (s *useCase) SendPrivateMessage(ctx context.Context, senderID, receiverID int64, content string) error {
-	if err := s.svc.SavePrivateMessage(ctx, senderID, receiverID, content); err != nil {
-		return err
-	}
-	return nil
+func (s *useCase) SendPrivateMessage(ctx context.Context, senderID, receiverID int64, content string) (*model.PrivateMessage, error) {
+	return s.svc.SavePrivateMessage(ctx, senderID, receiverID, content)
 }
 
 // GetPrivateMessages 获取私信列表
@@ -57,16 +54,11 @@ func (s *useCase) CreateChatRoom(ctx context.Context, name string, creatorID int
 		return nil, err
 	}
 	room.ID = id
-
-	// 转换为domain类型
-	domainRoom := &model.ChatRoom{
-		ID:        room.ID,
-		Name:      room.Name,
-		CreatorID: room.CreatorID,
-		Type:      room.Type,
+	for i := range room.Members {
+		room.Members[i].RoomID = id
 	}
 
-	return domainRoom, nil
+	return room, nil
 }
 
 func (s *useCase) GetChatRoom(ctx context.Context, roomID int64) (*model.ChatRoom, error) {
@@ -74,16 +66,8 @@ func (s *useCase) GetChatRoom(ctx context.Context, roomID int64) (*model.ChatRoo
 	if err != nil {
 		return nil, err
 	}
-
-	// 转换为domain类型
-	domainRoom := &model.ChatRoom{
-		ID:        room.ID,
-		Name:      room.Name,
-		CreatorID: room.CreatorID,
-		Type:      room.Type,
-	}
-
-	return domainRoom, nil
+	// 必须带回 Members，供群成员页 / WS 校验使用
+	return room, nil
 }
 
 func (s *useCase) GetUserChatRooms(ctx context.Context, userID int64) ([]*model.ChatRoom, error) {
@@ -108,7 +92,7 @@ func (s *useCase) GetUserChatRooms(ctx context.Context, userID int64) ([]*model.
 }
 
 // 聊天消息相关
-func (s *useCase) SendChatMessage(ctx context.Context, roomID, senderID int64, content string, msgType int8) error {
+func (s *useCase) SendChatMessage(ctx context.Context, roomID, senderID int64, content string, msgType int8) (*model.ChatMessage, error) {
 	msg := &model.ChatMessage{
 		RoomID:   roomID,
 		SenderID: senderID,
@@ -116,10 +100,9 @@ func (s *useCase) SendChatMessage(ctx context.Context, roomID, senderID int64, c
 		Type:     msgType,
 	}
 	if err := s.db.SendChatMessage(ctx, msg); err != nil {
-		return err
+		return nil, err
 	}
-
-	return nil
+	return msg, nil
 }
 
 func (s *useCase) GetChatMessages(ctx context.Context, roomID int64, page, size int32) ([]*model.ChatMessage, error) {

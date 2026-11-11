@@ -5,13 +5,11 @@ package social
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 	"strconv"
 	"sync"
 	"time"
 
 	"github.com/cloudwego/hertz/pkg/app"
-	"github.com/cloudwego/hertz/pkg/protocol/consts"
 	"github.com/cloudwego/kitex/pkg/klog"
 	"github.com/hertz-contrib/websocket"
 	api "github.com/yxrxy/videoHub/app/gateway/model/social"
@@ -19,6 +17,7 @@ import (
 	"github.com/yxrxy/videoHub/app/gateway/rpc"
 	"github.com/yxrxy/videoHub/app/gateway/service/ws"
 	"github.com/yxrxy/videoHub/kitex_gen/social"
+	metainfoContext "github.com/yxrxy/videoHub/pkg/base/context"
 	"github.com/yxrxy/videoHub/pkg/errno"
 	"github.com/yxrxy/videoHub/pkg/jwt"
 )
@@ -107,9 +106,15 @@ func CreateChatRoom(ctx context.Context, c *app.RequestContext) {
 func GetChatRoom(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req api.GetChatRoomRequest
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+	// 先 Bind 再补路径参数，避免 path 的 room_id 未进 body 时校验失败
+	_ = c.Bind(&req)
+	if pathID := c.Param("room_id"); pathID != "" {
+		if id, parseErr := strconv.ParseInt(pathID, 10, 64); parseErr == nil && id > 0 {
+			req.RoomID = id
+		}
+	}
+	if req.RoomID <= 0 {
+		pack.RespError(c, errno.ParamVerifyError.WithMessage("room_id required"))
 		return
 	}
 
@@ -120,7 +125,7 @@ func GetChatRoom(ctx context.Context, c *app.RequestContext) {
 		pack.RespError(c, err)
 		return
 	}
-	c.JSON(consts.StatusOK, resp)
+	pack.RespData(c, resp)
 }
 
 // GetUserChatRooms .
@@ -128,9 +133,27 @@ func GetChatRoom(ctx context.Context, c *app.RequestContext) {
 func GetUserChatRooms(ctx context.Context, c *app.RequestContext) {
 	var err error
 	var req api.GetUserChatRoomsRequest
-	err = c.BindAndValidate(&req)
-	if err != nil {
-		pack.RespError(c, errno.ParamVerifyError.WithError(err))
+	// user_id 可缺省：缺省取当前登录用户
+	_ = c.Bind(&req)
+	if req.UserID <= 0 {
+		if uid, gerr := metainfoContext.GetUserID(ctx); gerr == nil && uid > 0 {
+			req.UserID = uid
+		}
+	}
+	if req.UserID <= 0 {
+		auth := string(c.GetHeader("Authorization"))
+		token := auth
+		if len(token) > 7 && (token[:7] == "Bearer " || token[:7] == "bearer ") {
+			token = token[7:]
+		}
+		if token != "" {
+			if claims, perr := jwt.ParseToken(token); perr == nil && claims != nil {
+				req.UserID = claims.UserID
+			}
+		}
+	}
+	if req.UserID <= 0 {
+		pack.RespError(c, errno.ParamVerifyError.WithMessage("user_id required"))
 		return
 	}
 
@@ -407,21 +430,25 @@ func ConnectWebSocket(ctx context.Context, c *app.RequestContext) {
 
 	if err := upgrader.Upgrade(c, func(conn *websocket.Conn) {
 		defer conn.Close()
+		var wsClient *ws.Client
 		defer func() {
 			if roomID != -1 {
 				if err := globalService.LeaveChatRoom(userID, roomID); err != nil {
 					klog.Errorf("离开聊天室失败: %v", err)
 				}
 			}
+			globalService.UnregisterClient(wsClient)
 		}()
 
-		if err := globalService.RegisterClient(userID, conn); err != nil {
+		registered, err := globalService.RegisterClient(userID, conn)
+		if err != nil {
 			conn.WriteJSON(map[string]interface{}{
 				"type":    "error",
 				"message": "注册WebSocket客户端失败: " + err.Error(),
 			})
 			return
 		}
+		wsClient = registered
 
 		if roomID != -1 {
 			// 验证聊天室是否存在
@@ -520,13 +547,27 @@ func ConnectWebSocket(ctx context.Context, c *app.RequestContext) {
 				continue
 			}
 
-			var content interface{}
-			if err := json.Unmarshal(message, &content); err != nil {
-				content = string(message)
+			// 客户端发送 JSON：{"content":"...","type":"group|private",...}
+			// 只提取纯文本 content，避免入库变成 Go map 字符串
+			textContent := string(message)
+			payloadRoomID := roomID
+			var payload map[string]any
+			if err := json.Unmarshal(message, &payload); err == nil {
+				if c, ok := payload["content"].(string); ok && c != "" {
+					textContent = c
+				}
+				switch rid := payload["room_id"].(type) {
+				case float64:
+					payloadRoomID = int64(rid)
+				case string:
+					if n, err := strconv.ParseInt(rid, 10, 64); err == nil {
+						payloadRoomID = n
+					}
+				}
 			}
 			msg := ws.Message{
-				RoomID:  roomID,
-				Content: fmt.Sprint(content),
+				RoomID:  payloadRoomID,
+				Content: textContent,
 				Extra: map[string]any{
 					"type": "text",
 				},

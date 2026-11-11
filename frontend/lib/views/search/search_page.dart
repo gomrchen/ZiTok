@@ -134,12 +134,7 @@ class _SearchPageState extends State<SearchPage> {
               ),
               child: Row(
                 children: [
-                  // 返回按钮
-                  IconButton(
-                    icon: Icon(Icons.arrow_back, color: cs.onSurface),
-                    onPressed: _handleBack,
-                    padding: EdgeInsets.zero,
-                  ),
+                  ShellSurface.backButton(context, onPressed: _handleBack),
                   const SizedBox(width: Spacing.sm),
                   // 搜索输入框
                   Expanded(

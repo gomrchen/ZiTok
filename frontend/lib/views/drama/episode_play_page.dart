@@ -12,6 +12,7 @@ import '../../providers/drama_provider.dart';
 import '../../providers/settings_provider.dart';
 import '../../services/deep_link_service.dart';
 import 'android_system_pip.dart';
+import 'drama_detail_loader.dart';
 import 'episode_comments_sheet.dart';
 import 'episode_label.dart';
 import 'episode_picker_sheet.dart';
@@ -28,6 +29,7 @@ import 'player_poster.dart';
 import 'player_runtime.dart';
 import 'player_session.dart';
 import 'player_subtitle.dart';
+import '../../widgets/glass_nav.dart';
 
 /// 剧场/详情进入的全屏播放：上下滑切集、双击赞、长按倍速、追剧、播完自动下一集
 class EpisodePlayPage extends StatefulWidget {
@@ -82,18 +84,12 @@ class _EpisodePlayPageState extends State<EpisodePlayPage> {
       _listError = null;
     });
     try {
-      final resp = await context.read<DramaProvider>().dramaService.detail(widget.drama.id);
-      final raw = resp.data;
-      if (raw is! Map || '${raw['code']}' != '10000') {
-        throw Exception('加载分集失败');
-      }
-      final data = Map<String, dynamic>.from(raw['data'] as Map);
-      final eps = (data['episodes'] as List? ?? [])
-          .whereType<Map>()
-          .map((e) => Episode.fromJson(Map<String, dynamic>.from(e)))
-          .toList()
-        ..sort((a, b) => a.episodeNo.compareTo(b.episodeNo));
-      if (eps.isEmpty) throw Exception('暂无分集');
+      final bundle = await loadDramaDetailBundle(
+        context.read<DramaProvider>(),
+        widget.drama.id,
+        requireEpisodes: true,
+      );
+      final eps = bundle.episodes;
       var idx = eps.indexWhere((e) => e.id == widget.episode.id);
       if (idx < 0) idx = 0;
       if (!mounted) return;
@@ -382,7 +378,7 @@ class _EpisodeSlideState extends State<_EpisodeSlide> with EpisodeSlidePlaybackM
         return;
       }
       // 仅接受内联 VTT/SRT 时间轴正文，拒绝其它自由文本冒充字幕
-      if (field.contains('-->') && field.length < 200000) {
+      if (field.contains('-->') && field.length < 65536) {
         if (!mounted) return;
         setState(() => _cues = parseSubtitleTrack(field));
         return;
@@ -524,16 +520,15 @@ class _EpisodeSlideState extends State<_EpisodeSlide> with EpisodeSlidePlaybackM
       qualityLabel: _qualityLabel,
     );
     if (!mounted) return;
-    switch (action) {
-      case PlayerMoreAction.speed:
-        await pickSpeed();
-      case PlayerMoreAction.mute:
-        await toggleMute();
-      case PlayerMoreAction.intro:
-        await showPlayerDramaIntroSheet(context, drama: widget.drama);
-      case PlayerMoreAction.share:
-        await shareDramaEpisode(context, drama: widget.drama, episode: widget.episode);
-      case PlayerMoreAction.quality:
+    await dispatchPlayerMoreAction(
+      context,
+      action: action,
+      drama: widget.drama,
+      episode: widget.episode,
+      onSpeed: pickSpeed,
+      onMute: toggleMute,
+      onPip: _openPip,
+      onQuality: () async {
         final q = await showQualitySheet(
           context,
           options: _mergedQualityOptions(),
@@ -541,16 +536,16 @@ class _EpisodeSlideState extends State<_EpisodeSlide> with EpisodeSlidePlaybackM
           currentTrackId: player?.currentVideoTrackId,
         );
         if (q != null) await _switchQuality(q);
-      case PlayerMoreAction.cast:
-        await showCastSheet(
-          context,
-          playUrl: _playUrl,
-          deepLink: DeepLinkService.buildDramaEpisodeLink(
-            dramaId: widget.drama.id,
-            episodeId: widget.episode.id,
-          ),
-        );
-      case PlayerMoreAction.subtitle:
+      },
+      onCast: () => showCastSheet(
+        context,
+        playUrl: _playUrl,
+        deepLink: DeepLinkService.buildDramaEpisodeLink(
+          dramaId: widget.drama.id,
+          episodeId: widget.episode.id,
+        ),
+      ),
+      onSubtitle: () async {
         final next = !_subtitleOn;
         final engine = player?.supportsEngineSubtitle == true;
         final externalSub = sanitizeHttpMediaUrl(_subtitleUrl);
@@ -568,23 +563,19 @@ class _EpisodeSlideState extends State<_EpisodeSlide> with EpisodeSlidePlaybackM
           }
           setState(() => _subtitleOn = next && (canEngine || canOverlay));
         }
-      case PlayerMoreAction.poster:
-        await captureAndSharePoster(
-          context,
-          boundaryKey: _videoBoundaryKey,
-          title: widget.drama.title,
-          episodeLabel: '第${widget.episode.episodeNo}集',
-          deepLink: DeepLinkService.buildDramaEpisodeLink(
-            dramaId: widget.drama.id,
-            episodeId: widget.episode.id,
-          ),
-          ready: player?.isInitialized == true && !loading,
-        );
-      case PlayerMoreAction.pip:
-        await _openPip();
-      case null:
-        break;
-    }
+      },
+      onPoster: () => captureAndSharePoster(
+        context,
+        boundaryKey: _videoBoundaryKey,
+        title: widget.drama.title,
+        episodeLabel: '第${widget.episode.episodeNo}集',
+        deepLink: DeepLinkService.buildDramaEpisodeLink(
+          dramaId: widget.drama.id,
+          episodeId: widget.episode.id,
+        ),
+        ready: player?.isInitialized == true && !loading,
+      ),
+    );
     if (!mounted) return;
     await resumeIfActive(
       skip: PlayerPipController.isOpen || action == PlayerMoreAction.pip,
@@ -718,10 +709,12 @@ class _EpisodeSlideState extends State<_EpisodeSlide> with EpisodeSlidePlaybackM
                 padding: const EdgeInsets.fromLTRB(4, 2, 8, 0),
                 child: Row(
                   children: [
-                    IconButton(
+                    GlassNavButton(
+                      tooltip: '返回',
+                      icon: Icons.arrow_back_ios_new_rounded,
                       onPressed: () => Navigator.of(context).maybePop(),
-                      icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white, size: 20),
                     ),
+                    const SizedBox(width: 8),
                     PlayerEpisodeTitleLabel(
                       episodeNo: widget.episode.episodeNo,
                       onTap: _openEpisodeMeta,

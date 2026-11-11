@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../providers/messaging_provider.dart';
+import '../home/shell_surface.dart';
 import 'chat_page.dart';
 import '../../models/social_models.dart';
 
@@ -58,31 +59,34 @@ class _FriendSearchPageState extends State<FriendSearchPage> {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(
-        backgroundColor: cs.surface,
-        foregroundColor: cs.onSurface,
-        title: TextField(
+      backgroundColor: ShellSurface.canvasOf(context),
+      appBar: ShellSurface.appBar(
+        title: '',
+        context: context,
+        titleWidget: TextField(
           controller: _searchCtrl,
           autofocus: true,
-          // 输入变动时直接触发本地搜索
           onChanged: _onSearchChanged,
-          style: textTheme.bodyLarge?.copyWith(color: cs.onSurface),
+          style: textTheme.bodyLarge?.copyWith(color: ShellSurface.inkOf(context)),
           decoration: InputDecoration(
             hintText: '搜索本地好友 / ID...',
             border: InputBorder.none,
-            hintStyle: textTheme.bodyLarge?.copyWith(color: cs.onSurfaceVariant),
+            isDense: true,
+            hintStyle: textTheme.bodyLarge?.copyWith(
+              color: ShellSurface.mutedOf(context),
+            ),
           ),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.close, color: cs.onSurface),
+            tooltip: '关闭',
+            icon: Icon(Icons.close_rounded, color: ShellSurface.inkOf(context)),
             onPressed: () {
               _searchCtrl.clear();
-              _onSearchChanged("");
+              _onSearchChanged('');
               Navigator.pop(context);
             },
           )

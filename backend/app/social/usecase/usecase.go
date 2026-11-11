@@ -10,7 +10,7 @@ import (
 
 type SocialUseCase interface {
 	// 私信相关
-	SendPrivateMessage(ctx context.Context, senderID, receiverID int64, content string) error
+	SendPrivateMessage(ctx context.Context, senderID, receiverID int64, content string) (*model.PrivateMessage, error)
 	GetPrivateMessages(ctx context.Context, senderID, receiverID int64, page, size int32) ([]*model.PrivateMessage, error)
 
 	// 聊天室相关
@@ -19,7 +19,7 @@ type SocialUseCase interface {
 	GetUserChatRooms(ctx context.Context, userID int64) ([]*model.ChatRoom, error)
 
 	// 聊天消息相关
-	SendChatMessage(ctx context.Context, roomID, senderID int64, content string, msgType int8) error
+	SendChatMessage(ctx context.Context, roomID, senderID int64, content string, msgType int8) (*model.ChatMessage, error)
 	GetChatMessages(ctx context.Context, roomID int64, page, size int32) ([]*model.ChatMessage, error)
 
 	// 好友关系相关

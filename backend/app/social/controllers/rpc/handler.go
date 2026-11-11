@@ -21,9 +21,11 @@ func NewSocialHandler(useCase usecase.SocialUseCase) *SocialHandler {
 func (h *SocialHandler) SendPrivateMessage(ctx context.Context, req *social.SendPrivateMessageRequest) (r *social.SendPrivateMessageResponse, err error) {
 	r = new(social.SendPrivateMessageResponse)
 
-	if err = h.useCase.SendPrivateMessage(ctx, req.SenderId, req.ReceiverId, req.Content); err != nil {
+	msg, err := h.useCase.SendPrivateMessage(ctx, req.SenderId, req.ReceiverId, req.Content)
+	if err != nil {
 		return
 	}
+	r.Message = pack.PackPrivateMessage(msg)
 	r.Base = base.BuildBaseResp(err)
 	return
 }
@@ -32,7 +34,14 @@ func (h *SocialHandler) SendPrivateMessage(ctx context.Context, req *social.Send
 func (h *SocialHandler) GetPrivateMessages(ctx context.Context, req *social.GetPrivateMessagesRequest) (r *social.GetPrivateMessagesResponse, err error) {
 	r = new(social.GetPrivateMessagesResponse)
 
-	messages, err := h.useCase.GetPrivateMessages(ctx, req.UserId, req.OtherUserId, *req.Page, *req.Size)
+	page, size := int32(1), int32(20)
+	if req.Page != nil {
+		page = *req.Page
+	}
+	if req.Size != nil {
+		size = *req.Size
+	}
+	messages, err := h.useCase.GetPrivateMessages(ctx, req.UserId, req.OtherUserId, page, size)
 	if err != nil {
 		return
 	}
@@ -87,9 +96,11 @@ func (h *SocialHandler) SendChatMessage(ctx context.Context, req *social.SendCha
 		req.Type = new(int8)
 		*req.Type = 0
 	}
-	if err = h.useCase.SendChatMessage(ctx, req.RoomId, req.SenderId, req.Content, *req.Type); err != nil {
+	msg, err := h.useCase.SendChatMessage(ctx, req.RoomId, req.SenderId, req.Content, *req.Type)
+	if err != nil {
 		return
 	}
+	r.Message = pack.PackChatMessage(msg)
 	r.Base = base.BuildBaseResp(err)
 	return
 }
@@ -137,7 +148,11 @@ func (h *SocialHandler) GetUserFriends(ctx context.Context, req *social.GetUserF
 func (h *SocialHandler) GetFriendRequests(ctx context.Context, req *social.GetFriendRequestsRequest) (r *social.GetFriendRequestsResponse, err error) {
 	r = new(social.GetFriendRequestsResponse)
 
-	requests, err := h.useCase.GetFriendRequests(ctx, req.UserId, *req.Type)
+	reqType := int8(0) // 默认：收到的申请
+	if req.Type != nil {
+		reqType = *req.Type
+	}
+	requests, err := h.useCase.GetFriendRequests(ctx, req.UserId, reqType)
 	if err != nil {
 		return
 	}
@@ -204,7 +219,11 @@ func (h *SocialHandler) CreateFriendRequest(ctx context.Context, req *social.Cre
 func (h *SocialHandler) GetFriendRequest(ctx context.Context, req *social.GetFriendRequestsRequest) (r *social.GetFriendRequestsResponse, err error) {
 	r = new(social.GetFriendRequestsResponse)
 
-	requests, err := h.useCase.GetFriendRequests(ctx, req.UserId, *req.Type)
+	reqType := int8(0)
+	if req.Type != nil {
+		reqType = *req.Type
+	}
+	requests, err := h.useCase.GetFriendRequests(ctx, req.UserId, reqType)
 	if err != nil {
 		return
 	}

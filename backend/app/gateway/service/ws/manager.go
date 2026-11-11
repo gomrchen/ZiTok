@@ -62,21 +62,34 @@ func NewManager() *Manager {
 }
 
 // RegisterClient 注册新的WebSocket客户端
-func (m *Manager) RegisterClient(userID int64, conn *websocket.Conn) {
+// 注意：读循环由 gateway handler 负责，这里只登记连接并启动写侧心跳。
+func (m *Manager) RegisterClient(userID int64, conn *websocket.Conn) *Client {
 	client := &Client{
 		UserID: userID,
 		Conn:   conn,
 		Rooms:  make(map[int64]bool),
 	}
 
-	// 启动读写泵
-	go client.ReadPump(m)
-	go client.WritePump()
-
-	// 注册到管理器
 	m.mutex.Lock()
+	if old, ok := m.clients[userID]; ok && old != nil && old != client {
+		// 同用户重连：先摘掉旧连接，避免旧 defer 误删新客户端
+		for roomID := range old.Rooms {
+			if room, exists := m.roomMap[roomID]; exists {
+				delete(room, old)
+				if len(room) == 0 {
+					delete(m.roomMap, roomID)
+				}
+			}
+		}
+		delete(m.clients, userID)
+		go func(c *Client) {
+			_ = c.Conn.Close()
+		}(old)
+	}
 	m.clients[userID] = client
 	m.mutex.Unlock()
+
+	go client.WritePump()
 
 	// 发送欢迎消息
 	welcomeMsg := &Message{
@@ -88,6 +101,29 @@ func (m *Manager) RegisterClient(userID int64, conn *websocket.Conn) {
 	if err := client.SendMessage(websocket.TextMessage, data); err != nil {
 		log.Printf("error sending welcome message: %v", err)
 	}
+	return client
+}
+
+// UnregisterClient 仅当 map 中仍是该连接时才注销（防重连竞态）
+func (m *Manager) UnregisterClient(client *Client) {
+	if client == nil {
+		return
+	}
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	cur, ok := m.clients[client.UserID]
+	if !ok || cur != client {
+		return
+	}
+	for roomID := range client.Rooms {
+		if room, exists := m.roomMap[roomID]; exists {
+			delete(room, client)
+			if len(room) == 0 {
+				delete(m.roomMap, roomID)
+			}
+		}
+	}
+	delete(m.clients, client.UserID)
 }
 
 // Start 启动WebSocket管理器
@@ -95,20 +131,7 @@ func (m *Manager) Start(ctx context.Context) {
 	for {
 		select {
 		case client := <-m.unregister:
-			m.mutex.Lock()
-			if _, ok := m.clients[client.UserID]; ok {
-				// 从所有房间中移除客户端
-				for roomID := range client.Rooms {
-					if room, exists := m.roomMap[roomID]; exists {
-						delete(room, client)
-						if len(room) == 0 {
-							delete(m.roomMap, roomID)
-						}
-					}
-				}
-				delete(m.clients, client.UserID)
-			}
-			m.mutex.Unlock()
+			m.UnregisterClient(client)
 
 		case message := <-m.broadcast:
 			m.mutex.RLock()

@@ -8,6 +8,7 @@ import '../../services/relation_service.dart';
 import '../../app.dart';
 import '../../utils/url_utils.dart';
 import '../../theme/theme_tokens.dart';
+import '../home/shell_surface.dart';
 
 /// 群成员信息（扩展Friend，包含角色）
 class GroupMember {
@@ -153,7 +154,11 @@ class _GroupMembersPageState extends State<GroupMembersPage> {
 
       // 获取群成员ID列表
       final roomId = int.tryParse(widget.roomId) ?? 0;
-      final result = await relationRepo.getChatRoomMembers(roomId);
+      final userId = int.tryParse(AppBootstrap.userSession.userId ?? '') ?? 0;
+      if (userId <= 0) {
+        throw Exception('请先登录');
+      }
+      final result = await relationRepo.getChatRoomMembers(roomId, userId: userId);
 
       if (result['success'] != true) {
         throw Exception('获取群成员失败');
@@ -231,20 +236,32 @@ class _GroupMembersPageState extends State<GroupMembersPage> {
     final cs = theme.colorScheme;
 
     return Scaffold(
-      backgroundColor: cs.surface,
-      appBar: AppBar(
-        title: Column(
+      backgroundColor: ShellSurface.canvasOf(context),
+      appBar: ShellSurface.appBar(
+        title: '群聊成员',
+        context: context,
+        titleWidget: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('群聊成员'),
+            Text(
+              '群聊成员',
+              style: TextStyle(
+                color: ShellSurface.inkOf(context),
+                fontWeight: FontWeight.w800,
+                fontSize: 17,
+                letterSpacing: 0.3,
+              ),
+            ),
             Text(
               '共${_members.length}人',
-              style: theme.textTheme.bodySmall?.copyWith(color: cs.onSurfaceVariant),
+              style: TextStyle(
+                color: ShellSurface.mutedOf(context),
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ],
         ),
-        centerTitle: true,
-        backgroundColor: cs.surface,
-        elevation: 0,
       ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())

@@ -50,45 +50,84 @@ class ShellSurface {
     );
   }
 
+  /// 浅色壳层圆形返回（消息 / 设置 / 聊天等纸色页）
+  static Widget backButton(
+    BuildContext context, {
+    VoidCallback? onPressed,
+    String? tooltip,
+  }) {
+    final inkColor = inkOf(context);
+    return IconButton(
+      tooltip: tooltip ?? MaterialLocalizations.of(context).backButtonTooltip,
+      style: IconButton.styleFrom(
+        backgroundColor: inkColor.withValues(alpha: 0.06),
+        foregroundColor: inkColor,
+        shape: const CircleBorder(),
+        minimumSize: const Size(40, 40),
+        maximumSize: const Size(40, 40),
+        padding: EdgeInsets.zero,
+      ),
+      icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 16),
+      onPressed: onPressed ?? () => popOrHome(context),
+    );
+  }
+
   static AppBar appBar({
     required String title,
     BuildContext? context,
     List<Widget>? actions,
     PreferredSizeWidget? bottom,
     Widget? leading,
+    Widget? titleWidget,
     /// 深链 go 进入时系统不会自动出返回键；为 true 则始终展示可回退按钮
     bool forceBack = false,
+    /// 默认 true：有返回栈或 forceBack 时用圆形 soft back
+    bool softBack = true,
   }) {
     final inkColor = context != null ? inkOf(context) : ink;
     final bg = context != null ? canvasOf(context) : canvas;
-    final Widget? resolvedLeading = leading ??
-        (forceBack && context != null
-            ? IconButton(
-                tooltip: MaterialLocalizations.of(context).backButtonTooltip,
-                icon: const Icon(Icons.arrow_back_ios_new_rounded, size: 18),
-                onPressed: () => popOrHome(context),
-              )
-            : null);
+    final lineColor = context != null ? lineOf(context) : line;
+
+    Widget? resolvedLeading = leading;
+    if (resolvedLeading == null && context != null) {
+      final canPop = ModalRoute.of(context)?.canPop == true;
+      if (forceBack || (softBack && canPop)) {
+        resolvedLeading = backButton(context);
+      }
+    }
+
     return AppBar(
       leading: resolvedLeading,
       automaticallyImplyLeading: resolvedLeading == null,
-      title: Text(
-        title,
-        style: TextStyle(
-          color: inkColor,
-          fontWeight: FontWeight.w800,
-          fontSize: 18,
-          letterSpacing: 0.2,
-        ),
-      ),
+      title: titleWidget ??
+          Text(
+            title,
+            style: TextStyle(
+              color: inkColor,
+              fontWeight: FontWeight.w800,
+              fontSize: 17,
+              letterSpacing: 0.3,
+              height: 1.2,
+            ),
+          ),
       centerTitle: true,
       backgroundColor: bg,
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0,
       foregroundColor: inkColor,
+      actionsIconTheme: IconThemeData(color: inkColor, size: 22),
       actions: actions,
-      bottom: bottom,
+      bottom: bottom ??
+          (context == null
+              ? null
+              : PreferredSize(
+                  preferredSize: const Size.fromHeight(0.5),
+                  child: ColoredBox(
+                    color: lineColor,
+                    child: const SizedBox(width: double.infinity, height: 0.5),
+                  ),
+                )),
       systemOverlayStyle: context != null
           ? systemUiOf(context)
           : SystemUiOverlayStyle.dark.copyWith(

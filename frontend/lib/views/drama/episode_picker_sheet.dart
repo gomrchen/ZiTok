@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 
 import '../../models/drama_models.dart';
 import '../../providers/drama_provider.dart';
+import 'drama_detail_loader.dart';
+import 'media_url.dart';
 import 'unlock_sheet.dart';
 
 const _kBg = Color(0xFF141820);
@@ -80,33 +82,26 @@ class _EpisodePickerBodyState extends State<_EpisodePickerBody> {
     });
     try {
       final dp = context.read<DramaProvider>();
-      final resp = await dp.dramaService.detail(widget.drama.id);
-      final raw = resp.data;
-      if (raw is! Map || '${raw['code']}' != '10000') {
-        throw Exception('加载失败');
-      }
-      final data = Map<String, dynamic>.from(raw['data'] as Map);
-      final eps = (data['episodes'] as List? ?? [])
-          .whereType<Map>()
-          .map((e) => Episode.fromJson(Map<String, dynamic>.from(e)))
-          .toList()
-        ..sort((a, b) => a.episodeNo.compareTo(b.episodeNo));
-
-      final unlocked = await probeUnlockedEpisodeIds(dp, eps);
+      final bundle = await loadDramaDetailBundle(
+        dp,
+        widget.drama.id,
+        probeUnlocked: true,
+      );
       if (!mounted) return;
+      final eps = bundle.episodes;
       final cur = eps.indexWhere((e) => e.id == widget.currentEpisodeId);
       setState(() {
         _episodes = eps;
         _unlocked
           ..clear()
-          ..addAll(unlocked);
+          ..addAll(bundle.unlocked);
         _loading = false;
         if (cur >= 0) _rangeIndex = cur ~/ _rangeSize;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = playerFriendlyError(e, fallback: '分集加载失败');
         _loading = false;
       });
     }

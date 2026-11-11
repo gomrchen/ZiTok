@@ -19,13 +19,9 @@ const (
 	pingPeriod = time.Duration(float64(pongWait) * constants.WebSocketPingRatio)
 )
 
-// ReadPump 处理WebSocket读取
-func (c *Client) ReadPump(manager *Manager) {
-	defer func() {
-		manager.unregister <- c
-		c.Conn.Close()
-	}()
-}
+// ReadPump 已废弃：业务读循环由 gateway ConnectWebSocket handler 负责。
+// 保留空实现以免外部误调用；切勿再 go ReadPump，否则会立刻 unregister。
+func (c *Client) ReadPump(manager *Manager) {}
 
 func (c *Client) WritePump() {
 	ticker := time.NewTicker(pingPeriod)

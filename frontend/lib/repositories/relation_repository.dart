@@ -104,17 +104,30 @@ class RelationRepository {
 
   /// 获取群聊成员列表
   /// 返回成员ID列表和创建者ID
-  Future<Map<String, dynamic>> getChatRoomMembers(int roomId) async {
+  Future<Map<String, dynamic>> getChatRoomMembers(int roomId, {required int userId}) async {
     try {
-      final response = await api.getChatRoomMembers(roomId: roomId);
+      final response = await api.getChatRoomMembers(roomId: roomId, userId: userId);
       final data = response.data;
       if (data['code'] == '10000' || data['code'] == 10000) {
         final roomData = data['data'];
-        final List memberIds = roomData?['member_ids'] ?? roomData?['members'] ?? [];
-        final int creatorId = roomData?['creator_id'] ?? 0;
+        final rawMembers = roomData?['members'] ?? roomData?['member_ids'] ?? [];
+        final List<int> memberIds = [];
+        if (rawMembers is List) {
+          for (final e in rawMembers) {
+            if (e is Map) {
+              final id = e['user_id'] ?? e['userId'] ?? e['id'];
+              final parsed = int.tryParse(id?.toString() ?? '');
+              if (parsed != null && parsed > 0) memberIds.add(parsed);
+            } else {
+              final parsed = int.tryParse(e.toString());
+              if (parsed != null && parsed > 0) memberIds.add(parsed);
+            }
+          }
+        }
+        final int creatorId = int.tryParse(roomData?['creator_id']?.toString() ?? '') ?? 0;
         return {
           'success': true,
-          'member_ids': memberIds.map((e) => int.tryParse(e.toString()) ?? 0).toList(),
+          'member_ids': memberIds,
           'creator_id': creatorId,
         };
       }

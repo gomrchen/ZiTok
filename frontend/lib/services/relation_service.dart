@@ -64,10 +64,15 @@ class RelationService {
     });
   }
 
-  /// 获取群聊成员列表
-  Future<Response> getChatRoomMembers({required int roomId}) {
-    return dio.get('/social/chatroom/members', queryParameters: {
+  /// 获取群聊详情（含成员）
+  /// 正确路由：GET /social/chatroom/:room_id（不是 /chatroom/members）
+  Future<Response> getChatRoomMembers({
+    required int roomId,
+    required int userId,
+  }) {
+    return dio.get('/social/chatroom/$roomId', queryParameters: {
       'room_id': roomId,
+      'user_id': userId,
     });
   }
 

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../models/drama_models.dart';
 import '../../providers/drama_provider.dart';
+import '../home/shell_surface.dart';
 
 class SearchResultsPage extends StatefulWidget {
   final String keywords;
@@ -54,7 +55,11 @@ class _SearchResultsPageState extends State<SearchResultsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text('搜索：${widget.keywords}')),
+      backgroundColor: ShellSurface.canvasOf(context),
+      appBar: ShellSurface.appBar(
+        title: '搜索：${widget.keywords}',
+        context: context,
+      ),
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null

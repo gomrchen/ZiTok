@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 
 import '../../app.dart';
 import '../../services/comment_service.dart';
+import 'media_url.dart';
+import 'player_session.dart';
 
 const _kSheetBg = Color(0xFF141820);
 const _kInputBg = Color(0xFF1E2530);
@@ -81,7 +83,7 @@ class _EpisodeCommentsBodyState extends State<_EpisodeCommentsBody> {
       final resp = await _api.episodeCommentList(episodeId: widget.episodeId);
       final raw = resp.data;
       if (raw is! Map || '${raw['code']}' != '10000') {
-        throw Exception(raw is Map ? raw['message'] : '加载失败');
+        throw StateError('comment_list_failed');
       }
       final data = raw['data'];
       final list = data is Map ? (data['list'] as List? ?? []) : (data as List? ?? []);
@@ -93,7 +95,7 @@ class _EpisodeCommentsBodyState extends State<_EpisodeCommentsBody> {
     } catch (e) {
       if (!mounted) return;
       setState(() {
-        _error = '$e';
+        _error = playerFriendlyError(e, fallback: '评论加载失败');
         _loading = false;
       });
     }
@@ -107,15 +109,16 @@ class _EpisodeCommentsBodyState extends State<_EpisodeCommentsBody> {
       final resp = await _api.addEpisodeComment(episodeId: widget.episodeId, content: text);
       final raw = resp.data;
       if (raw is! Map || '${raw['code']}' != '10000') {
-        throw Exception(raw is Map ? raw['message'] : '发送失败');
+        throw StateError('comment_send_failed');
       }
       _ctrl.clear();
       _focus.unfocus();
       await _load();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.maybeOf(context)?.showSnackBar(
-          SnackBar(content: Text('发送失败: $e'), behavior: SnackBarBehavior.floating),
+        showPlayerTip(
+          context,
+          playerFriendlyError(e, fallback: '发送失败，请稍后重试'),
         );
       }
     } finally {

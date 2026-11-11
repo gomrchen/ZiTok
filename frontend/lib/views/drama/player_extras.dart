@@ -345,6 +345,72 @@ enum PlayerMoreAction {
   pip,
 }
 
+/// Feed / 全集共用「更多」分支；compact 页面对清晰度等给出提示
+Future<void> dispatchPlayerMoreAction(
+  BuildContext context, {
+  required PlayerMoreAction? action,
+  required Drama drama,
+  required Episode episode,
+  required Future<void> Function() onSpeed,
+  required Future<void> Function() onMute,
+  Future<void> Function()? onPip,
+  Future<void> Function()? onQuality,
+  Future<void> Function()? onCast,
+  Future<void> Function()? onSubtitle,
+  Future<void> Function()? onPoster,
+  bool compactExtrasHint = false,
+}) async {
+  Future<void> tipCompact() async {
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('请点「观看完整短剧」使用该功能'),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(milliseconds: 1400),
+      ),
+    );
+  }
+
+  switch (action) {
+    case PlayerMoreAction.speed:
+      await onSpeed();
+    case PlayerMoreAction.mute:
+      await onMute();
+    case PlayerMoreAction.intro:
+      await showPlayerDramaIntroSheet(context, drama: drama);
+    case PlayerMoreAction.share:
+      await shareDramaEpisode(context, drama: drama, episode: episode);
+    case PlayerMoreAction.pip:
+      await onPip?.call();
+    case PlayerMoreAction.quality:
+      if (compactExtrasHint) {
+        await tipCompact();
+      } else {
+        await onQuality?.call();
+      }
+    case PlayerMoreAction.cast:
+      if (compactExtrasHint) {
+        await tipCompact();
+      } else {
+        await onCast?.call();
+      }
+    case PlayerMoreAction.subtitle:
+      if (compactExtrasHint) {
+        await tipCompact();
+      } else {
+        await onSubtitle?.call();
+      }
+    case PlayerMoreAction.poster:
+      if (compactExtrasHint) {
+        await tipCompact();
+      } else {
+        await onPoster?.call();
+      }
+    case null:
+      break;
+  }
+}
+
 /// 红果式「更多」收纳；[compact] 首页精简（倍速/静音/简介/分享）
 Future<PlayerMoreAction?> showPlayerMoreSheet(
   BuildContext context, {

@@ -111,8 +111,10 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
       value: ShellSurface.systemUiOf(context),
       child: Scaffold(
         backgroundColor: ShellSurface.canvasOf(context),
-        appBar: AppBar(
-          title: TextField(
+        appBar: ShellSurface.appBar(
+          title: '',
+          context: context,
+          titleWidget: TextField(
             controller: _searchCtrl,
             autofocus: true,
             textInputAction: TextInputAction.search,
@@ -122,20 +124,17 @@ class _GlobalSearchPageState extends State<GlobalSearchPage> {
               hintText: l10n.globalSearchHint,
               hintStyle: TextStyle(color: ink.withValues(alpha: 0.35)),
               border: InputBorder.none,
+              isDense: true,
             ),
             onSubmitted: (_) => _executeSearch(),
           ),
           actions: [
             IconButton(
+              tooltip: '搜索',
               icon: const Icon(Icons.search_rounded),
               onPressed: _executeSearch,
             ),
           ],
-          backgroundColor: ShellSurface.canvasOf(context),
-          surfaceTintColor: Colors.transparent,
-          elevation: 0,
-          foregroundColor: ink,
-          systemOverlayStyle: ShellSurface.systemUiOf(context),
         ),
         body: _buildBody(),
       ),

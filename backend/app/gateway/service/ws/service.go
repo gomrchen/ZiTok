@@ -31,11 +31,18 @@ func (s *WsService) Start(ctx context.Context) {
 }
 
 // RegisterClient 注册WebSocket客户端（只走 Manager，避免重复建 Client 覆盖连接）
-func (s *WsService) RegisterClient(userID int64, conn *websocket.Conn) error {
+func (s *WsService) RegisterClient(userID int64, conn *websocket.Conn) (*Client, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.manager.RegisterClient(userID, conn)
-	return nil
+	return s.manager.RegisterClient(userID, conn), nil
+}
+
+// UnregisterClient 连接结束时注销（指针安全）
+func (s *WsService) UnregisterClient(client *Client) {
+	if client == nil {
+		return
+	}
+	s.manager.UnregisterClient(client)
 }
 
 // JoinChatRoom 加入聊天室

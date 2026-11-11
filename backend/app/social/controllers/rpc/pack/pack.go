@@ -24,12 +24,31 @@ func PackPrivateMessageList(msgs []*model.PrivateMessage) []*rpcmodel.PrivateMes
 }
 
 func PackChatRoom(room *model.ChatRoom) *rpcmodel.ChatRoom {
-	return &rpcmodel.ChatRoom{
+	if room == nil {
+		return nil
+	}
+	out := &rpcmodel.ChatRoom{
 		Id:        room.ID,
 		Name:      room.Name,
 		Type:      room.Type,
 		CreatorId: room.CreatorID,
 	}
+	if len(room.Members) == 0 {
+		return out
+	}
+	members := make([]*rpcmodel.ChatRoomMember, 0, len(room.Members))
+	for _, m := range room.Members {
+		nick := m.Nickname
+		members = append(members, &rpcmodel.ChatRoomMember{
+			Id:       m.ID,
+			RoomId:   m.RoomID,
+			UserId:   m.UserID,
+			Nickname: &nick,
+			Role:     m.Role,
+		})
+	}
+	out.Members = members
+	return out
 }
 
 func PackChatRoomList(rooms []*model.ChatRoom) []*rpcmodel.ChatRoom {
@@ -41,11 +60,17 @@ func PackChatRoomList(rooms []*model.ChatRoom) []*rpcmodel.ChatRoom {
 }
 
 func PackChatMessage(msg *model.ChatMessage) *rpcmodel.ChatMessage {
+	if msg == nil {
+		return nil
+	}
 	return &rpcmodel.ChatMessage{
-		Id:       msg.ID,
-		RoomId:   msg.RoomID,
-		SenderId: msg.SenderID,
-		Content:  msg.Content,
+		Id:        msg.ID,
+		RoomId:    msg.RoomID,
+		SenderId:  msg.SenderID,
+		Content:   msg.Content,
+		Type:      msg.Type,
+		CreatedAt: msg.CreateAt,
+		UpdatedAt: msg.CreateAt,
 	}
 }
 

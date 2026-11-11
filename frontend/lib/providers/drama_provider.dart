@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import '../models/drama_models.dart';
 import '../services/drama_service.dart';
+import '../views/drama/media_url.dart';
 
 bool _ok(dynamic code) {
   final s = '$code';
@@ -54,7 +55,7 @@ class DramaProvider extends ChangeNotifier {
       _feedPage = 1;
       hasMoreFeed = list.isNotEmpty;
     } catch (e) {
-      feedError = '$e';
+      feedError = playerFriendlyError(e, fallback: '短剧加载失败');
     } finally {
       loadingFeed = false;
       notifyListeners();

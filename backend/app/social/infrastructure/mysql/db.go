@@ -24,7 +24,11 @@ func (s *SocialDB) SendPrivateMessage(ctx context.Context, msg *model.PrivateMes
 		Content:    msg.Content,
 		IsRead:     msg.IsRead,
 	}
-	return s.db.WithContext(ctx).Create(dbMsg).Error
+	if err := s.db.WithContext(ctx).Create(dbMsg).Error; err != nil {
+		return err
+	}
+	msg.ID = dbMsg.ID
+	return nil
 }
 
 func (s *SocialDB) GetPrivateMessages(ctx context.Context, senderID, receiverID int64, page, size int) ([]model.PrivateMessage, int64, error) {
@@ -62,11 +66,21 @@ func (s *SocialDB) GetPrivateMessages(ctx context.Context, senderID, receiverID 
 
 // 聊天室相关
 func (s *SocialDB) CreateChatRoom(ctx context.Context, room *model.ChatRoom) (int64, error) {
+	dbMembers := make([]ChatRoomMember, 0, len(room.Members))
+	for _, m := range room.Members {
+		dbMembers = append(dbMembers, ChatRoomMember{
+			UserID:   m.UserID,
+			Nickname: m.Nickname,
+			Role:     m.Role,
+		})
+	}
 	dbRoom := &ChatRoom{
 		Name:      room.Name,
 		CreatorID: room.CreatorID,
 		Type:      room.Type,
+		Members:   dbMembers,
 	}
+	// GORM 会级联写入 Members（foreignKey:RoomID）
 	err := s.db.WithContext(ctx).Create(dbRoom).Error
 	if err != nil {
 		return 0, err
@@ -144,7 +158,12 @@ func (s *SocialDB) SendChatMessage(ctx context.Context, msg *model.ChatMessage) 
 		Content:  msg.Content,
 		Type:     msg.Type,
 	}
-	return s.db.WithContext(ctx).Create(dbMsg).Error
+	if err := s.db.WithContext(ctx).Create(dbMsg).Error; err != nil {
+		return err
+	}
+	msg.ID = dbMsg.ID
+	msg.CreateAt = dbMsg.CreatedAt.Unix()
+	return nil
 }
 
 func (s *SocialDB) GetChatMessages(ctx context.Context, roomID int64, page, size int) ([]model.ChatMessage, int64, error) {

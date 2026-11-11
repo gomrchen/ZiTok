@@ -8,6 +8,7 @@ import '../../providers/messaging_provider.dart';
 import '../../providers/profile_provider.dart';
 import '../../utils/url_utils.dart';
 import '../../utils/app_config.dart';
+import '../home/shell_surface.dart';
 import 'friend_search_page.dart';
 import 'group_members_page.dart';
 
@@ -52,17 +53,28 @@ class _ChatPageState extends State<ChatPage> {
     });
   }
 
+  MessagingProvider? _messaging;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // dispose 时 Element 已 deactivate，不能再 context.read
+    _messaging ??= context.read<MessagingProvider>();
+  }
+
   @override
   void dispose() {
-    final mp = context.read<MessagingProvider>();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) return;
-      mp.connectGlobal();
-    });
+    final mp = _messaging;
     _controller.dispose();
     _scrollController.dispose();
     _focusNode.dispose();
     super.dispose();
+    // 退回全局 WS（不依赖已卸载的 context）
+    if (mp != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        mp.connectGlobal();
+      });
+    }
   }
 
   void _scrollToBottom() {
@@ -147,33 +159,33 @@ class _ChatPageState extends State<ChatPage> {
         }
       },
       child: Scaffold(
-        appBar: AppBar(
-          // 现在这里显示的标题就是正确的了
-          title: Text(conversation?.name ?? '聊天'),
-          centerTitle: true,
+        backgroundColor: ShellSurface.canvasOf(context),
+        appBar: ShellSurface.appBar(
+          title: conversation?.name ?? '聊天',
+          context: context,
           actions: [
             IconButton(
-                onPressed: () => Navigator.of(context).push(MaterialPageRoute(builder: (_) => const FriendSearchPage())),
-                icon: const Icon(Icons.search)
+              tooltip: '搜索',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(builder: (_) => const FriendSearchPage()),
+              ),
+              icon: const Icon(Icons.search_rounded),
             ),
             IconButton(
+              tooltip: widget.isGroup ? '群成员' : '主页',
               onPressed: () {
                 if (widget.isGroup) {
-                  // 群聊：打开群成员页面
                   Navigator.of(context).push(MaterialPageRoute(
                     builder: (_) => GroupMembersPage(
                       roomId: widget.conversationId,
                       groupName: conversation?.name ?? '群聊',
                     ),
                   ));
-                } else {
-                  // 私聊：可以添加其他功能，如查看对方主页
-                  if (widget.conversationId.isNotEmpty) {
-                    context.push('/user/${widget.conversationId}');
-                  }
+                } else if (widget.conversationId.isNotEmpty) {
+                  context.push('/user/${widget.conversationId}');
                 }
               },
-              icon: const Icon(Icons.more_horiz),
+              icon: const Icon(Icons.more_horiz_rounded),
             ),
           ],
         ),
