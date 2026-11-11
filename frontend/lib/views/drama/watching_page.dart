@@ -57,7 +57,14 @@ class _WatchingPageState extends State<WatchingPage> {
                       title: drama?.title ?? l10n.watchingUnknownDrama,
                       subtitle: l10n.profileEpisodeSeen(c.episodeNo),
                       accentSubtitle: true,
-                      onTap: drama == null ? null : () => context.push('/drama/${drama.id}'),
+                      onTap: drama == null
+                          ? null
+                          : () {
+                              final ep = c.resumeEpisodeId;
+                              context.push(
+                                ep > 0 ? '/drama/${drama.id}?ep=$ep' : '/drama/${drama.id}',
+                              );
+                            },
                     ),
                   );
                 }),

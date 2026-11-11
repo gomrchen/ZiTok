@@ -15,6 +15,8 @@ class PlayerBottomMeta extends StatefulWidget {
   final VoidCallback? onWatchFull;
   final ValueChanged<String>? onTagTap;
   final VoidCallback? onDanmakuTap;
+  /// 弹幕开/关态；为 null 时芯片不强调选中样式
+  final bool? danmakuOn;
 
   const PlayerBottomMeta({
     super.key,
@@ -29,6 +31,7 @@ class PlayerBottomMeta extends StatefulWidget {
     this.onWatchFull,
     this.onTagTap,
     this.onDanmakuTap,
+    this.danmakuOn,
   });
 
   @override
@@ -56,6 +59,7 @@ class _PlayerBottomMetaState extends State<PlayerBottomMeta> {
         if (widget.onDanmakuTap != null) ...[
           _DanmakuChip(
             label: l10n.playerDanmaku,
+            active: widget.danmakuOn == true,
             onTap: widget.onDanmakuTap!,
           ),
           const SizedBox(height: 10),
@@ -251,33 +255,47 @@ class _PlayerBottomMetaState extends State<PlayerBottomMeta> {
 
 class _DanmakuChip extends StatelessWidget {
   final String label;
+  final bool active;
   final VoidCallback onTap;
 
-  const _DanmakuChip({required this.label, required this.onTap});
+  const _DanmakuChip({
+    required this.label,
+    required this.onTap,
+    this.active = false,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
-        child: Ink(
-          width: 34,
-          height: 34,
-          decoration: BoxDecoration(
-            color: const Color(0x99000000),
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.12)),
-          ),
-          child: Center(
-            child: Text(
-              label,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
-                height: 1,
+    const accent = Color(0xFF2ED3BE);
+    return Semantics(
+      button: true,
+      selected: active,
+      label: label,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: Ink(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: active ? accent.withValues(alpha: 0.28) : const Color(0x99000000),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: active ? accent : Colors.white.withValues(alpha: 0.12),
+                width: active ? 1.4 : 1,
+              ),
+            ),
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: active ? accent : Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  height: 1,
+                ),
               ),
             ),
           ),

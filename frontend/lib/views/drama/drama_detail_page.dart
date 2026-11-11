@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -20,7 +21,9 @@ const _kCellHi = Color(0xFF242C3E);
 /// 短剧详情：影院感封面 + 清晰信息层 + 精品选集 + 底部立即播放
 class DramaDetailPage extends StatefulWidget {
   final int dramaId;
-  const DramaDetailPage({super.key, required this.dramaId});
+  /// 分享/深链带入的集 ID，加载完成后自动进入播放
+  final int? initialEpisodeId;
+  const DramaDetailPage({super.key, required this.dramaId, this.initialEpisodeId});
 
   @override
   State<DramaDetailPage> createState() => _DramaDetailPageState();
@@ -32,6 +35,7 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
   bool _favorite = false;
   bool _loading = true;
   bool _descExpanded = false;
+  bool _autoPlayConsumed = false;
   String? _error;
   final Set<int> _unlocked = {};
 
@@ -74,6 +78,7 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
         _favorite = data['favorite'] == true;
         _loading = false;
       });
+      _maybeAutoPlay();
     } catch (e) {
       if (!mounted) return;
       setState(() {
@@ -85,8 +90,48 @@ class _DramaDetailPageState extends State<DramaDetailPage> {
 
   bool _needsUnlock(Episode ep) => !ep.isFree && !_unlocked.contains(ep.id);
 
+  void _maybeAutoPlay() {
+    if (_autoPlayConsumed) return;
+    final id = widget.initialEpisodeId;
+    if (id == null || id <= 0 || _episodes.isEmpty) return;
+    Episode? ep;
+    for (final e in _episodes) {
+      if (e.id == id) {
+        ep = e;
+        break;
+      }
+    }
+    if (ep == null) return;
+    _autoPlayConsumed = true;
+    final target = ep;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_playEpisode(target));
+    });
+  }
+
   Episode? get _playTarget {
     if (_episodes.isEmpty) return null;
+    // 深链指定集
+    final initial = widget.initialEpisodeId;
+    if (initial != null && initial > 0) {
+      for (final e in _episodes) {
+        if (e.id == initial) return e;
+      }
+    }
+    // 在追进度集
+    final cont = context.read<DramaProvider>().continueList;
+    for (final c in cont) {
+      if (c.drama?.id != widget.dramaId) continue;
+      final eid = c.resumeEpisodeId;
+      if (eid <= 0) continue;
+      for (final e in _episodes) {
+        if (e.id == eid) return e;
+      }
+      // 仅有集号时兜底
+      for (final e in _episodes) {
+        if (e.episodeNo == c.episodeNo) return e;
+      }
+    }
     final free = _episodes.where((e) => e.isFree || _unlocked.contains(e.id));
     return free.isNotEmpty ? free.first : _episodes.first;
   }

@@ -1,10 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:media_kit/media_kit.dart';
 import 'app.dart';
 import 'utils/app_config.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  try {
+    MediaKit.ensureInitialized();
+  } catch (_) {
+    // 原生库未就绪时回退 video_player 路径
+  }
 
   // 生产模式性能优化
   _configurePerformance();

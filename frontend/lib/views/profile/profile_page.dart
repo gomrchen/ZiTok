@@ -168,7 +168,10 @@ class _ProfilePageState extends State<ProfilePage> with SingleTickerProviderStat
                       items: continues.take(8).toList(),
                       onAll: () => context.push('/watching'),
                       onTap: (c) {
-                        if (c.drama != null) context.push('/drama/${c.drama!.id}');
+                        final d = c.drama;
+                        if (d == null) return;
+                        final ep = c.resumeEpisodeId;
+                        context.push(ep > 0 ? '/drama/${d.id}?ep=$ep' : '/drama/${d.id}');
                       },
                     ),
                   ),

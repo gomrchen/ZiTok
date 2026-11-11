@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 
 import '../../l10n/l10n_ext.dart';
 import '../../providers/auth_provider.dart';
+import '../drama/player_pip.dart';
 import '../home/shell_surface.dart';
 import 'settings_chrome.dart';
 
@@ -146,6 +147,9 @@ class AccountSettingsPage extends StatelessWidget {
     );
 
     try {
+      if (PlayerPipController.isOpen) {
+        PlayerPipController.close(disposeHandle: true);
+      }
       await authProvider.logout();
       if (!context.mounted) return;
       if (nav.canPop()) nav.pop();

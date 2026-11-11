@@ -110,6 +110,10 @@ class PlayInfo {
   final int unlockPrice;
   final bool canPlay;
   final String videoUrl;
+  /// 外挂字幕（WebVTT/SRT 文本或可下载 URL，客户端自行判断）
+  final String subtitleUrl;
+  /// 多清晰度原始列表（[{label,url}]），可空
+  final List<dynamic> qualities;
 
   const PlayInfo({
     required this.episode,
@@ -118,6 +122,8 @@ class PlayInfo {
     this.unlockPrice = 10,
     this.canPlay = false,
     this.videoUrl = '',
+    this.subtitleUrl = '',
+    this.qualities = const [],
   });
 
   factory PlayInfo.fromJson(Map<String, dynamic> j) => PlayInfo(
@@ -127,6 +133,8 @@ class PlayInfo {
         unlockPrice: _asInt(j['unlock_price'], 10),
         canPlay: j['can_play'] == true,
         videoUrl: '${j['video_url'] ?? ''}',
+        subtitleUrl: '${j['subtitle_url'] ?? j['subtitle'] ?? ''}',
+        qualities: (j['qualities'] as List?) ?? const [],
       );
 }
 
@@ -145,23 +153,33 @@ class WalletInfo {
 class ContinueItem {
   final Drama? drama;
   final Episode? episode;
+  final int episodeId;
   final int episodeNo;
   final int positionSec;
 
   const ContinueItem({
     this.drama,
     this.episode,
+    this.episodeId = 0,
     this.episodeNo = 1,
     this.positionSec = 0,
   });
+
+  /// 跳转详情用的集 ID（优先嵌套 episode，其次 progress）
+  int get resumeEpisodeId {
+    if (episodeId > 0) return episodeId;
+    return episode?.id ?? 0;
+  }
 
   factory ContinueItem.fromJson(Map<String, dynamic> j) {
     final progress = j['progress'] is Map ? Map<String, dynamic>.from(j['progress'] as Map) : <String, dynamic>{};
     final episode = j['episode'] is Map ? Episode.fromJson(Map<String, dynamic>.from(j['episode'] as Map)) : null;
     final no = _asInt(progress['episode_no']);
+    final epId = _asInt(progress['episode_id']);
     return ContinueItem(
       drama: j['drama'] is Map ? Drama.fromJson(Map<String, dynamic>.from(j['drama'] as Map)) : null,
       episode: episode,
+      episodeId: epId > 0 ? epId : (episode?.id ?? 0),
       episodeNo: no > 0 ? no : (episode?.episodeNo ?? 1),
       positionSec: _asInt(progress['position_sec']),
     );

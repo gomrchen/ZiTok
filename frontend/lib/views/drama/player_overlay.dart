@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
+import 'player_handle.dart';
 
 export '../../widgets/player/player_bottom_meta.dart';
 
@@ -15,6 +15,61 @@ double playerBottomInset(BuildContext context, {required bool withHomeBar}) {
   if (!withHomeBar) return safe;
   final dockLift = safe > 0 ? 2.0 + safe * 0.15 : 6.0;
   return dockLift + kHomeBottomBarHeight + 4;
+}
+
+/// 缓冲中轻提示（不挡手势）
+class PlayerBufferingHint extends StatefulWidget {
+  final PlayHandle? handle;
+  final bool enabled;
+
+  const PlayerBufferingHint({super.key, required this.handle, this.enabled = true});
+
+  @override
+  State<PlayerBufferingHint> createState() => _PlayerBufferingHintState();
+}
+
+class _PlayerBufferingHintState extends State<PlayerBufferingHint> {
+  @override
+  void initState() {
+    super.initState();
+    widget.handle?.addListener(_onTick);
+  }
+
+  @override
+  void didUpdateWidget(covariant PlayerBufferingHint oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.handle != widget.handle) {
+      oldWidget.handle?.removeListener(_onTick);
+      widget.handle?.addListener(_onTick);
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.handle?.removeListener(_onTick);
+    super.dispose();
+  }
+
+  void _onTick() {
+    if (mounted) setState(() {});
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final h = widget.handle;
+    if (!widget.enabled || h == null || !h.isInitialized || !h.isBuffering) {
+      return const SizedBox.shrink();
+    }
+    return const IgnorePointer(
+      child: Center(
+        child: SizedBox(
+          width: 28,
+          height: 28,
+          child: CircularProgressIndicator(strokeWidth: 2.4, color: Colors.white70),
+        ),
+      ),
+    );
+  }
 }
 
 /// 底部可读性渐变（红果沉浸播放）
@@ -256,10 +311,10 @@ class PlayerSideAction extends StatelessWidget {
 
 /// 红果风进度条：细轨 + 微光填充，拖拽时加粗并显示时间
 class PlayerProgressBar extends StatefulWidget {
-  final VideoPlayerController? controller;
+  final PlayHandle? handle;
   final ValueChanged<Duration>? onSeek;
 
-  const PlayerProgressBar({super.key, required this.controller, this.onSeek});
+  const PlayerProgressBar({super.key, required this.handle, this.onSeek});
 
   @override
   State<PlayerProgressBar> createState() => _PlayerProgressBarState();
@@ -272,21 +327,21 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
   @override
   void initState() {
     super.initState();
-    widget.controller?.addListener(_onTick);
+    widget.handle?.addListener(_onTick);
   }
 
   @override
   void didUpdateWidget(covariant PlayerProgressBar oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.controller != widget.controller) {
-      oldWidget.controller?.removeListener(_onTick);
-      widget.controller?.addListener(_onTick);
+    if (oldWidget.handle != widget.handle) {
+      oldWidget.handle?.removeListener(_onTick);
+      widget.handle?.addListener(_onTick);
     }
   }
 
   @override
   void dispose() {
-    widget.controller?.removeListener(_onTick);
+    widget.handle?.removeListener(_onTick);
     super.dispose();
   }
 
@@ -295,9 +350,9 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
   }
 
   void _seekTo(double ratio, double width) {
-    final c = widget.controller;
-    if (c == null || !c.value.isInitialized || width <= 0) return;
-    final dur = c.value.duration;
+    final c = widget.handle;
+    if (c == null || !c.isInitialized || width <= 0) return;
+    final dur = c.duration;
     if (dur.inMilliseconds <= 0) return;
     final target = Duration(milliseconds: (dur.inMilliseconds * ratio.clamp(0.0, 1.0)).round());
     c.seekTo(target);
@@ -312,13 +367,13 @@ class _PlayerProgressBarState extends State<PlayerProgressBar> {
 
   @override
   Widget build(BuildContext context) {
-    final c = widget.controller;
-    if (c == null || !c.value.isInitialized) {
+    final c = widget.handle;
+    if (c == null || !c.isInitialized) {
       return const SizedBox(height: 20);
     }
-    final total = c.value.duration;
+    final total = c.duration;
     final durMs = total.inMilliseconds;
-    final posMs = c.value.position.inMilliseconds;
+    final posMs = c.position.inMilliseconds;
     final value = _dragging ? _dragValue : (durMs <= 0 ? 0.0 : (posMs / durMs).clamp(0.0, 1.0));
     final trackH = _dragging ? 4.0 : 2.2;
     final thumb = _dragging ? 12.0 : 5.0;

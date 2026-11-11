@@ -19,6 +19,7 @@ import '../views/settings/account_switcher_page.dart';
 import '../views/settings/account_settings_page.dart';
 import '../views/profile/visitor_profile_page.dart';
 import '../views/drama/drama_detail_page.dart';
+import '../views/drama/player_pip.dart';
 import '../views/drama/wallet_page.dart';
 import '../views/drama/theater_page.dart';
 import '../views/drama/watching_page.dart';
@@ -66,7 +67,10 @@ class AppRouter {
         GoRoute(
           path: '/drama/:id',
           builder: _builder(
-            (state) => DramaDetailPage(dramaId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0),
+            (state) => DramaDetailPage(
+              dramaId: int.tryParse(state.pathParameters['id'] ?? '') ?? 0,
+              initialEpisodeId: int.tryParse(state.uri.queryParameters['ep'] ?? ''),
+            ),
           ),
         ),
         GoRoute(path: '/wallet', builder: _builder((_) => const WalletPage())),
@@ -139,8 +143,11 @@ class AppRouter {
           (p) => state.matchedLocation.startsWith(p),
         );
 
-        // 已退出：禁止停留在业务页
+        // 已退出：禁止停留在业务页，并关掉离页小窗
         if (!canAccess && wantsProtected && !loggingIn) {
+          if (PlayerPipController.isOpen) {
+            PlayerPipController.close(disposeHandle: true);
+          }
           return '/auth/login';
         }
         // 登录中页：已登录则回首页

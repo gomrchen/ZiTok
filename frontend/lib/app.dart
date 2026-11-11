@@ -31,6 +31,7 @@ import 'repositories/relation_repository.dart';
 import 'services/relation_service.dart';
 import 'services/drama_service.dart';
 import 'providers/drama_provider.dart';
+import 'services/deep_link_service.dart';
 
 class AppBootstrap {
   static late SharedPreferences prefs;
@@ -221,10 +222,23 @@ class AppBootstrap {
   }
 }
 
-class ZitokApp extends StatelessWidget {
+class ZitokApp extends StatefulWidget {
   const ZitokApp({super.key});
 
   static GoRouter? _routerCache;
+
+  @override
+  State<ZitokApp> createState() => _ZitokAppState();
+}
+
+class _ZitokAppState extends State<ZitokApp> {
+  bool _deepLinkAttached = false;
+
+  @override
+  void dispose() {
+    DeepLinkService.instance.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -301,7 +315,11 @@ class ZitokApp extends StatelessWidget {
       child: Builder(
         builder: (context) {
           final authProvider = context.read<AuthProvider>();
-          final router = _routerCache ??= AppRouter.buildRouter(authProvider);
+          final router = ZitokApp._routerCache ??= AppRouter.buildRouter(authProvider);
+          if (!_deepLinkAttached) {
+            _deepLinkAttached = true;
+            DeepLinkService.instance.attach(router);
+          }
           final theme = context.watch<ThemeProvider>().theme;
           final locale = context.watch<SettingsProvider>().locale;
 

@@ -2,26 +2,48 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_volume_controller/flutter_volume_controller.dart';
 import 'package:go_router/go_router.dart';
 import 'package:screen_brightness/screen_brightness.dart';
-import 'package:video_player/video_player.dart';
-
+import 'package:share_plus/share_plus.dart';
 import '../../models/drama_models.dart';
+import 'player_handle.dart';
 import 'player_overlay.dart';
 
-/// 复制分享文案（无需额外 share 插件，联调稳定）
+/// 系统分享面板；原生未链上或失败时回退复制文案
 Future<void> shareDramaEpisode(BuildContext context, {required Drama drama, required Episode episode}) async {
+  // 自定义 scheme 已接 app_links；https 域名 Universal Link 仍可后置
   final text =
       '《${drama.title}》第${episode.episodeNo}集 · ${drama.category.isEmpty ? '短剧' : drama.category}\n来 ZiTok 一起追：zitok://drama/${drama.id}?ep=${episode.id}';
-  await Clipboard.setData(ClipboardData(text: text));
-  if (!context.mounted) return;
-  ScaffoldMessenger.of(context).showSnackBar(
-    const SnackBar(
-      content: Text('分享文案已复制'),
-      behavior: SnackBarBehavior.floating,
-      duration: Duration(milliseconds: 1400),
-    ),
-  );
+
+  // iPad/Mac 弹层需要锚点，否则可能直接抛错
+  final box = context.findRenderObject() as RenderBox?;
+  final origin = box != null && box.hasSize
+      ? (box.localToGlobal(Offset.zero) & box.size)
+      : const Rect.fromLTWH(0, 0, 1, 1);
+
+  try {
+    final result = await SharePlus.instance.share(
+      ShareParams(
+        text: text,
+        subject: drama.title,
+        title: drama.title,
+        sharePositionOrigin: origin,
+      ),
+    );
+    if (!context.mounted) return;
+    if (result.status == ShareResultStatus.dismissed) return;
+  } catch (_) {
+    await Clipboard.setData(ClipboardData(text: text));
+    if (!context.mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('分享面板不可用，文案已复制'),
+        behavior: SnackBarBehavior.floating,
+        duration: Duration(milliseconds: 1600),
+      ),
+    );
+  }
 }
 
 Future<double?> showPlayerSpeedSheet(BuildContext context, {required double current}) {
@@ -307,18 +329,32 @@ Future<void> showPlayerDramaIntroSheet(BuildContext context, {required Drama dra
   );
 }
 
-enum PlayerMoreAction { speed, mute, intro, share }
+enum PlayerMoreAction {
+  speed,
+  mute,
+  intro,
+  share,
+  quality,
+  cast,
+  subtitle,
+  poster,
+  pip,
+}
 
-/// 红果式「更多」收纳：倍速 / 静音 / 简介 / 分享
+/// 红果式「更多」收纳；[compact] 首页精简（倍速/静音/简介/分享）
 Future<PlayerMoreAction?> showPlayerMoreSheet(
   BuildContext context, {
   required bool muted,
   required double speed,
+  bool subtitleOn = false,
+  String qualityLabel = '自动',
+  bool compact = false,
 }) {
   final speedLabel = speed == speed.roundToDouble() ? '${speed.toStringAsFixed(0)}x' : '${speed}x';
   return showModalBottomSheet<PlayerMoreAction>(
     context: context,
     backgroundColor: const Color(0xFF16181F),
+    isScrollControlled: true,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
     ),
@@ -380,6 +416,53 @@ Future<PlayerMoreAction?> showPlayerMoreSheet(
                   ),
                 ],
               ),
+              if (!compact) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _MoreTile(
+                        icon: Icons.hd_rounded,
+                        label: '清晰度',
+                        hint: qualityLabel,
+                        onTap: () => Navigator.pop(ctx, PlayerMoreAction.quality),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _MoreTile(
+                        icon: Icons.closed_caption_rounded,
+                        label: '字幕',
+                        hint: subtitleOn ? '开' : '关',
+                        accent: subtitleOn,
+                        onTap: () => Navigator.pop(ctx, PlayerMoreAction.subtitle),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _MoreTile(
+                        icon: Icons.cast_rounded,
+                        label: '投屏',
+                        hint: 'AirPlay/复制链',
+                        onTap: () => Navigator.pop(ctx, PlayerMoreAction.cast),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: _MoreTile(
+                        icon: Icons.picture_in_picture_alt_outlined,
+                      label: '小窗',
+                      hint: '系统/应用内',
+                      onTap: () => Navigator.pop(ctx, PlayerMoreAction.pip),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
               const SizedBox(height: 10),
               Row(
                 children: [
@@ -396,15 +479,34 @@ Future<PlayerMoreAction?> showPlayerMoreSheet(
                     child: _MoreTile(
                       icon: Icons.ios_share_rounded,
                       label: '分享',
-                      hint: '复制链接',
+                      hint: '系统分享',
                       onTap: () => Navigator.pop(ctx, PlayerMoreAction.share),
                     ),
                   ),
                 ],
               ),
+              if (!compact) ...[
+                const SizedBox(height: 10),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _MoreTile(
+                        icon: Icons.photo_camera_outlined,
+                        label: '打卡',
+                        hint: '截图海报',
+                        onTap: () => Navigator.pop(ctx, PlayerMoreAction.poster),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    const Expanded(child: SizedBox.shrink()),
+                  ],
+                ),
+              ],
               const SizedBox(height: 14),
               Text(
-                '手势 · 左侧调亮度 · 右侧调音量 · 长按 2 倍速',
+                compact
+                    ? '清晰度 / 字幕 / 小窗 / 打卡 · 请进入「观看完整短剧」'
+                    : '手势 · 左侧亮度 · 右侧系统音量 · 长按 2 倍速',
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: Colors.white.withValues(alpha: 0.42),
@@ -489,12 +591,12 @@ class _MoreTile extends StatelessWidget {
 
 /// 左右缘竖滑：左亮度 / 右音量
 class PlayerEdgeGestureLayer extends StatefulWidget {
-  final VideoPlayerController? controller;
+  final PlayHandle? handle;
   final bool enabled;
 
   const PlayerEdgeGestureLayer({
     super.key,
-    required this.controller,
+    required this.handle,
     this.enabled = true,
   });
 
@@ -506,6 +608,7 @@ class _PlayerEdgeGestureLayerState extends State<PlayerEdgeGestureLayer> {
   bool _show = false;
   bool _isBrightness = true;
   double _value = 0.5;
+  double _playerVol = 1.0;
   Timer? _hide;
 
   Future<void> _ensureBrightness() async {
@@ -539,18 +642,41 @@ class _PlayerEdgeGestureLayerState extends State<PlayerEdgeGestureLayer> {
     } catch (_) {}
   }
 
+  Future<void> _ensureVolume() async {
+    try {
+      await FlutterVolumeController.updateShowSystemUI(false);
+      _value = (await FlutterVolumeController.getVolume()) ?? 0.5;
+    } catch (_) {
+      _value = _playerVol;
+    }
+  }
+
   Future<void> _onVolume(DragUpdateDetails d, double h) async {
-    final c = widget.controller;
-    if (c == null || !c.value.isInitialized) return;
     final delta = -d.delta.dy / h;
-    final next = (c.value.volume + delta).clamp(0.0, 1.0);
-    await c.setVolume(next);
-    if (!mounted) return;
-    setState(() {
-      _isBrightness = false;
-      _value = next;
-    });
-    _pulse();
+    try {
+      final cur = (await FlutterVolumeController.getVolume()) ?? _value;
+      final next = (cur + delta).clamp(0.0, 1.0);
+      await FlutterVolumeController.setVolume(next);
+      if (!mounted) return;
+      setState(() {
+        _isBrightness = false;
+        _value = next;
+      });
+      _pulse();
+    } catch (_) {
+      // 桌面端无系统音量时回退到播放器音量
+      final c = widget.handle;
+      if (c == null || !c.isInitialized) return;
+      final next = (_playerVol + delta).clamp(0.0, 1.0);
+      await c.setVolume(next);
+      _playerVol = next;
+      if (!mounted) return;
+      setState(() {
+        _isBrightness = false;
+        _value = next;
+      });
+      _pulse();
+    }
   }
 
   @override
@@ -565,11 +691,12 @@ class _PlayerEdgeGestureLayerState extends State<PlayerEdgeGestureLayer> {
     return Stack(
       fit: StackFit.expand,
       children: [
+        // 右侧避让底栏侧栏（点赞/评论），手势带上移收窄
         Positioned(
           left: 0,
           top: 100,
-          bottom: 140,
-          width: 40,
+          bottom: 220,
+          width: 28,
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
             onVerticalDragStart: (_) => _ensureBrightness(),
@@ -582,10 +709,11 @@ class _PlayerEdgeGestureLayerState extends State<PlayerEdgeGestureLayer> {
         Positioned(
           right: 0,
           top: 100,
-          bottom: 140,
-          width: 40,
+          bottom: 280,
+          width: 28,
           child: GestureDetector(
             behavior: HitTestBehavior.translucent,
+            onVerticalDragStart: (_) => _ensureVolume(),
             onVerticalDragUpdate: (d) {
               final h = context.size?.height ?? 600;
               _onVolume(d, h);

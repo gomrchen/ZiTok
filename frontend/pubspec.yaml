@@ -37,6 +37,15 @@ dependencies:
   screen_brightness: ^2.1.7
   lpinyin: ^2.0.3
   connectivity_plus: ^6.0.5
+  wakelock_plus: ^1.5.2
+  flutter_volume_controller: ^2.0.2
+  share_plus: ^12.0.2
+  flutter_cache_manager: ^3.5.0
+  media_kit: ^1.2.6
+  media_kit_video: ^2.0.1
+  media_kit_libs_video: ^1.0.7
+  app_links: ^7.2.2
+  simple_pip_mode: ^1.1.0
 
 dev_dependencies:
   flutter_test:
